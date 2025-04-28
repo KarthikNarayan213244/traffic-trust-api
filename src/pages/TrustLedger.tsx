@@ -1,8 +1,7 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { fetchTrustLedger } from "@/services/api";
-import { getTrustLedger, stakeTrust, simulateStakeTrust } from "@/services/blockchain";
+import { getTrustLedger, stakeTrust, simulateStakeTrust, getConnectedAddress } from "@/services/blockchain";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -23,8 +22,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RefreshCw, ExternalLink } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 const TrustLedger: React.FC = () => {
   const [apiData, setApiData] = useState<any[]>([]);
@@ -37,6 +37,8 @@ const TrustLedger: React.FC = () => {
   const [vehicleId, setVehicleId] = useState<string>("");
   const [amount, setAmount] = useState<string>("0.1");
   const [isStaking, setIsStaking] = useState<boolean>(false);
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [etherscanUrl, setEtherscanUrl] = useState<string>('');
 
   const loadApiData = async () => {
     try {
@@ -61,8 +63,19 @@ const TrustLedger: React.FC = () => {
     try {
       setIsBlockchainLoading(true);
       setIsBlockchainError(false);
+      
+      const address = getConnectedAddress();
+      setConnectedWallet(address);
+      
       const data = await getTrustLedger();
       setBlockchainData(Array.isArray(data) ? data : []);
+      
+      const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS || 
+        localStorage.getItem('env_VITE_CONTRACT_ADDRESS');
+      
+      if (contractAddress) {
+        setEtherscanUrl(`https://goerli.etherscan.io/address/${contractAddress}`);
+      }
     } catch (error) {
       console.error("Error fetching blockchain trust ledger:", error);
       setIsBlockchainError(true);
@@ -89,15 +102,12 @@ const TrustLedger: React.FC = () => {
   const handleStake = async () => {
     try {
       setIsStaking(true);
-      // Try to use the real blockchain function first
       try {
         await stakeTrust(vehicleId, amount);
       } catch (error) {
-        // Fallback to simulation if real blockchain fails
         await simulateStakeTrust(vehicleId, amount);
       }
       setIsDialogOpen(false);
-      // Refresh blockchain data after staking
       loadBlockchainData();
     } catch (error) {
       console.error("Stake operation failed:", error);
@@ -111,7 +121,6 @@ const TrustLedger: React.FC = () => {
     }
   };
 
-  // Format timestamp
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return new Intl.DateTimeFormat('en-US', {
@@ -122,11 +131,39 @@ const TrustLedger: React.FC = () => {
     }).format(date);
   };
 
+  const getNetworkInfo = () => {
+    const rpcUrl = import.meta.env.VITE_RPC_URL || 
+      localStorage.getItem('env_VITE_RPC_URL') || 
+      'Goerli Testnet';
+    
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Badge variant="outline">
+          {rpcUrl.includes('goerli') ? 'Goerli Testnet' : 'Custom Network'}
+        </Badge>
+        {etherscanUrl && (
+          <a 
+            href={etherscanUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-blue-600 hover:underline"
+          >
+            View on Etherscan
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
+    );
+  };
+
   return (
     <MainLayout>
       <div className="flex flex-col space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Trust Ledger</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Trust Ledger</h1>
+            {getNetworkInfo()}
+          </div>
           <div className="flex items-center space-x-4">
             <Button
               variant="outline"
@@ -142,11 +179,13 @@ const TrustLedger: React.FC = () => {
           </div>
         </div>
 
-        {/* Blockchain Trust Ledger */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Blockchain Trust Ledger</CardTitle>
+              <CardDescription>
+                Trust attestations recorded on the blockchain
+              </CardDescription>
             </div>
             <Button 
               variant="outline" 
@@ -226,7 +265,6 @@ const TrustLedger: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* API Trust Ledger */}
         <Card>
           <CardHeader>
             <CardTitle>API Trust Ledger</CardTitle>
@@ -302,7 +340,6 @@ const TrustLedger: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Stake Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent>
             <DialogHeader>

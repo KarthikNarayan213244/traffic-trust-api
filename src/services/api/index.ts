@@ -9,27 +9,35 @@ export * from './trustLedger';
 export * from './congestion';
 export * from './supabase';
 
-// Import mock data functions
-import { getMockVehicles } from './vehicles';
-import { getMockRSUs } from './rsus';
-import { getMockAnomalies } from './anomalies';
-import { getMockTrustLedger } from './trustLedger';
-import { getMockCongestion } from './congestion';
+import { Vehicle, Rsu, Anomaly, TrustLedgerEntry, CongestionZone } from './types';
+import { supabase } from "@/integrations/supabase/client";
 
-// Helper function for accessing mock data
-export const getMockData = (endpoint: string) => {
-  switch (endpoint) {
-    case "vehicles":
-      return getMockVehicles();
-    case "rsus":
-      return getMockRSUs();
-    case "anomalies":
-      return getMockAnomalies();
-    case "trustLedger":
-      return getMockTrustLedger();
-    case "congestion":
-      return getMockCongestion();
-    default:
-      return [];
+// Add a utility function to seed the database
+export async function seedDatabaseWithTestData(clearExisting = false): Promise<any> {
+  try {
+    const url = new URL(`${window.location.origin}/functions/v1/seed-data`);
+    if (clearExisting) {
+      url.searchParams.append('clear', 'true');
+    }
+    
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token || '';
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Seeding failed with status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error seeding database:', error);
+    throw error;
   }
-};
+}

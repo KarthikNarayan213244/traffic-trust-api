@@ -1,73 +1,72 @@
-# Welcome to your Lovable project
 
-## Project info
+# Hyderabad Traffic Trust Platform
 
-**URL**: https://lovable.dev/projects/4ff6d364-485e-46ef-8ba1-193cccd1b741
+A Smart Traffic Management System with real-time traffic monitoring, trust management via blockchain, and anomaly detection.
 
-## How can I edit this code?
+## Getting Started
 
-There are several ways of editing your application.
+### Prerequisites
 
-**Use Lovable**
+- Node.js v16 or newer
+- A modern web browser
+- Metamask extension installed (for blockchain interactions)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/4ff6d364-485e-46ef-8ba1-193cccd1b741) and start prompting.
+### Environment Setup
 
-Changes made via Lovable will be committed automatically to this repo.
+Create a `.env` file in the project root directory based on the `.env.example` file:
 
-**Use your preferred IDE**
+```
+# API Configuration
+VITE_API_URL=http://localhost:5000
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+# Blockchain Configuration 
+VITE_RPC_URL=https://eth-goerli.public.blastapi.io
+VITE_CONTRACT_ADDRESS=0xYourContractAddressHere
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Maps Configuration
+VITE_GOOGLE_MAPS_API_KEY=YourGoogleMapsApiKeyHere
 ```
 
-**Edit a file directly in GitHub**
+### Installation
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Install dependencies:
+   ```
+   npm install
+   ```
 
-**Use GitHub Codespaces**
+2. Start the development server:
+   ```
+   npm run dev
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. Seed the database (via UI):
+   - Navigate to the dashboard
+   - Click the "Seed Database" button in the top right
 
-## What technologies are used for this project?
+### Features
 
-This project is built with:
+- Real-time traffic visualization with vehicle tracking
+- Trust management using blockchain technology
+- Anomaly detection and alerts
+- RSU (Roadside Unit) monitoring
+- Traffic congestion heatmaps
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Blockchain Integration
 
-## How can I deploy this project?
+The application integrates with Ethereum Goerli testnet. To interact with the blockchain features:
 
-Simply open [Lovable](https://lovable.dev/projects/4ff6d364-485e-46ef-8ba1-193cccd1b741) and click on Share -> Publish.
+1. Install MetaMask browser extension
+2. Connect to Goerli testnet
+3. Use the "Connect Wallet" button in the app
+4. View the live trust ledger and stake trust on vehicles
 
-## Can I connect a custom domain to my Lovable project?
+### Database
 
-Yes, you can!
+The application uses Supabase for data storage. The database can be seeded with test data using:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- The "Seed Database" button on the Dashboard
+- The Edge Function at `/functions/v1/seed-data`
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## License
+
+This project is licensed under the MIT License.

@@ -2,14 +2,17 @@
 import { ethers } from 'ethers';
 import { toast } from "@/hooks/use-toast";
 
-// Mock ABI - Replace with your actual contract ABI
+// ABI for the TrustLedger contract
 const ABI = [
   "function stakeTrust(string vehicleId, uint256 amount) public returns (bool)",
   "function getTrustLedger() public view returns (tuple(string vehicleId, uint256 amount, uint256 timestamp)[])"
 ];
 
-// Contract address - Replace with your actual contract address
-const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+// Use environment variable or default to a test contract address
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+
+// Use environment variable or default to Goerli public RPC
+const RPC_URL = import.meta.env.VITE_RPC_URL || "https://eth-goerli.public.blastapi.io";
 
 let provider;
 let contract;
@@ -19,6 +22,7 @@ let connectedAddress = null;
 export const connectWallet = async () => {
   try {
     if (window.ethereum) {
+      // Connect to user's wallet (e.g., MetaMask)
       provider = new ethers.providers.Web3Provider(window.ethereum);
       await provider.send("eth_requestAccounts", []);
       signer = provider.getSigner();
@@ -52,14 +56,34 @@ export const connectWallet = async () => {
   }
 };
 
+// Initialize readonly provider for public data
+const initReadonlyProvider = () => {
+  if (!provider) {
+    try {
+      provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+      console.log("Initialized readonly provider for Goerli testnet");
+      return true;
+    } catch (error) {
+      console.error("Error initializing readonly provider:", error);
+      return false;
+    }
+  }
+  return true;
+};
+
 export const getConnectedAddress = () => {
   return connectedAddress;
 };
 
 export const getTrustLedger = async () => {
   try {
+    // Initialize readonly provider if not already connected with a wallet
     if (!contract) {
-      throw new Error("Wallet not connected");
+      const initialized = initReadonlyProvider();
+      if (!initialized) {
+        throw new Error("Failed to initialize blockchain connection");
+      }
     }
     
     const ledger = await contract.getTrustLedger();
@@ -84,8 +108,11 @@ export const getTrustLedger = async () => {
 
 export const stakeTrust = async (vehicleId, amount) => {
   try {
-    if (!contract) {
-      throw new Error("Wallet not connected");
+    if (!contract || !signer) {
+      await connectWallet();
+      if (!contract || !signer) {
+        throw new Error("Wallet connection required for staking");
+      }
     }
     
     const amountInWei = ethers.utils.parseEther(amount.toString());

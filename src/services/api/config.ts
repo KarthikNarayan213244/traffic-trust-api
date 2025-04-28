@@ -1,7 +1,7 @@
 
 // API configuration and helper functions
 export const API_CONFIG = {
-  baseUrl: "http://localhost:5000", // This can be updated to your API URL
+  baseUrl: import.meta.env.VITE_API_URL || "http://localhost:5000",
   endpoints: {
     vehicles: "/api/vehicles",
     rsus: "/api/rsus",
