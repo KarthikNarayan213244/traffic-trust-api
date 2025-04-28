@@ -1,13 +1,15 @@
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
-import { API_KEY_STORAGE_KEY, libraries } from "./map/constants";
-import { fetchVehicles, fetchRSUs, fetchCongestionData, Vehicle } from "@/services/api";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, Play, Pause } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { libraries } from "./map/constants";
+import { Vehicle } from "@/services/api";
+import SimulationControls from "./SimulationControls";
+import ApiKeyControl from "./ApiKeyControl";
+import { useMapData } from "@/hooks/useMapData";
+import { useSimulation } from "@/hooks/useSimulation";
+import { useMapApiKey } from "@/hooks/useMapApiKey";
 
 interface TrafficMapProps {
   vehicles?: any[];
@@ -22,68 +24,24 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   isLoading: initialLoading = false,
   congestionData: initialCongestionData = []
 }) => {
-  // State for Google Maps API key
-  const [apiKey, setApiKey] = useState<string>(() => {
-    return localStorage.getItem(API_KEY_STORAGE_KEY) || "";
-  });
-  
-  // State for data
-  const [vehicles, setVehicles] = useState<any[]>(initialVehicles);
-  const [rsus, setRsus] = useState<any[]>(initialRsus);
-  const [congestionData, setCongestionData] = useState<any[]>(initialCongestionData);
-  const [isLoading, setIsLoading] = useState<boolean>(initialLoading);
-  
-  // Simulation controls
-  const [isSimulationRunning, setIsSimulationRunning] = useState<boolean>(false);
-  const [selectedAmbulance, setSelectedAmbulance] = useState<Vehicle | null>(null);
-  const [destination, setDestination] = useState<google.maps.LatLngLiteral | null>(null);
+  // Custom hooks to manage state
+  const { apiKey, handleApiKeySet } = useMapApiKey();
+  const { vehicles, rsus, congestionData, isLoading } = useMapData(
+    initialVehicles, 
+    initialRsus, 
+    initialCongestionData, 
+    initialLoading
+  );
+  const { 
+    isSimulationRunning, selectedAmbulance, destination, 
+    toggleSimulation, handleAmbulanceSelect, handleDestinationSelect, resetRouting 
+  } = useSimulation();
 
   // Setup Google Maps JS API loader
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
     libraries,
   });
-
-  // Handle API key update
-  const handleApiKeySet = useCallback((newApiKey: string) => {
-    setApiKey(newApiKey);
-    // Force reload the page to re-initialize the Google Maps API with the new key
-    if (newApiKey !== apiKey) {
-      window.location.reload();
-    }
-  }, [apiKey]);
-
-  // Fetch data
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Fetch vehicles data
-      const vehiclesData = await fetchVehicles();
-      setVehicles(vehiclesData);
-      
-      // Fetch RSUs data
-      const rsusData = await fetchRSUs();
-      setRsus(rsusData);
-      
-      // Fetch congestion data
-      const congestionData = await fetchCongestionData();
-      setCongestionData(congestionData);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast({
-        title: "Error fetching data",
-        description: "Could not fetch traffic data. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Initial data load
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   // Set up interval for data updates when simulation is running
   useEffect(() => {
@@ -110,39 +68,6 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       clearInterval(congestionInterval);
     };
   }, [isSimulationRunning]);
-
-  // Toggle simulation
-  const toggleSimulation = () => {
-    setIsSimulationRunning(prev => !prev);
-    toast({
-      title: !isSimulationRunning ? "Simulation Started" : "Simulation Paused",
-      description: !isSimulationRunning ? 
-        "Live data updates enabled. Vehicles update every 5 seconds, congestion every minute." : 
-        "Data updates paused.",
-    });
-  };
-
-  // Handle ambulance selection for routing
-  const handleAmbulanceSelect = (ambulance: Vehicle) => {
-    setSelectedAmbulance(ambulance);
-    toast({
-      title: "Ambulance Selected",
-      description: "Click on the map to set a destination for route optimization.",
-    });
-  };
-
-  // Handle destination selection for routing
-  const handleDestinationSelect = (latLng: google.maps.LatLngLiteral) => {
-    if (selectedAmbulance) {
-      setDestination(latLng);
-    }
-  };
-
-  // Reset routing
-  const resetRouting = () => {
-    setSelectedAmbulance(null);
-    setDestination(null);
-  };
 
   // Show loading spinner
   if (initialLoading && isLoading) {
@@ -191,35 +116,17 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
-        <div className="space-x-2">
-          <Button 
-            onClick={toggleSimulation}
-            variant="outline"
-            className={isSimulationRunning ? "bg-red-100" : "bg-green-100"}
-          >
-            {isSimulationRunning ? (
-              <><Pause className="mr-1" size={16} /> Pause Simulation</>
-            ) : (
-              <><Play className="mr-1" size={16} /> Start Simulation</>
-            )}
-          </Button>
-          
-          {selectedAmbulance && (
-            <Button variant="outline" onClick={resetRouting} className="bg-blue-100">
-              Cancel Route Planning
-            </Button>
-          )}
-        </div>
+        <SimulationControls
+          isSimulationRunning={isSimulationRunning}
+          selectedAmbulance={selectedAmbulance}
+          toggleSimulation={toggleSimulation}
+          resetRouting={resetRouting}
+        />
         
-        <div className="flex items-center space-x-2">
-          {!apiKey && (
-            <p className="text-sm text-yellow-600 flex items-center">
-              <AlertCircle className="mr-1" size={16} /> 
-              Maps API key required
-            </p>
-          )}
-          <MapApiKeyForm onApiKeySet={handleApiKeySet} />
-        </div>
+        <ApiKeyControl
+          apiKey={apiKey}
+          onApiKeySet={handleApiKeySet}
+        />
       </div>
 
       <GoogleMapDisplay 
