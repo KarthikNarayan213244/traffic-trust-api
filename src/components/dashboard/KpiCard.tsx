@@ -10,6 +10,11 @@ interface KpiCardProps {
   isLoading?: boolean;
   icon?: LucideIcon;
   color?: string;
+  trend?: {
+    value: string;
+    label: string;
+  };
+  total?: number;
 }
 
 const KpiCard: React.FC<KpiCardProps> = ({
@@ -18,6 +23,8 @@ const KpiCard: React.FC<KpiCardProps> = ({
   isLoading = false,
   icon: Icon,
   color = "primary",
+  trend,
+  total,
 }) => {
   const colorClasses = {
     primary: "text-primary",
@@ -34,9 +41,19 @@ const KpiCard: React.FC<KpiCardProps> = ({
             {isLoading ? (
               <Skeleton className="h-8 w-16 mt-1"></Skeleton>
             ) : (
-              <p className={`text-2xl font-bold ${colorClasses[color as keyof typeof colorClasses] || colorClasses.primary}`}>
-                {value}
-              </p>
+              <div>
+                <p className={`text-2xl font-bold ${colorClasses[color as keyof typeof colorClasses] || colorClasses.primary}`}>
+                  {value}
+                  {total && <span className="text-sm font-normal text-gray-500 ml-1">/ {total}</span>}
+                </p>
+                
+                {trend && (
+                  <div className="flex items-center mt-1 text-xs">
+                    <span className="text-gray-600">{trend.value}</span>
+                    <span className="text-gray-500 ml-1">{trend.label}</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
           {Icon && (
