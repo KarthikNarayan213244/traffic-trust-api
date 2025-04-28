@@ -16,7 +16,9 @@ const API_CONFIG = {
 export async function fetchData(endpoint: string, options = {}) {
   try {
     // First try to fetch from Supabase
-    return await fetchFromSupabase(endpoint, options);
+    const data = await fetchFromSupabase(endpoint, options);
+    console.log(`Successfully fetched ${endpoint} data from Supabase:`, data);
+    return data;
   } catch (error) {
     console.error(`Error fetching data from Supabase for ${endpoint}:`, error);
     
@@ -221,3 +223,30 @@ export const getMockData = (endpoint: string): Vehicle[] | Rsu[] | Anomaly[] | T
       return [];
   }
 };
+
+// Add a utility function to seed the database
+export async function seedDatabaseWithTestData(clearExisting = false) {
+  try {
+    const url = new URL(`${window.location.origin}/functions/v1/seed-data`);
+    if (clearExisting) {
+      url.searchParams.append('clear', 'true');
+    }
+    
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`,
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Seeding failed with status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error seeding database:', error);
+    throw error;
+  }
+}

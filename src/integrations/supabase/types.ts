@@ -9,7 +9,174 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      anomalies: {
+        Row: {
+          id: string
+          message: string | null
+          severity: string
+          status: string | null
+          timestamp: string
+          type: string
+          vehicle_id: string
+        }
+        Insert: {
+          id?: string
+          message?: string | null
+          severity: string
+          status?: string | null
+          timestamp?: string
+          type: string
+          vehicle_id: string
+        }
+        Update: {
+          id?: string
+          message?: string | null
+          severity?: string
+          status?: string | null
+          timestamp?: string
+          type?: string
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
+      rsus: {
+        Row: {
+          coverage_radius: number
+          id: string
+          last_seen: string | null
+          lat: number
+          lng: number
+          location: string
+          rsu_id: string
+          status: string
+        }
+        Insert: {
+          coverage_radius: number
+          id?: string
+          last_seen?: string | null
+          lat: number
+          lng: number
+          location: string
+          rsu_id: string
+          status: string
+        }
+        Update: {
+          coverage_radius?: number
+          id?: string
+          last_seen?: string | null
+          lat?: number
+          lng?: number
+          location?: string
+          rsu_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      trust_ledger: {
+        Row: {
+          action: string
+          details: string | null
+          id: string
+          new_value: number
+          old_value: number
+          timestamp: string
+          tx_id: string
+          vehicle_id: string
+        }
+        Insert: {
+          action: string
+          details?: string | null
+          id?: string
+          new_value: number
+          old_value: number
+          timestamp?: string
+          tx_id: string
+          vehicle_id: string
+        }
+        Update: {
+          action?: string
+          details?: string | null
+          id?: string
+          new_value?: number
+          old_value?: number
+          timestamp?: string
+          tx_id?: string
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
+      vehicles: {
+        Row: {
+          heading: number | null
+          id: string
+          lat: number
+          lng: number
+          location: string | null
+          owner_name: string
+          speed: number | null
+          status: string
+          timestamp: string
+          trust_score: number
+          vehicle_id: string
+          vehicle_type: string
+        }
+        Insert: {
+          heading?: number | null
+          id?: string
+          lat: number
+          lng: number
+          location?: string | null
+          owner_name: string
+          speed?: number | null
+          status?: string
+          timestamp?: string
+          trust_score: number
+          vehicle_id: string
+          vehicle_type: string
+        }
+        Update: {
+          heading?: number | null
+          id?: string
+          lat?: number
+          lng?: number
+          location?: string | null
+          owner_name?: string
+          speed?: number | null
+          status?: string
+          timestamp?: string
+          trust_score?: number
+          vehicle_id?: string
+          vehicle_type?: string
+        }
+        Relationships: []
+      }
+      zones_congestion: {
+        Row: {
+          congestion_level: number
+          id: string
+          lat: number
+          lng: number
+          updated_at: string
+          zone_name: string
+        }
+        Insert: {
+          congestion_level: number
+          id?: string
+          lat: number
+          lng: number
+          updated_at?: string
+          zone_name: string
+        }
+        Update: {
+          congestion_level?: number
+          id?: string
+          lat?: number
+          lng?: number
+          updated_at?: string
+          zone_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

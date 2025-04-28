@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -6,10 +5,10 @@ import TrafficMap from "@/components/dashboard/TrafficMap";
 import AnomalyChart from "@/components/dashboard/AnomalyChart";
 import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Radio, AlertTriangle, Shield, RefreshCw, BarChart3 } from "lucide-react";
+import { Car, Radio, AlertTriangle, Shield, RefreshCw, BarChart3, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, fetchCongestionData } from "@/services/api";
+import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, fetchCongestionData, seedDatabaseWithTestData } from "@/services/api";
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,12 +20,12 @@ const Dashboard: React.FC = () => {
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const loadAllData = useCallback(async () => {
     setIsLoading(true);
     
     try {
-      // We use Promise.allSettled to continue even if some requests fail
       const [vehiclesResult, rsusResult, anomaliesResult, trustResult, congestionResult] = 
         await Promise.allSettled([
           fetchVehicles({ limit: 1000 }),
@@ -36,7 +35,6 @@ const Dashboard: React.FC = () => {
           fetchCongestionData({ limit: 100 })
         ]);
       
-      // Handle each result individually
       if (vehiclesResult.status === 'fulfilled') {
         setVehicles(Array.isArray(vehiclesResult.value) ? vehiclesResult.value : []);
       }
@@ -57,7 +55,6 @@ const Dashboard: React.FC = () => {
         setCongestionData(Array.isArray(congestionResult.value) ? congestionResult.value : []);
       }
       
-      // Check if any requests failed
       const failedRequests = [vehiclesResult, rsusResult, anomaliesResult, trustResult, congestionResult]
         .filter(result => result.status === 'rejected');
       
@@ -82,17 +79,38 @@ const Dashboard: React.FC = () => {
     }
   }, []);
 
-  // Initial data load
+  const seedDatabase = async () => {
+    setIsSeeding(true);
+    
+    try {
+      const result = await seedDatabaseWithTestData(true);
+      toast({
+        title: "Database Seeded Successfully",
+        description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
+      });
+      
+      await loadAllData();
+    } catch (error) {
+      console.error("Error seeding database:", error);
+      toast({
+        title: "Error",
+        description: "Failed to seed database. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
   
-  // Set up auto-refresh
   useEffect(() => {
     if (autoRefresh && !refreshInterval) {
       const interval = setInterval(() => {
         loadAllData();
-      }, 30000); // Refresh every 30 seconds
+      }, 30000);
       setRefreshInterval(interval);
     } else if (!autoRefresh && refreshInterval) {
       clearInterval(refreshInterval);
@@ -106,12 +124,10 @@ const Dashboard: React.FC = () => {
     };
   }, [autoRefresh, refreshInterval, loadAllData]);
 
-  // Format the last updated time
   const getLastUpdatedText = () => {
     return lastUpdated.toLocaleTimeString();
   };
 
-  // Toggle auto-refresh
   const toggleAutoRefresh = () => {
     setAutoRefresh(prev => !prev);
   };
@@ -149,6 +165,16 @@ const Dashboard: React.FC = () => {
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               <span>Refresh Now</span>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={seedDatabase}
+              disabled={isSeeding}
+              className="flex items-center gap-2"
+            >
+              <Database className={`h-4 w-4 ${isSeeding ? 'animate-pulse' : ''}`} />
+              <span>{isSeeding ? 'Seeding...' : 'Seed Database'}</span>
             </Button>
           </div>
         </div>
