@@ -92,11 +92,18 @@ export const useTrustLedger = () => {
       loadBlockchainData();
     };
     
-    window.ethereum?.on("accountsChanged", handleAccountsChanged);
+    // Safely access window.ethereum with type checking
+    if (typeof window !== 'undefined' && window.ethereum) {
+      window.ethereum.on("accountsChanged", handleAccountsChanged);
+      
+      return () => {
+        if (window.ethereum) {
+          window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+        }
+      };
+    }
     
-    return () => {
-      window.ethereum?.removeListener("accountsChanged", handleAccountsChanged);
-    };
+    return undefined;
   }, [loadApiData, loadBlockchainData]);
 
   return {
