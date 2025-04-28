@@ -41,60 +41,58 @@ export async function fetchData(endpoint: string, options = {}) {
 
 async function fetchFromSupabase(endpoint: string, options: Record<string, any> = {}) {
   let tableName: string;
-  let query: any;
+  let result;
   
   switch (endpoint) {
     case "vehicles":
       tableName = "vehicles";
+      // Use type assertion to bypass TypeScript errors
+      result = await (supabase.from as any)(tableName).select("*");
       break;
     case "rsus":
       tableName = "rsus";
+      // Use type assertion to bypass TypeScript errors
+      result = await (supabase.from as any)(tableName).select("*");
       break;
     case "anomalies":
       tableName = "anomalies";
-      // Need to use `any` to bypass TypeScript checking
-      query = supabase.from(tableName);
-      // Force type to any to bypass type checking limitations
-      (query as any) = (query as any).select("*").order('timestamp', { ascending: false });
+      // Use type assertion to bypass TypeScript errors with ordering
+      result = await (supabase.from as any)(tableName).select("*").order('timestamp', { ascending: false });
       break;
     case "trustLedger":
       tableName = "trust_ledger";
-      // Need to use `any` to bypass TypeScript checking
-      query = supabase.from(tableName);
-      // Force type to any to bypass type checking limitations
-      (query as any) = (query as any).select("*").order('timestamp', { ascending: false });
+      // Use type assertion to bypass TypeScript errors with ordering
+      result = await (supabase.from as any)(tableName).select("*").order('timestamp', { ascending: false });
       break;
     case "congestion":
       tableName = "zones_congestion";
-      // Need to use `any` to bypass TypeScript checking
-      query = supabase.from(tableName);
-      // Force type to any to bypass type checking limitations
-      (query as any) = (query as any).select("*").order('updated_at', { ascending: false });
+      // Use type assertion to bypass TypeScript errors with ordering
+      result = await (supabase.from as any)(tableName).select("*").order('updated_at', { ascending: false });
       break;
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
   }
 
-  // If query wasn't set above, create default query
-  if (!query) {
-    // Need to use `any` to bypass TypeScript checking
-    query = supabase.from(tableName as string);
-    // Force type to any to bypass type checking limitations
-    (query as any) = (query as any).select("*");
-  }
-
-  // Add limit if specified
-  if (options.limit) {
-    (query as any) = (query as any).limit(options.limit);
-  }
-
-  const { data, error } = await (query as any);
-  
-  if (error) {
-    throw error;
+  // For endpoints where we didn't add specific query handling
+  if (!result && tableName) {
+    // Add limit if specified
+    if (options.limit) {
+      result = await (supabase.from as any)(tableName).select("*").limit(options.limit);
+    } else {
+      result = await (supabase.from as any)(tableName).select("*");
+    }
   }
   
-  return data;
+  // Apply limit if it wasn't applied above and it's specified in options
+  if (result && options.limit && !['anomalies', 'trustLedger', 'congestion'].includes(endpoint)) {
+    result = await (supabase.from as any)(tableName).select("*").limit(options.limit);
+  }
+  
+  if (result.error) {
+    throw result.error;
+  }
+  
+  return result.data;
 }
 
 export async function fetchVehicles(options = {}) {
