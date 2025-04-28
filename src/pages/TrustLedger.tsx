@@ -31,6 +31,9 @@ const TrustLedger: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Trust Ledger</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View trust attestations from both the blockchain and API sources
+            </p>
             <NetworkInfo etherscanUrl={etherscanUrl} />
           </div>
           <div className="flex items-center space-x-4">
