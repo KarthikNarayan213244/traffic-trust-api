@@ -7,7 +7,7 @@ export const API_CONFIG = {
     rsus: "/api/rsus",
     anomalies: "/api/anomalies",
     trustLedger: "/api/trust/live_ledger",
-    congestion: "/api/congestion"
+    congestion: "/api/zones_congestion"
   }
 };
 
@@ -18,7 +18,12 @@ export async function fetchData(endpoint: ApiEndpoint, options = {}) {
   try {
     const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoints[endpoint]}`;
     console.log(`Fetching data from: ${url}`);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      ...options
+    });
     
     if (!response.ok) {
       throw new Error(`API request failed with status ${response.status}`);
@@ -27,7 +32,6 @@ export async function fetchData(endpoint: ApiEndpoint, options = {}) {
     return await response.json();
   } catch (error) {
     console.error(`Error fetching data from ${endpoint}:`, error);
-    // If API fails, fall back to mock data for development
     throw error;
   }
 }

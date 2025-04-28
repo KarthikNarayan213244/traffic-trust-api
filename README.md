@@ -25,6 +25,10 @@ VITE_CONTRACT_ADDRESS=0xYourContractAddressHere
 
 # Maps Configuration
 VITE_GOOGLE_MAPS_API_KEY=YourGoogleMapsApiKeyHere
+
+# Supabase Configuration
+VITE_SUPABASE_URL=YourSupabaseUrlHere
+VITE_SUPABASE_ANON_KEY=YourSupabaseAnonKeyHere
 ```
 
 ### Installation
@@ -42,11 +46,12 @@ VITE_GOOGLE_MAPS_API_KEY=YourGoogleMapsApiKeyHere
 3. Seed the database (via UI):
    - Navigate to the dashboard
    - Click the "Seed Database" button in the top right
+   - Wait for the seeding process to complete
 
 ### Features
 
 - Real-time traffic visualization with vehicle tracking
-- Trust management using blockchain technology
+- Trust management using blockchain technology (Goerli testnet)
 - Anomaly detection and alerts
 - RSU (Roadside Unit) monitoring
 - Traffic congestion heatmaps
@@ -60,12 +65,24 @@ The application integrates with Ethereum Goerli testnet. To interact with the bl
 3. Use the "Connect Wallet" button in the app
 4. View the live trust ledger and stake trust on vehicles
 
-### Database
+### API and Database
 
-The application uses Supabase for data storage. The database can be seeded with test data using:
+The application fetches data from API endpoints and Supabase. If the API is not available, the application will fall back to mock data.
 
-- The "Seed Database" button on the Dashboard
-- The Edge Function at `/functions/v1/seed-data`
+You can configure the API URL and other environment variables in the Settings page.
+
+### Seeding Database
+
+If you need to reset or populate the database with test data:
+
+1. Navigate to the Dashboard
+2. Click the "Seed Database" button
+3. The application will seed approximately:
+   - 10,000 vehicle records
+   - 500 RSU records
+   - 2,000 anomaly records
+   - 1,000 congestion records
+   - 3,000 trust ledger entries
 
 ## License
 

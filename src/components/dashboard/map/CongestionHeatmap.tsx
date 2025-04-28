@@ -12,13 +12,18 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
   const heatmapData = useMemo(() => {
     if (!congestionData.length) return [];
     
-    return congestionData.map(zone => ({
-      location: new google.maps.LatLng(
-        zone.lat || (defaultCenter.lat + (Math.random() * 0.1 - 0.05)),
-        zone.lng || (defaultCenter.lng + (Math.random() * 0.1 - 0.05))
-      ),
-      weight: (zone.congestion_level || zone.level) / 100 * 3 // Normalized and amplified weight
-    }));
+    return congestionData.map(zone => {
+      // Weight is amplified based on congestion level
+      const weight = (zone.congestion_level || zone.level) / 10;
+      
+      return {
+        location: new google.maps.LatLng(
+          zone.lat || (defaultCenter.lat + (Math.random() * 0.1 - 0.05)),
+          zone.lng || (defaultCenter.lng + (Math.random() * 0.1 - 0.05))
+        ),
+        weight: weight
+      };
+    });
   }, [congestionData]);
 
   // No congestion data, don't render anything
@@ -31,7 +36,7 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
         radius: 30,
         opacity: 0.7,
         dissipating: true,
-        maxIntensity: 3,
+        maxIntensity: 10,
         gradient: [
           'rgba(0, 255, 0, 0)',    // green (transparent)
           'rgba(0, 255, 0, 1)',    // green

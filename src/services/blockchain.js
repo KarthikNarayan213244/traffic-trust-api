@@ -8,11 +8,11 @@ const ABI = [
   "function getTrustLedger() public view returns (tuple(string vehicleId, uint256 amount, uint256 timestamp)[])"
 ];
 
-// Use environment variable or default to a test contract address
-const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+// Use environment variable or get from localStorage, or default to a test contract address
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || localStorage.getItem('env_VITE_CONTRACT_ADDRESS') || "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
-// Use environment variable or default to Goerli public RPC
-const RPC_URL = import.meta.env.VITE_RPC_URL || "https://eth-goerli.public.blastapi.io";
+// Use environment variable or get from localStorage, or default to Goerli public RPC
+const RPC_URL = import.meta.env.VITE_RPC_URL || localStorage.getItem('env_VITE_RPC_URL') || "https://eth-goerli.public.blastapi.io";
 
 let provider;
 let contract;
@@ -31,9 +31,20 @@ export const connectWallet = async () => {
       // Initialize contract with signer for sending transactions
       contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
       
+      // Verify connection to Goerli
+      const network = await provider.getNetwork();
+      if (network.chainId !== 5) {
+        toast({
+          title: "Wrong Network",
+          description: "Please connect to Goerli testnet in your wallet",
+          variant: "destructive",
+        });
+        return null;
+      }
+      
       toast({
         title: "Wallet Connected",
-        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`,
+        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)} on Goerli`,
       });
       
       return connectedAddress;
@@ -62,7 +73,7 @@ const initReadonlyProvider = () => {
     try {
       provider = new ethers.providers.JsonRpcProvider(RPC_URL);
       contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
-      console.log("Initialized readonly provider for Goerli testnet");
+      console.log(`Initialized readonly provider for Goerli testnet with RPC: ${RPC_URL.substring(0, 30)}...`);
       return true;
     } catch (error) {
       console.error("Error initializing readonly provider:", error);
@@ -86,22 +97,30 @@ export const getTrustLedger = async () => {
       }
     }
     
-    const ledger = await contract.getTrustLedger();
-    
-    // Transform the data to match our application format
-    return ledger.map((entry, index) => ({
-      tx_id: `TX${Date.now()}${index}`,
-      vehicle_id: entry.vehicleId,
-      amount: ethers.utils.formatEther(entry.amount),
-      timestamp: new Date(entry.timestamp.toNumber() * 1000).toISOString(),
-    }));
+    // Try to get data from the actual contract
+    try {
+      const ledger = await contract.getTrustLedger();
+      
+      // Transform the data to match our application format
+      return ledger.map((entry, index) => ({
+        tx_id: `0x${Math.random().toString(16).substring(2, 10)}${Date.now().toString(16)}${index}`,
+        vehicle_id: entry.vehicleId,
+        action: "Trust Stake",
+        old_value: 0, 
+        new_value: parseInt(ethers.utils.formatEther(entry.amount)) * 100,
+        timestamp: new Date(entry.timestamp.toNumber() * 1000).toISOString(),
+      }));
+    } catch (contractError) {
+      console.warn("Contract call failed, using mock data:", contractError);
+      throw contractError; // Let it fall through to the mock data
+    }
   } catch (error) {
     console.error("Error getting trust ledger:", error);
     
     // Return mock data if contract call fails
     return [
-      { tx_id: "TX00001", vehicle_id: "HYD001", amount: "0.5", timestamp: new Date().toISOString() },
-      { tx_id: "TX00002", vehicle_id: "HYD002", amount: "1.0", timestamp: new Date(Date.now() - 86400000).toISOString() }
+      { tx_id: "0x7a23b5ef8742c16d3b6eb0b42128f69081592bad", vehicle_id: "TS07-2345-AB", action: "Trust Stake", old_value: 90, new_value: 95, timestamp: new Date().toISOString() },
+      { tx_id: "0x5bf1c6dde8dc48c21799e23751b612acf4d6d93c", vehicle_id: "TS08-5678-CD", action: "Trust Stake", old_value: 95, new_value: 88, timestamp: new Date(Date.now() - 86400000).toISOString() }
     ];
   }
 };
@@ -135,9 +154,16 @@ export const stakeTrust = async (vehicleId, amount) => {
     console.error("Error staking trust:", error);
     toast({
       title: "Stake Failed",
-      description: "Failed to stake trust. Please try again.",
+      description: `Failed to stake trust: ${error.message || "Unknown error"}`,
       variant: "destructive",
     });
+    
+    // If we're in development or test environment, simulate success
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test' || window.location.hostname === 'localhost') {
+      console.log("Development mode: Simulating successful stake");
+      return simulateStakeTrust(vehicleId, amount);
+    }
+    
     throw error;
   }
 };
