@@ -232,11 +232,14 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
       url.searchParams.append('clear', 'true');
     }
     
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token || '';
+    
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`,
+        'Authorization': `Bearer ${accessToken}`,
       }
     });
     
