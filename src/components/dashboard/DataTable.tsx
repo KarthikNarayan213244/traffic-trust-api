@@ -1,6 +1,5 @@
 
-import React, { useEffect, useState } from "react";
-import { fetchData, getMockData } from "@/lib/api";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -15,43 +14,19 @@ import { Search } from "lucide-react";
 
 interface DataTableProps {
   columns: string[];
-  dataEndpoint: string;
+  data?: any[];
+  isLoading?: boolean;
   title?: string;
 }
 
 const DataTable: React.FC<DataTableProps> = ({
   columns,
-  dataEndpoint,
+  data = [],
+  isLoading = false,
   title,
 }) => {
-  const [data, setData] = useState<any[]>([]);
   const [filteredData, setFilteredData] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        // Use mock data for development
-        const responseData = getMockData(dataEndpoint);
-        
-        // In production, use actual API
-        // const responseData = await fetchData(dataEndpoint as any);
-        
-        if (Array.isArray(responseData)) {
-          setData(responseData);
-          setFilteredData(responseData);
-        }
-      } catch (error) {
-        console.error(`Error loading data for table:`, error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, [dataEndpoint]);
 
   useEffect(() => {
     if (searchTerm === "") {
@@ -120,7 +95,7 @@ const DataTable: React.FC<DataTableProps> = ({
                 filteredData.map((row, index) => (
                   <TableRow key={index}>
                     {columns.map((column) => (
-                      <TableCell key={column}>{row[column] || "—"}</TableCell>
+                      <TableCell key={column}>{row[column] !== undefined ? row[column] : "—"}</TableCell>
                     ))}
                   </TableRow>
                 ))
