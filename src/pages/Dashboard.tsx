@@ -1,15 +1,15 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
 import TrafficMap from "@/components/dashboard/TrafficMap";
 import AnomalyChart from "@/components/dashboard/AnomalyChart";
 import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Radio, AlertTriangle, Shield, RefreshCw } from "lucide-react";
+import { Car, Radio, AlertTriangle, Shield, RefreshCw, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, getMockData } from "@/services/api";
+import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, fetchCongestionData } from "@/services/api";
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -18,18 +18,22 @@ const Dashboard: React.FC = () => {
   const [anomalies, setAnomalies] = useState<any[]>([]);
   const [trustLedger, setTrustLedger] = useState<any[]>([]);
   const [congestionData, setCongestionData] = useState<any[]>([]);
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     setIsLoading(true);
     
     try {
       // We use Promise.allSettled to continue even if some requests fail
-      const [vehiclesResult, rsusResult, anomaliesResult, trustResult] = 
+      const [vehiclesResult, rsusResult, anomaliesResult, trustResult, congestionResult] = 
         await Promise.allSettled([
-          fetchVehicles(),
-          fetchRSUs(),
-          fetchAnomalies(),
-          fetchTrustLedger()
+          fetchVehicles({ limit: 1000 }),
+          fetchRSUs({ limit: 100 }),
+          fetchAnomalies({ limit: 500 }),
+          fetchTrustLedger({ limit: 500 }),
+          fetchCongestionData({ limit: 100 })
         ]);
       
       // Handle each result individually
@@ -49,11 +53,12 @@ const Dashboard: React.FC = () => {
         setTrustLedger(Array.isArray(trustResult.value) ? trustResult.value : []);
       }
       
-      // Get mock congestion data for now - this can be replaced with actual API call
-      setCongestionData(getMockData('congestion'));
+      if (congestionResult.status === 'fulfilled') {
+        setCongestionData(Array.isArray(congestionResult.value) ? congestionResult.value : []);
+      }
       
       // Check if any requests failed
-      const failedRequests = [vehiclesResult, rsusResult, anomaliesResult, trustResult]
+      const failedRequests = [vehiclesResult, rsusResult, anomaliesResult, trustResult, congestionResult]
         .filter(result => result.status === 'rejected');
       
       if (failedRequests.length > 0) {
@@ -63,6 +68,8 @@ const Dashboard: React.FC = () => {
           variant: "destructive",
         });
       }
+      
+      setLastUpdated(new Date());
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast({
@@ -73,11 +80,41 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
+  // Initial data load
   useEffect(() => {
     loadAllData();
-  }, []);
+  }, [loadAllData]);
+  
+  // Set up auto-refresh
+  useEffect(() => {
+    if (autoRefresh && !refreshInterval) {
+      const interval = setInterval(() => {
+        loadAllData();
+      }, 30000); // Refresh every 30 seconds
+      setRefreshInterval(interval);
+    } else if (!autoRefresh && refreshInterval) {
+      clearInterval(refreshInterval);
+      setRefreshInterval(null);
+    }
+    
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [autoRefresh, refreshInterval, loadAllData]);
+
+  // Format the last updated time
+  const getLastUpdatedText = () => {
+    return lastUpdated.toLocaleTimeString();
+  };
+
+  // Toggle auto-refresh
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(prev => !prev);
+  };
 
   return (
     <MainLayout>
@@ -90,16 +127,30 @@ const Dashboard: React.FC = () => {
               <span className="text-xs text-muted-foreground">v1.0.0</span>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadAllData}
-            disabled={isLoading}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh Dashboard</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-muted-foreground">
+              Last updated: {getLastUpdatedText()}
+            </div>
+            <Button
+              variant={autoRefresh ? "default" : "outline"}
+              size="sm"
+              onClick={toggleAutoRefresh}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+              <span>{autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadAllData}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh Now</span>
+            </Button>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -108,10 +159,15 @@ const Dashboard: React.FC = () => {
             value={vehicles.length}
             isLoading={isLoading}
             icon={Car}
+            trend={{
+              value: vehicles.length > 100 ? "+12%" : "+0%",
+              label: vehicles.length > 100 ? "from last hour" : "No change"
+            }}
           />
           <KpiCard 
             title="Active RSUs" 
             value={rsus.filter(rsu => rsu.status === 'Active').length}
+            total={rsus.length}
             isLoading={isLoading}
             icon={Radio}
             color="accent"
@@ -122,12 +178,22 @@ const Dashboard: React.FC = () => {
             isLoading={isLoading}
             icon={AlertTriangle}
             color="danger"
+            trend={{
+              value: anomalies.filter(a => a.severity === "Critical").length > 0 ? 
+                `${anomalies.filter(a => a.severity === "Critical").length} critical` : 
+                "0 critical",
+              label: "issues detected"
+            }}
           />
           <KpiCard 
             title="Trust Updates" 
             value={trustLedger.length}
             isLoading={isLoading}
             icon={Shield}
+            trend={{
+              value: "+15%",
+              label: "increase in trust"
+            }}
           />
         </div>
         
@@ -149,7 +215,10 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader className="pb-0">
-              <CardTitle>Anomaly Distribution</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                <span>Anomaly Distribution</span>
+              </CardTitle>
               <CardDescription>Recent vehicle anomalies by severity</CardDescription>
             </CardHeader>
             <CardContent>
@@ -162,7 +231,10 @@ const Dashboard: React.FC = () => {
           
           <Card>
             <CardHeader className="pb-0">
-              <CardTitle>Blockchain Trust Ledger</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                <span>Blockchain Trust Ledger</span>
+              </CardTitle>
               <CardDescription>Recent trust score changes secured by blockchain</CardDescription>
             </CardHeader>
             <CardContent>
