@@ -21,25 +21,57 @@ let connectedAddress = null;
 
 export const connectWallet = async () => {
   try {
-    if (window.ethereum) {
-      // Connect to user's wallet (e.g., MetaMask)
-      provider = new ethers.providers.Web3Provider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      signer = provider.getSigner();
-      connectedAddress = await signer.getAddress();
-      
-      // Initialize contract with signer for sending transactions
-      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-      
-      // Verify connection to Goerli
+    // Check if MetaMask is installed
+    if (!window.ethereum) {
+      toast({
+        title: "MetaMask Not Found",
+        description: "Please install MetaMask extension to connect your wallet",
+        variant: "destructive",
+      });
+      throw new Error("MetaMask not installed");
+    }
+    
+    // Reset provider to ensure we're getting a fresh connection
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+    
+    // Request account access - this will prompt the user to connect their wallet if not connected
+    await provider.send("eth_requestAccounts", []);
+    
+    // Get the signer and address
+    signer = provider.getSigner();
+    connectedAddress = await signer.getAddress();
+    
+    // Initialize contract with signer for sending transactions
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    
+    // Verify connection to Goerli
+    try {
       const network = await provider.getNetwork();
+      
+      // Check for Goerli network (chainId 5)
       if (network.chainId !== 5) {
         toast({
           title: "Wrong Network",
           description: "Please connect to Goerli testnet in your wallet",
           variant: "destructive",
         });
-        return null;
+        
+        // Try to switch to Goerli
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x5' }], // 0x5 is the chainId for Goerli
+          });
+          
+          // Re-initialize after network switch
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+          signer = provider.getSigner();
+          contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        } catch (switchError) {
+          // Network switching failed, return null
+          connectedAddress = null;
+          return null;
+        }
       }
       
       toast({
@@ -48,41 +80,28 @@ export const connectWallet = async () => {
       });
       
       return connectedAddress;
-    } else {
+    } catch (networkError) {
+      console.error("Error checking network:", networkError);
       toast({
-        title: "MetaMask Not Found",
-        description: "Please install MetaMask extension to connect your wallet",
+        title: "Network Error",
+        description: "Could not verify network. Please ensure you're connected to Ethereum.",
         variant: "destructive",
       });
-      throw new Error("MetaMask not installed");
+      return connectedAddress;
     }
   } catch (error) {
     console.error("Error connecting wallet:", error);
     toast({
       title: "Connection Failed",
-      description: "Failed to connect wallet. Please try again.",
+      description: error.message || "Failed to connect wallet. Please try again.",
       variant: "destructive",
     });
+    connectedAddress = null;
     throw error;
   }
 };
 
-// Initialize readonly provider for public data
-const initReadonlyProvider = () => {
-  if (!provider) {
-    try {
-      provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
-      console.log(`Initialized readonly provider for Goerli testnet with RPC: ${RPC_URL.substring(0, 30)}...`);
-      return true;
-    } catch (error) {
-      console.error("Error initializing readonly provider:", error);
-      return false;
-    }
-  }
-  return true;
-};
-
+// Get the connected address without triggering a wallet connection
 export const getConnectedAddress = () => {
   return connectedAddress;
 };
