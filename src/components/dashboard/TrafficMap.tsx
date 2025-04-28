@@ -1,6 +1,5 @@
-
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { GoogleMap, useJsApiLoader, Marker, Circle, HeatmapLayer } from "@react-google-maps/api";
+import { GoogleMap, useJsApiLoader, Marker, Circle, HeatmapLayer, Libraries } from "@react-google-maps/api";
 import { Card } from "@/components/ui/card";
 import MapApiKeyForm from "./MapApiKeyForm";
 
@@ -28,9 +27,8 @@ const mapOptions = {
   fullscreenControl: true,
 };
 
-// Libraries to load with Google Maps - using the correct type
-// The @react-google-maps/api library expects a specific type for libraries
-const libraries: ("visualization" | "places" | "drawing" | "geometry" | "localContext")[] = ["visualization"];
+// Libraries to load with Google Maps
+const libraries: Libraries = ['visualization'];
 
 // Map theme - slightly muted colors to make markers stand out
 const mapTheme = [
