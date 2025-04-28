@@ -17,7 +17,7 @@ export async function fetchCongestionData(options = {}): Promise<CongestionZone[
     } else {
       console.log("No congestion data found in Supabase, falling back to API");
       // Try fallback to direct API
-      const apiData = await fetchData("congestion" as ApiEndpoint, options);
+      const apiData = await fetchData("congestion", options);
       return apiData;
     }
   } catch (error) {
@@ -25,7 +25,7 @@ export async function fetchCongestionData(options = {}): Promise<CongestionZone[
     // Fallback to direct API or mock data
     try {
       console.log("Attempting to fetch congestion data from API");
-      const apiData = await fetchData("congestion" as ApiEndpoint, options);
+      const apiData = await fetchData("congestion", options);
       return apiData;
     } catch (apiError) {
       console.error("Error fetching congestion data from API:", apiError);

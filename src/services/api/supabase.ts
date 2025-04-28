@@ -25,6 +25,84 @@ type EndpointTypeMap = {
   congestion: CongestionZone[];
 };
 
+// Interface for table-specific data shapes
+interface VehicleData {
+  id: string;
+  vehicle_id: string;
+  owner_name: string;
+  vehicle_type: string;
+  trust_score: number;
+  lat: number;
+  lng: number;
+  speed?: number | null;
+  heading?: number | null;
+  timestamp?: string;
+  location?: string | null;
+  status?: string;
+}
+
+interface RsuData {
+  id: string;
+  rsu_id: string;
+  location: string;
+  status: string;
+  coverage_radius: number;
+  lat: number;
+  lng: number;
+  last_seen?: string | null;
+}
+
+interface AnomalyData {
+  id: string;
+  timestamp: string;
+  type: string;
+  severity: string;
+  vehicle_id: string;
+  message?: string | null;
+  status?: string | null;
+}
+
+interface TrustLedgerData {
+  id: string;
+  tx_id: string;
+  timestamp: string;
+  vehicle_id: string;
+  action: string;
+  old_value: number;
+  new_value: number;
+  details?: string | null;
+}
+
+interface CongestionData {
+  id: string;
+  zone_name: string;
+  lat: number;
+  lng: number;
+  congestion_level: number;
+  updated_at: string;
+}
+
+// Type guard functions to check data types
+function isVehicleData(data: any): data is VehicleData {
+  return data && 'vehicle_id' in data && 'owner_name' in data && 'vehicle_type' in data;
+}
+
+function isRsuData(data: any): data is RsuData {
+  return data && 'rsu_id' in data && 'coverage_radius' in data;
+}
+
+function isAnomalyData(data: any): data is AnomalyData {
+  return data && 'type' in data && 'severity' in data && 'timestamp' in data;
+}
+
+function isTrustLedgerData(data: any): data is TrustLedgerData {
+  return data && 'tx_id' in data && 'action' in data && 'old_value' in data && 'new_value' in data;
+}
+
+function isCongestionData(data: any): data is CongestionData {
+  return data && 'zone_name' in data && 'congestion_level' in data;
+}
+
 // Fetch data from Supabase with proper type handling
 export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, options: Record<string, any> = {}): Promise<EndpointTypeMap[T]> {
   // Get the corresponding table name for this endpoint
@@ -67,32 +145,73 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
     
     console.log(`Successfully fetched ${result.data?.length || 0} records from ${tableName}`);
     
-    // Transform data to match the expected types if needed
-    if (endpoint === "trustLedger") {
-      // Handle trust_ledger to TrustLedgerEntry mapping
-      return (result.data || []).map(item => ({
-        tx_id: item.tx_id,
-        timestamp: item.timestamp,
-        vehicle_id: item.vehicle_id,
-        action: item.action,
-        old_value: item.old_value,
-        new_value: item.new_value,
-        details: item.details
-      })) as EndpointTypeMap[T];
-    } else if (endpoint === "congestion") {
-      // Handle zones_congestion to CongestionZone mapping
-      return (result.data || []).map(item => ({
-        id: typeof item.id === 'number' ? item.id : parseInt(item.id) || 0,
-        zone_name: item.zone_name,
-        lat: item.lat,
-        lng: item.lng,
-        congestion_level: item.congestion_level,
-        updated_at: item.updated_at
-      })) as EndpointTypeMap[T];
+    // Transform data to match the expected types based on the endpoint
+    if (!result.data || result.data.length === 0) {
+      return [] as EndpointTypeMap[T];
     }
     
-    // Return typed data
-    return (result.data || []) as EndpointTypeMap[T];
+    switch (endpoint) {
+      case "vehicles":
+        return result.data.map(item => ({
+          vehicle_id: item.vehicle_id,
+          owner_name: item.owner_name,
+          vehicle_type: item.vehicle_type,
+          trust_score: item.trust_score,
+          lat: item.lat,
+          lng: item.lng,
+          speed: item.speed,
+          heading: item.heading,
+          timestamp: item.timestamp,
+          location: item.location,
+          status: item.status
+        })) as EndpointTypeMap[T];
+        
+      case "rsus":
+        return result.data.map(item => ({
+          rsu_id: item.rsu_id,
+          location: item.location,
+          status: item.status,
+          coverage_radius: item.coverage_radius,
+          lat: item.lat,
+          lng: item.lng
+        })) as EndpointTypeMap[T];
+        
+      case "anomalies":
+        return result.data.map(item => ({
+          id: item.id,
+          timestamp: item.timestamp,
+          type: item.type,
+          severity: item.severity,
+          vehicle_id: item.vehicle_id,
+          message: item.message,
+          status: item.status
+        })) as EndpointTypeMap[T];
+        
+      case "trustLedger":
+        return result.data.map(item => ({
+          tx_id: item.tx_id,
+          timestamp: item.timestamp,
+          vehicle_id: item.vehicle_id,
+          action: item.action,
+          old_value: item.old_value,
+          new_value: item.new_value,
+          details: item.details
+        })) as EndpointTypeMap[T];
+        
+      case "congestion":
+        return result.data.map(item => ({
+          id: item.id,
+          zone_name: item.zone_name,
+          lat: item.lat,
+          lng: item.lng,
+          congestion_level: item.congestion_level,
+          updated_at: item.updated_at
+        })) as EndpointTypeMap[T];
+        
+      default:
+        // For safety, fallback to direct return
+        return result.data as EndpointTypeMap[T];
+    }
   } catch (error) {
     console.error(`Error fetching from ${tableName}:`, error);
     throw error;
