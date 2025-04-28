@@ -1,6 +1,7 @@
 
 // API configuration and helper functions
 import { supabase } from "@/integrations/supabase/client";
+import { PostgrestError } from "@supabase/supabase-js";
 
 const API_CONFIG = {
   baseUrl: "http://localhost:5000", // This can be updated to your API URL
@@ -13,7 +14,7 @@ const API_CONFIG = {
   }
 };
 
-export async function fetchData(endpoint, options = {}) {
+export async function fetchData(endpoint: string, options = {}) {
   try {
     // First try to fetch from Supabase
     return await fetchFromSupabase(endpoint, options);
@@ -22,7 +23,7 @@ export async function fetchData(endpoint, options = {}) {
     
     // Fallback to direct API
     try {
-      const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoints[endpoint]}`;
+      const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoints[endpoint as keyof typeof API_CONFIG.endpoints]}`;
       console.log(`Falling back to direct API: ${url}`);
       const response = await fetch(url);
       
@@ -39,9 +40,9 @@ export async function fetchData(endpoint, options = {}) {
   }
 }
 
-async function fetchFromSupabase(endpoint, options = {}) {
-  let tableName;
-  let query;
+async function fetchFromSupabase(endpoint: string, options: Record<string, any> = {}) {
+  let tableName: string;
+  let query: any;
   
   switch (endpoint) {
     case "vehicles":
@@ -52,15 +53,21 @@ async function fetchFromSupabase(endpoint, options = {}) {
       break;
     case "anomalies":
       tableName = "anomalies";
-      query = supabase.from(tableName).select("*").order('timestamp', { ascending: false });
+      // Use any type to bypass TypeScript checking for tables not in the generated types
+      query = supabase.from(tableName) as any;
+      query = query.select("*").order('timestamp', { ascending: false });
       break;
     case "trustLedger":
       tableName = "trust_ledger";
-      query = supabase.from(tableName).select("*").order('timestamp', { ascending: false });
+      // Use any type to bypass TypeScript checking for tables not in the generated types
+      query = supabase.from(tableName) as any;
+      query = query.select("*").order('timestamp', { ascending: false });
       break;
     case "congestion":
       tableName = "zones_congestion";
-      query = supabase.from(tableName).select("*").order('updated_at', { ascending: false });
+      // Use any type to bypass TypeScript checking for tables not in the generated types
+      query = supabase.from(tableName) as any;
+      query = query.select("*").order('updated_at', { ascending: false });
       break;
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
@@ -68,7 +75,9 @@ async function fetchFromSupabase(endpoint, options = {}) {
 
   // If query wasn't set above, create default query
   if (!query) {
-    query = supabase.from(tableName).select("*");
+    // Use any type to bypass TypeScript checking for tables not in the generated types
+    query = supabase.from(tableName as string) as any;
+    query = query.select("*");
   }
 
   // Add limit if specified
@@ -195,7 +204,7 @@ export type CongestionZone = {
   updated_at: string;
 };
 
-export const getMockData = (endpoint) => {
+export const getMockData = (endpoint: string): Vehicle[] | Rsu[] | Anomaly[] | TrustLedgerEntry[] | CongestionZone[] | any[] => {
   switch (endpoint) {
     case "vehicles":
       return getMockVehicles();
