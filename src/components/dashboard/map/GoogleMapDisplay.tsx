@@ -9,6 +9,7 @@ import MapStatsOverlay from "./MapStatsOverlay";
 import EmergencyRoutePanel from "./EmergencyRoutePanel";
 import { defaultCenter, mapContainerStyle, mapOptions, mapTheme } from "./constants";
 import { Vehicle } from "@/services/api";
+import { useMapApiKey } from "@/hooks/useMapApiKey";
 
 interface GoogleMapDisplayProps {
   vehicles: any[];
@@ -35,6 +36,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const { apiKey } = useMapApiKey();
 
   // Handle map load
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
@@ -104,7 +106,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         <CongestionHeatmap congestionData={congestionData} />
         
         {/* Directions service and renderer */}
-        {selectedAmbulance && destination && (
+        {selectedAmbulance && destination && apiKey && (
           <DirectionsService
             options={{
               origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
@@ -139,6 +141,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
           ambulance={selectedAmbulance} 
           destination={destination} 
           directionsStatus={directionsStatus}
+          apiKey={apiKey}
         />
       )}
     </div>

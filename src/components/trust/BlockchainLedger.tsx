@@ -30,13 +30,18 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
   onStakeClick,
 }) => {
   const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    }).format(date);
+    try {
+      const date = new Date(timestamp);
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      console.error("Invalid timestamp format:", error);
+      return "Invalid date";
+    }
   };
 
   return (
@@ -63,7 +68,7 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
               <TableRow>
                 <TableHead>Transaction ID</TableHead>
                 <TableHead>Vehicle ID</TableHead>
-                <TableHead>Staked Amount (ETH)</TableHead>
+                <TableHead>Staked Amount</TableHead>
                 <TableHead>Timestamp</TableHead>
               </TableRow>
             </TableHeader>

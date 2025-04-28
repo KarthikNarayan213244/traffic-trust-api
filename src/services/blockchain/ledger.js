@@ -23,8 +23,7 @@ export const getTrustLedger = async () => {
         tx_id: `0x${Math.random().toString(16).substring(2, 10)}${Date.now().toString(16)}${index}`,
         vehicle_id: entry.vehicleId,
         action: "Trust Stake",
-        old_value: 0, 
-        new_value: parseInt(ethers.utils.formatEther(entry.amount)) * 100,
+        amount: parseInt(ethers.utils.formatEther(entry.amount)) * 100,
         timestamp: new Date(entry.timestamp.toNumber() * 1000).toISOString(),
       }));
     } catch (contractError) {
@@ -36,8 +35,20 @@ export const getTrustLedger = async () => {
     
     // Return mock data if contract call fails
     return [
-      { tx_id: "0x7a23b5ef8742c16d3b6eb0b42128f69081592bad", vehicle_id: "TS07-2345-AB", action: "Trust Stake", old_value: 90, new_value: 95, timestamp: new Date().toISOString() },
-      { tx_id: "0x5bf1c6dde8dc48c21799e23751b612acf4d6d93c", vehicle_id: "TS08-5678-CD", action: "Trust Stake", old_value: 95, new_value: 88, timestamp: new Date(Date.now() - 86400000).toISOString() }
+      { 
+        tx_id: "0x7a23b5ef8742c16d3b6eb0b42128f69081592bad", 
+        vehicle_id: "TS07-2345-AB", 
+        action: "Trust Stake", 
+        amount: 95, 
+        timestamp: new Date().toISOString() 
+      },
+      { 
+        tx_id: "0x5bf1c6dde8dc48c21799e23751b612acf4d6d93c", 
+        vehicle_id: "TS08-5678-CD", 
+        action: "Trust Stake", 
+        amount: 88, 
+        timestamp: new Date(Date.now() - 86400000).toISOString() 
+      }
     ];
   }
 };

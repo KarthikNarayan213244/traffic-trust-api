@@ -9,12 +9,14 @@ interface EmergencyRoutePanelProps {
   ambulance: Vehicle;
   destination: google.maps.LatLngLiteral | null;
   directionsStatus: google.maps.DirectionsStatus | null;
+  apiKey?: string;
 }
 
 const EmergencyRoutePanel: React.FC<EmergencyRoutePanelProps> = ({
   ambulance,
   destination,
-  directionsStatus
+  directionsStatus,
+  apiKey
 }) => {
   // Helper function to display appropriate message based on directions status
   const getDirectionsStatusMessage = () => {
@@ -87,15 +89,24 @@ const EmergencyRoutePanel: React.FC<EmergencyRoutePanelProps> = ({
               
               {directionsStatus === google.maps.DirectionsStatus.REQUEST_DENIED && (
                 <div className="mt-2 text-xs bg-amber-50 p-2 rounded border border-amber-200">
-                  <p className="font-semibold text-amber-800">API Configuration Required:</p>
-                  <ol className="list-decimal ml-4 mt-1 text-amber-700 space-y-1">
-                    <li>Go to <a href="https://console.cloud.google.com/google/maps-apis/api-list" target="_blank" rel="noopener noreferrer" className="text-blue-600 flex items-center gap-1 hover:underline">
-                      Google Cloud Console <ExternalLink size={10} />
-                    </a></li>
-                    <li>Enable the <strong>Directions API</strong> for your project</li>
-                    <li>Your API key must have the Directions API permission</li>
-                    <li>Update your API key in the app settings</li>
-                  </ol>
+                  {!apiKey ? (
+                    <>
+                      <p className="font-semibold text-amber-800">API Key Required:</p>
+                      <p className="mt-1 text-amber-700">Please set your Google Maps API key in the settings.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-amber-800">API Configuration Required:</p>
+                      <ol className="list-decimal ml-4 mt-1 text-amber-700 space-y-1">
+                        <li>Go to <a href="https://console.cloud.google.com/google/maps-apis/api-list" target="_blank" rel="noopener noreferrer" className="text-blue-600 flex items-center gap-1 hover:underline">
+                          Google Cloud Console <ExternalLink size={10} />
+                        </a></li>
+                        <li>Enable the <strong>Directions API</strong> for your project</li>
+                        <li>Your API key must have the Directions API permission</li>
+                        <li>Update your API key in the app settings</li>
+                      </ol>
+                    </>
+                  )}
                 </div>
               )}
               

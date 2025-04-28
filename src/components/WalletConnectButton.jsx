@@ -24,6 +24,25 @@ const WalletConnectButton = () => {
     if (connectedAddress) {
       setAddress(connectedAddress);
     }
+    
+    // Listen for account changes from window.ethereum
+    const handleAccountsChanged = (accounts) => {
+      if (accounts.length === 0) {
+        setAddress(null);
+      } else {
+        setAddress(accounts[0]);
+      }
+    };
+    
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+    }
+    
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      }
+    };
   }, []);
 
   const handleConnect = async () => {
