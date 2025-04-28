@@ -31,7 +31,7 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
     } else {
       setShowDialog(true);
     }
-  }, [onApiKeySet]);
+  }, []);
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {

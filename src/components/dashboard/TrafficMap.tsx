@@ -28,6 +28,9 @@ const mapOptions = {
   fullscreenControl: true,
 };
 
+// Libraries to load with Google Maps
+const libraries = ["visualization"];
+
 // Map theme - slightly muted colors to make markers stand out
 const mapTheme = [
   {
@@ -93,10 +96,10 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     return localStorage.getItem(API_KEY_STORAGE_KEY) || "";
   });
   
-  // Set up Google Maps API with dynamic API key
+  // Setup Google Maps JS API loader with the libraries array as a constant reference
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
-    libraries: ["visualization"],
+    libraries,
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -105,7 +108,11 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   // Handle API key update
   const handleApiKeySet = useCallback((newApiKey: string) => {
     setApiKey(newApiKey);
-  }, []);
+    // Force reload the page to re-initialize the Google Maps API with the new key
+    if (newApiKey !== apiKey) {
+      window.location.reload();
+    }
+  }, [apiKey]);
 
   // Handle map load
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
