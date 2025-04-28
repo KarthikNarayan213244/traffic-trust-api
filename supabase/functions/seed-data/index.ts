@@ -403,6 +403,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Seed data function invoked");
     // Get request parameters
     let body = {};
     try {

@@ -20,9 +20,9 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
     return congestionData.map(zone => {
       // Extract congestion level from different potential properties
       // This handles both congestion_level (from DB) and level (from mock data)
-      const congestionLevel = zone.congestion_level !== undefined 
+      const congestionLevel = typeof zone.congestion_level !== 'undefined' 
         ? zone.congestion_level 
-        : (zone.level !== undefined ? zone.level : 50);
+        : (typeof zone.level !== 'undefined' ? zone.level : 50);
       
       // Scale weight by congestion level (0.1 to 1)
       const weight = congestionLevel / 100;

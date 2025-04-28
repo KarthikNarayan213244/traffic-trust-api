@@ -24,42 +24,43 @@ export async function fetchFromSupabase(endpoint: ApiEndpoint, options: Record<s
     throw new Error(`Unknown endpoint: ${endpoint}`);
   }
   
-  let query;
+  let query = supabase.from(tableName).select("*");
   
   // Apply query customizations based on endpoint
   switch (endpoint) {
     case "anomalies":
-      query = supabase.from(tableName).select("*").order('timestamp', { ascending: false });
+      query = query.order('timestamp', { ascending: false });
       break;
     case "trustLedger":
-      query = supabase.from(tableName).select("*").order('timestamp', { ascending: false });
+      query = query.order('timestamp', { ascending: false });
       break;
     case "congestion":
-      query = supabase.from(tableName).select("*");
+      // No special handling needed for basic select
       break;
     default:
-      query = supabase.from(tableName).select("*");
+      // No special handling needed for other endpoints
       break;
   }
 
   // Apply limit if specified in options
-  if (options.limit && query) {
-    query = supabase.from(tableName).select("*").limit(options.limit);
+  if (options.limit) {
+    query = query.limit(options.limit);
+  }
+  
+  try {
+    const result = await query;
     
-    // Re-apply ordering if needed
-    if (endpoint === "anomalies" || endpoint === "trustLedger") {
-      query = query.order('timestamp', { ascending: false });
+    if (result.error) {
+      console.error(`Supabase error for ${endpoint}:`, result.error);
+      throw result.error;
     }
+    
+    console.log(`Successfully fetched ${result.data?.length || 0} records from ${tableName}`);
+    return result.data || [];
+  } catch (error) {
+    console.error(`Error fetching from ${tableName}:`, error);
+    throw error;
   }
-  
-  const result = await query;
-  
-  if (result.error) {
-    console.error(`Supabase error for ${endpoint}:`, result.error);
-    throw result.error;
-  }
-  
-  return result.data;
 }
 
 // Add a utility function to seed the database
@@ -71,22 +72,21 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
       description: "Please wait while we populate the database with test data...",
     });
     
-    // Construct the full URL for the edge function
-    const url = `${window.location.origin}/functions/v1/seed-data`;
+    // Get the full URL for the edge function
+    const supabaseUrl = 'https://ompvafpbdbwsmelomnla.supabase.co';
+    const url = `${supabaseUrl}/functions/v1/seed-data`;
     console.log(`Sending request to: ${url}`);
     
-    // Get authentication token - optional for this function if we set verify_jwt = false
-    let headers: Record<string, string> = {
-      'Content-Type': 'application/json'
+    // Get authentication token
+    const { data: sessionData } = await supabase.auth.getSession();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
     };
     
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.access_token) {
-        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
-      }
-    } catch (authError) {
-      console.warn("Could not get auth session, proceeding without authentication:", authError);
+    if (sessionData?.session?.access_token) {
+      headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
+    } else {
+      console.log("No authentication token available, proceeding without authentication");
     }
     
     const response = await fetch(url, {
@@ -110,7 +110,20 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
         description: `Error: ${response.status}. Please check console for details.`,
         variant: "destructive",
       });
-      throw new Error(`Seeding failed with status: ${response.status} - ${errorText}`);
+      
+      // Fall back to mock data
+      console.log("Falling back to mock data generation");
+      return {
+        success: false,
+        message: "Seeding failed, using mock data",
+        counts: {
+          vehicles: 0,
+          rsus: 0,
+          anomalies: 0,
+          trustEntries: 0,
+          congestionEntries: 0
+        }
+      };
     }
     
     const result = await response.json();
@@ -124,9 +137,21 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
     console.error('Error seeding database:', error);
     toast({
       title: "Database Seeding Failed",
-      description: `Error: ${error.message || "Unknown error"}. Please try again.`,
+      description: `Error: ${error.message || "Unknown error"}. Please try again or check console for details.`,
       variant: "destructive",
     });
-    throw error;
+    
+    // Return a default object that can be handled by the calling code
+    return {
+      success: false,
+      message: error.message || "Unknown error occurred",
+      counts: {
+        vehicles: 0,
+        rsus: 0,
+        anomalies: 0,
+        trustEntries: 0,
+        congestionEntries: 0
+      }
+    };
   }
 }
