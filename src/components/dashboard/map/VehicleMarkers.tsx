@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from "react";
 import { Marker } from "@react-google-maps/api";
 import { getTrustScoreColor } from "./utils";
@@ -104,10 +105,11 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
           scale: scale + 2,
         };
       case 'bus':
+        // Use a filled circle with larger scale for bus instead of RECTANGLE
         return {
           ...icon,
-          path: google.maps.SymbolPath.RECTANGLE,
-          scale: scale + 1,
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: scale + 3,
         };
       case 'ambulance':
         return {
