@@ -25,6 +25,27 @@ type EndpointTypeMap = {
   congestion: CongestionZone[];
 };
 
+// Type guards for each data type
+function isVehicleData(item: any): item is Vehicle {
+  return item && 'vehicle_id' in item && 'owner_name' in item && 'vehicle_type' in item;
+}
+
+function isRsuData(item: any): item is Rsu {
+  return item && 'rsu_id' in item && 'location' in item && 'coverage_radius' in item;
+}
+
+function isAnomalyData(item: any): item is Anomaly {
+  return item && 'type' in item && 'severity' in item && 'vehicle_id' in item;
+}
+
+function isTrustLedgerData(item: any): item is TrustLedgerEntry {
+  return item && 'tx_id' in item && 'action' in item && 'old_value' in item && 'new_value' in item;
+}
+
+function isCongestionData(item: any): item is CongestionZone {
+  return item && 'zone_name' in item && 'congestion_level' in item;
+}
+
 // Fetch data from Supabase with proper type handling
 export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, options: Record<string, any> = {}): Promise<EndpointTypeMap[T]> {
   // Get the corresponding table name for this endpoint
@@ -76,8 +97,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
     switch (endpoint) {
       case "vehicles":
         return result.data.map(item => {
-          // Ensure the item has the required properties
-          if (!('vehicle_id' in item && 'owner_name' in item && 'vehicle_type' in item && 'trust_score' in item)) {
+          if (!isVehicleData(item)) {
             console.error('Invalid vehicle data:', item);
             return null;
           }
@@ -98,8 +118,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
         
       case "rsus":
         return result.data.map(item => {
-          // Ensure the item has the required properties
-          if (!('rsu_id' in item && 'location' in item && 'coverage_radius' in item)) {
+          if (!isRsuData(item)) {
             console.error('Invalid RSU data:', item);
             return null;
           }
@@ -115,8 +134,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
         
       case "anomalies":
         return result.data.map(item => {
-          // Ensure the item has the required properties
-          if (!('type' in item && 'severity' in item && 'vehicle_id' in item)) {
+          if (!isAnomalyData(item)) {
             console.error('Invalid anomaly data:', item);
             return null;
           }
@@ -133,8 +151,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
         
       case "trustLedger":
         return result.data.map(item => {
-          // Ensure the item has the required properties
-          if (!('tx_id' in item && 'action' in item && 'old_value' in item && 'new_value' in item)) {
+          if (!isTrustLedgerData(item)) {
             console.error('Invalid trust ledger data:', item);
             return null;
           }
@@ -151,8 +168,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
         
       case "congestion":
         return result.data.map(item => {
-          // Ensure the item has the required properties
-          if (!('zone_name' in item && 'congestion_level' in item && 'lat' in item && 'lng' in item)) {
+          if (!isCongestionData(item)) {
             console.error('Invalid congestion data:', item);
             return null;
           }
