@@ -8,12 +8,14 @@ export async function fetchCongestionData(options = {}): Promise<CongestionZone[
   try {
     // First try to fetch from Supabase
     const data = await fetchFromSupabase("congestion" as ApiEndpoint, options);
+    console.log("Congestion data from Supabase:", data);
     return data;
   } catch (error) {
     console.error("Error fetching congestion data from Supabase:", error);
     // Fallback to direct API or mock data
     try {
-      return await fetchData("congestion", options);
+      const apiData = await fetchData("congestion" as ApiEndpoint, options);
+      return apiData;
     } catch (apiError) {
       console.error("Error fetching congestion data from API:", apiError);
       return getMockCongestion();

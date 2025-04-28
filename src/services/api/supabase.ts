@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ApiEndpoint } from "./config";
+import { toast } from "@/hooks/use-toast";
 
 // Map API endpoints to their corresponding Supabase table names
 const endpointToTableMap = {
@@ -65,18 +66,32 @@ export async function fetchFromSupabase(endpoint: ApiEndpoint, options: Record<s
 export async function seedDatabaseWithTestData(clearExisting = false) {
   try {
     console.log("Starting database seeding process...");
+    toast({
+      title: "Seeding database",
+      description: "Please wait while we populate the database with test data...",
+    });
+    
+    // Construct the full URL for the edge function
     const url = `${window.location.origin}/functions/v1/seed-data`;
     console.log(`Sending request to: ${url}`);
     
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData?.session?.access_token || '';
+    // Get authentication token - optional for this function if we set verify_jwt = false
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.access_token) {
+        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
+      }
+    } catch (authError) {
+      console.warn("Could not get auth session, proceeding without authentication:", authError);
+    }
     
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      },
+      headers,
       body: JSON.stringify({
         clear: clearExisting,
         vehicles: 1000,
@@ -90,14 +105,28 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Seeding failed with status: ${response.status}`, errorText);
+      toast({
+        title: "Database Seeding Failed",
+        description: `Error: ${response.status}. Please check console for details.`,
+        variant: "destructive",
+      });
       throw new Error(`Seeding failed with status: ${response.status} - ${errorText}`);
     }
     
     const result = await response.json();
     console.log("Seeding completed successfully:", result);
+    toast({
+      title: "Database Seeded Successfully",
+      description: `Added ${result.counts?.vehicles || 'many'} vehicles, ${result.counts?.rsus || 'many'} RSUs, and more data to the database.`,
+    });
     return result;
   } catch (error) {
     console.error('Error seeding database:', error);
+    toast({
+      title: "Database Seeding Failed",
+      description: `Error: ${error.message || "Unknown error"}. Please try again.`,
+      variant: "destructive",
+    });
     throw error;
   }
 }

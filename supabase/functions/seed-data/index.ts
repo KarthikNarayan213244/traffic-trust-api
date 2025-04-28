@@ -382,6 +382,7 @@ function generateMockCongestion(count: number) {
       baseCongestionLevel = Math.min(100, baseCongestionLevel + 15);
     }
     
+    // Using congestion_level (the actual field name in our database) instead of level
     const entry = {
       zone_name: zone.name,
       lat: zone.lat,
@@ -423,6 +424,11 @@ serve(async (req) => {
     // Create a Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing required environment variables SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY');
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     console.log("Supabase client created");
