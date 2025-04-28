@@ -7,7 +7,7 @@ import { ApiEndpoint } from "./config";
 export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
   try {
     // First try to fetch from Supabase
-    const data = await fetchFromSupabase("anomalies" as ApiEndpoint, options);
+    const data = await fetchFromSupabase<"anomalies">("anomalies", options);
     return data;
   } catch (error) {
     console.error("Error fetching anomalies from Supabase:", error);

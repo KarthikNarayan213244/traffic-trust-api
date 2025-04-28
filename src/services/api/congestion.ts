@@ -8,7 +8,7 @@ export async function fetchCongestionData(options = {}): Promise<CongestionZone[
   try {
     // First try to fetch from Supabase
     console.log("Attempting to fetch congestion data from Supabase");
-    const data = await fetchFromSupabase("congestion" as ApiEndpoint, options);
+    const data = await fetchFromSupabase<"congestion">("congestion", options);
     console.log("Congestion data from Supabase:", data);
     
     // If we got data back and it's valid, return it

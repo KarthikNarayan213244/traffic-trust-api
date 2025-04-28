@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ApiEndpoint } from "./config";
+import { Vehicle, Rsu, Anomaly, TrustLedgerEntry, CongestionZone } from "./types";
 import { toast } from "@/hooks/use-toast";
 
 // Map API endpoints to their corresponding Supabase table names
@@ -15,8 +16,17 @@ const endpointToTableMap = {
 // Define a type for valid table names based on the values in our map
 type ValidTableName = typeof endpointToTableMap[keyof typeof endpointToTableMap];
 
-// Fetch data from Supabase
-export async function fetchFromSupabase(endpoint: ApiEndpoint, options: Record<string, any> = {}) {
+// Type mapping for each endpoint's return type
+type EndpointTypeMap = {
+  vehicles: Vehicle[];
+  rsus: Rsu[];
+  anomalies: Anomaly[];
+  trustLedger: TrustLedgerEntry[];
+  congestion: CongestionZone[];
+};
+
+// Fetch data from Supabase with proper type handling
+export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, options: Record<string, any> = {}): Promise<EndpointTypeMap[T]> {
   // Get the corresponding table name for this endpoint
   const tableName = endpointToTableMap[endpoint] as ValidTableName;
   
@@ -56,7 +66,33 @@ export async function fetchFromSupabase(endpoint: ApiEndpoint, options: Record<s
     }
     
     console.log(`Successfully fetched ${result.data?.length || 0} records from ${tableName}`);
-    return result.data || [];
+    
+    // Transform data to match the expected types if needed
+    if (endpoint === "trustLedger") {
+      // Handle trust_ledger to TrustLedgerEntry mapping
+      return (result.data || []).map(item => ({
+        tx_id: item.tx_id,
+        timestamp: item.timestamp,
+        vehicle_id: item.vehicle_id,
+        action: item.action,
+        old_value: item.old_value,
+        new_value: item.new_value,
+        details: item.details
+      })) as EndpointTypeMap[T];
+    } else if (endpoint === "congestion") {
+      // Handle zones_congestion to CongestionZone mapping
+      return (result.data || []).map(item => ({
+        id: typeof item.id === 'number' ? item.id : parseInt(item.id) || 0,
+        zone_name: item.zone_name,
+        lat: item.lat,
+        lng: item.lng,
+        congestion_level: item.congestion_level,
+        updated_at: item.updated_at
+      })) as EndpointTypeMap[T];
+    }
+    
+    // Return typed data
+    return (result.data || []) as EndpointTypeMap[T];
   } catch (error) {
     console.error(`Error fetching from ${tableName}:`, error);
     throw error;

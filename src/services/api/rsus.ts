@@ -7,7 +7,7 @@ import { ApiEndpoint } from "./config";
 export async function fetchRSUs(options = {}): Promise<Rsu[]> {
   try {
     // First try to fetch from Supabase
-    const data = await fetchFromSupabase("rsus" as ApiEndpoint, options);
+    const data = await fetchFromSupabase<"rsus">("rsus", options);
     return data;
   } catch (error) {
     console.error("Error fetching RSUs from Supabase:", error);

@@ -2,9 +2,10 @@
 import React, { useMemo } from "react";
 import { HeatmapLayer } from "@react-google-maps/api";
 import { defaultCenter } from "./constants";
+import { CongestionZone } from "@/services/api/types";
 
 interface CongestionHeatmapProps {
-  congestionData: any[];
+  congestionData: CongestionZone[];
 }
 
 const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData }) => {
@@ -18,18 +19,15 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
     console.log(`Processing ${congestionData.length} congestion data points for heatmap:`, congestionData[0]);
     
     return congestionData.map(zone => {
-      // Extract congestion level from different potential properties
-      // This handles both congestion_level (from DB) and level (from mock data)
-      const congestionLevel = typeof zone.congestion_level !== 'undefined' 
-        ? zone.congestion_level 
-        : (typeof zone.level !== 'undefined' ? zone.level : 50);
+      // Get congestion level from the standard property
+      const congestionLevel = zone.congestion_level;
       
       // Scale weight by congestion level (0.1 to 1)
       const weight = congestionLevel / 100;
       
-      // Use provided coordinates or fall back to defaults with randomization
-      const lat = zone.lat || (defaultCenter.lat + (Math.random() * 0.1 - 0.05));
-      const lng = zone.lng || (defaultCenter.lng + (Math.random() * 0.1 - 0.05));
+      // Use provided coordinates
+      const lat = zone.lat;
+      const lng = zone.lng;
       
       return {
         location: new google.maps.LatLng(lat, lng),
