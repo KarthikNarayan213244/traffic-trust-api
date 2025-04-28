@@ -28,8 +28,9 @@ const mapOptions = {
   fullscreenControl: true,
 };
 
-// Libraries to load with Google Maps
-const libraries = ["visualization"];
+// Libraries to load with Google Maps - using the correct type
+// The @react-google-maps/api library expects a specific type for libraries
+const libraries: ("visualization" | "places" | "drawing" | "geometry" | "localContext")[] = ["visualization"];
 
 // Map theme - slightly muted colors to make markers stand out
 const mapTheme = [
