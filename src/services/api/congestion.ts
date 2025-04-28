@@ -1,10 +1,10 @@
-
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { CongestionZone } from "./types";
 import { ApiEndpoint } from "./config";
 
-export async function fetchCongestionZones(options = {}): Promise<CongestionZone[]> {
+// Renamed function to match import expectations across the app
+export async function fetchCongestionData(options = {}): Promise<CongestionZone[]> {
   try {
     // First try to fetch from Supabase
     const data = await fetchFromSupabase<"congestion">("congestion", options);
@@ -19,6 +19,11 @@ export async function fetchCongestionZones(options = {}): Promise<CongestionZone
       return getMockCongestionZones();
     }
   }
+}
+
+// Keep the original function name for backward compatibility
+export async function fetchCongestionZones(options = {}): Promise<CongestionZone[]> {
+  return fetchCongestionData(options);
 }
 
 // Mock data for congestion zones
