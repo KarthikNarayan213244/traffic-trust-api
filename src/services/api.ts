@@ -1,4 +1,3 @@
-
 // API configuration and helper functions
 import { supabase } from "@/integrations/supabase/client";
 import { PostgrestError } from "@supabase/supabase-js";
@@ -53,21 +52,24 @@ async function fetchFromSupabase(endpoint: string, options: Record<string, any> 
       break;
     case "anomalies":
       tableName = "anomalies";
-      // Use any type to bypass TypeScript checking for tables not in the generated types
-      query = supabase.from(tableName) as any;
-      query = query.select("*").order('timestamp', { ascending: false });
+      // Need to use `any` to bypass TypeScript checking
+      query = supabase.from(tableName);
+      // Force type to any to bypass type checking limitations
+      (query as any) = (query as any).select("*").order('timestamp', { ascending: false });
       break;
     case "trustLedger":
       tableName = "trust_ledger";
-      // Use any type to bypass TypeScript checking for tables not in the generated types
-      query = supabase.from(tableName) as any;
-      query = query.select("*").order('timestamp', { ascending: false });
+      // Need to use `any` to bypass TypeScript checking
+      query = supabase.from(tableName);
+      // Force type to any to bypass type checking limitations
+      (query as any) = (query as any).select("*").order('timestamp', { ascending: false });
       break;
     case "congestion":
       tableName = "zones_congestion";
-      // Use any type to bypass TypeScript checking for tables not in the generated types
-      query = supabase.from(tableName) as any;
-      query = query.select("*").order('updated_at', { ascending: false });
+      // Need to use `any` to bypass TypeScript checking
+      query = supabase.from(tableName);
+      // Force type to any to bypass type checking limitations
+      (query as any) = (query as any).select("*").order('updated_at', { ascending: false });
       break;
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
@@ -75,17 +77,18 @@ async function fetchFromSupabase(endpoint: string, options: Record<string, any> 
 
   // If query wasn't set above, create default query
   if (!query) {
-    // Use any type to bypass TypeScript checking for tables not in the generated types
-    query = supabase.from(tableName as string) as any;
-    query = query.select("*");
+    // Need to use `any` to bypass TypeScript checking
+    query = supabase.from(tableName as string);
+    // Force type to any to bypass type checking limitations
+    (query as any) = (query as any).select("*");
   }
 
   // Add limit if specified
   if (options.limit) {
-    query = query.limit(options.limit);
+    (query as any) = (query as any).limit(options.limit);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await (query as any);
   
   if (error) {
     throw error;
