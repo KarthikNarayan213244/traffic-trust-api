@@ -6,7 +6,8 @@ const API_CONFIG = {
     vehicles: "/api/vehicles",
     rsus: "/api/rsus",
     anomalies: "/api/anomalies",
-    trustLedger: "/api/trust/live_ledger"
+    trustLedger: "/api/trust/live_ledger",
+    congestion: "/api/congestion"
   }
 };
 
@@ -56,6 +57,13 @@ export const getMockTrustLedger = () => [
   { tx_id: "TX123459", timestamp: "2025-04-28T07:30:00Z", vehicle_id: "V003", action: "Trust Score Update", old_value: 89, new_value: 92 }
 ];
 
+export const getMockCongestion = () => [
+  { id: 1, location: "Downtown", level: 8, timestamp: "2025-04-28T10:15:00Z" },
+  { id: 2, location: "Highway 101", level: 5, timestamp: "2025-04-28T10:15:00Z" },
+  { id: 3, location: "Main Street", level: 3, timestamp: "2025-04-28T10:15:00Z" },
+  { id: 4, location: "Industrial Zone", level: 6, timestamp: "2025-04-28T10:15:00Z" }
+];
+
 export const getMockData = (endpoint: string) => {
   switch (endpoint) {
     case "vehicles":
@@ -66,6 +74,8 @@ export const getMockData = (endpoint: string) => {
       return getMockAnomalies();
     case "trustLedger":
       return getMockTrustLedger();
+    case "congestion":
+      return getMockCongestion();
     default:
       return [];
   }
