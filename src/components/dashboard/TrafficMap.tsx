@@ -38,10 +38,11 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     toggleSimulation, handleAmbulanceSelect, handleDestinationSelect, resetRouting 
   } = useSimulation();
 
-  // Setup Google Maps JS API loader
+  // Only initialize Google Maps when we have an API key
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
+    googleMapsApiKey: apiKey || "",  // Use empty string if no key is available
     libraries,
+    id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
 
   // Set up interval for data updates when simulation is running

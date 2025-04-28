@@ -11,8 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-
-const API_KEY_STORAGE_KEY = "traffic_management_maps_api_key";
+import { API_KEY_STORAGE_KEY } from "./map/constants";
 
 interface MapApiKeyFormProps {
   onApiKeySet: (apiKey: string) => void;
@@ -27,7 +26,8 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
     const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
     if (storedApiKey) {
       setApiKey(storedApiKey);
-      onApiKeySet(storedApiKey);
+      // Don't automatically call onApiKeySet here to avoid multiple initializations
+      // Only set it when the user explicitly clicks Save
     } else {
       setShowDialog(true);
     }
