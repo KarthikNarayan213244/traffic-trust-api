@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Car, Radio, AlertTriangle, Shield, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger } from "@/services/api";
+import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, getMockData } from "@/services/api";
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -17,6 +17,7 @@ const Dashboard: React.FC = () => {
   const [rsus, setRsus] = useState<any[]>([]);
   const [anomalies, setAnomalies] = useState<any[]>([]);
   const [trustLedger, setTrustLedger] = useState<any[]>([]);
+  const [congestionData, setCongestionData] = useState<any[]>([]);
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -47,6 +48,9 @@ const Dashboard: React.FC = () => {
       if (trustResult.status === 'fulfilled') {
         setTrustLedger(Array.isArray(trustResult.value) ? trustResult.value : []);
       }
+      
+      // Get mock congestion data for now - this can be replaced with actual API call
+      setCongestionData(getMockData('congestion'));
       
       // Check if any requests failed
       const failedRequests = [vehiclesResult, rsusResult, anomaliesResult, trustResult]
@@ -137,6 +141,7 @@ const Dashboard: React.FC = () => {
               vehicles={vehicles}
               rsus={rsus}
               isLoading={isLoading}
+              congestionData={congestionData}
             />
           </CardContent>
         </Card>
