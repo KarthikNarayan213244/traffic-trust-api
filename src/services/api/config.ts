@@ -29,7 +29,9 @@ export async function fetchData(endpoint: ApiEndpoint, options = {}) {
       throw new Error(`API request failed with status ${response.status}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log(`Successfully fetched data from ${endpoint}:`, data);
+    return data;
   } catch (error) {
     console.error(`Error fetching data from ${endpoint}:`, error);
     throw error;

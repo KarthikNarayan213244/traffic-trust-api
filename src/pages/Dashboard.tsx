@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Car, Radio, AlertTriangle, Shield, RefreshCw, BarChart3, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, fetchCongestionData, seedDatabaseWithTestData } from "@/services/api";
+import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, fetchCongestionData } from "@/services/api";
+import { seedDatabaseWithTestData } from "@/services/api/supabase";
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +27,8 @@ const Dashboard: React.FC = () => {
     setIsLoading(true);
     
     try {
+      console.log("Loading all dashboard data...");
+      
       const [vehiclesResult, rsusResult, anomaliesResult, trustResult, congestionResult] = 
         await Promise.allSettled([
           fetchVehicles({ limit: 1000 }),
@@ -36,22 +39,27 @@ const Dashboard: React.FC = () => {
         ]);
       
       if (vehiclesResult.status === 'fulfilled') {
+        console.log(`Loaded ${vehiclesResult.value?.length || 0} vehicles`);
         setVehicles(Array.isArray(vehiclesResult.value) ? vehiclesResult.value : []);
       }
       
       if (rsusResult.status === 'fulfilled') {
+        console.log(`Loaded ${rsusResult.value?.length || 0} RSUs`);
         setRsus(Array.isArray(rsusResult.value) ? rsusResult.value : []);
       }
       
       if (anomaliesResult.status === 'fulfilled') {
+        console.log(`Loaded ${anomaliesResult.value?.length || 0} anomalies`);
         setAnomalies(Array.isArray(anomaliesResult.value) ? anomaliesResult.value : []);
       }
       
       if (trustResult.status === 'fulfilled') {
+        console.log(`Loaded ${trustResult.value?.length || 0} trust ledger entries`);
         setTrustLedger(Array.isArray(trustResult.value) ? trustResult.value : []);
       }
       
       if (congestionResult.status === 'fulfilled') {
+        console.log(`Loaded ${congestionResult.value?.length || 0} congestion data points`);
         setCongestionData(Array.isArray(congestionResult.value) ? congestionResult.value : []);
       }
       
@@ -59,6 +67,7 @@ const Dashboard: React.FC = () => {
         .filter(result => result.status === 'rejected');
       
       if (failedRequests.length > 0) {
+        console.error("Some data failed to load:", failedRequests);
         toast({
           title: "Some data failed to load",
           description: "Some dashboard data couldn't be retrieved. Please refresh to try again.",
@@ -81,6 +90,10 @@ const Dashboard: React.FC = () => {
 
   const seedDatabase = async () => {
     setIsSeeding(true);
+    toast({
+      title: "Seeding Database",
+      description: "Please wait while we populate the database with sample data...",
+    });
     
     try {
       const result = await seedDatabaseWithTestData(true);
@@ -94,7 +107,7 @@ const Dashboard: React.FC = () => {
       console.error("Error seeding database:", error);
       toast({
         title: "Error",
-        description: "Failed to seed database. Please try again.",
+        description: `Failed to seed database: ${error.message || "Unknown error"}. Please try again.`,
         variant: "destructive",
       });
     } finally {

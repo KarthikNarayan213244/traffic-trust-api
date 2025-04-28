@@ -10,24 +10,38 @@ interface CongestionHeatmapProps {
 const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData }) => {
   // Prepare heatmap data
   const heatmapData = useMemo(() => {
-    if (!congestionData.length) return [];
+    if (!congestionData || !congestionData.length) {
+      console.log("No congestion data available for heatmap");
+      return [];
+    }
+    
+    console.log(`Processing ${congestionData.length} congestion data points for heatmap`);
     
     return congestionData.map(zone => {
-      // Weight is amplified based on congestion level
-      const weight = (zone.congestion_level || zone.level) / 10;
+      // Extract congestion level from different potential properties
+      const congestionLevel = zone.congestion_level || zone.level || 50;
+      
+      // Scale weight by congestion level (0.1 to 1)
+      const weight = congestionLevel / 100;
+      
+      // Use provided coordinates or fall back to defaults with randomization
+      const lat = zone.lat || (defaultCenter.lat + (Math.random() * 0.1 - 0.05));
+      const lng = zone.lng || (defaultCenter.lng + (Math.random() * 0.1 - 0.05));
       
       return {
-        location: new google.maps.LatLng(
-          zone.lat || (defaultCenter.lat + (Math.random() * 0.1 - 0.05)),
-          zone.lng || (defaultCenter.lng + (Math.random() * 0.1 - 0.05))
-        ),
+        location: new google.maps.LatLng(lat, lng),
         weight: weight
       };
     });
   }, [congestionData]);
 
   // No congestion data, don't render anything
-  if (!congestionData.length) return null;
+  if (!congestionData || !congestionData.length) {
+    console.log("No congestion data to render heatmap");
+    return null;
+  }
+
+  console.log(`Rendering heatmap with ${heatmapData.length} points`);
 
   return (
     <HeatmapLayer
@@ -36,7 +50,7 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
         radius: 30,
         opacity: 0.7,
         dissipating: true,
-        maxIntensity: 10,
+        maxIntensity: 1,
         gradient: [
           'rgba(0, 255, 0, 0)',    // green (transparent)
           'rgba(0, 255, 0, 1)',    // green
