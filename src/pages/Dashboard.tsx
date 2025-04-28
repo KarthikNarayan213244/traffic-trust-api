@@ -13,7 +13,7 @@ const Dashboard: React.FC = () => {
     <MainLayout>
       <div className="flex flex-col space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Traffic Trust Platform</h1>
+          <h1 className="text-2xl font-bold">Hyderabad Traffic Trust Platform</h1>
           <div className="flex items-center gap-2">
             <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">BETA</span>
             <span className="text-xs text-muted-foreground">v1.0.0</span>
@@ -52,7 +52,7 @@ const Dashboard: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Real-time Traffic Monitoring</CardTitle>
-            <CardDescription>View and track vehicles and roadside units in real-time</CardDescription>
+            <CardDescription>View and track vehicles and roadside units across Hyderabad in real-time</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <TrafficMap 
@@ -76,8 +76,8 @@ const Dashboard: React.FC = () => {
           
           <Card>
             <CardHeader className="pb-0">
-              <CardTitle>Trust Ledger</CardTitle>
-              <CardDescription>Recent trust score changes</CardDescription>
+              <CardTitle>Blockchain Trust Ledger</CardTitle>
+              <CardDescription>Recent trust score changes secured by blockchain</CardDescription>
             </CardHeader>
             <CardContent>
               <TrustLedgerTable dataEndpoint="trustLedger" />

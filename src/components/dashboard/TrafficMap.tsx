@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from "react";
-import { fetchData, getMockData } from "@/lib/api";
+import { fetchData, getMockData, Vehicle, Rsu, CongestionZone } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader } from "lucide-react";
 
@@ -22,9 +22,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   rsuEndpoint,
   congestionZonesEndpoint,
 }) => {
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const [rsus, setRsus] = useState<any[]>([]);
-  const [congestionZones, setCongestionZones] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [rsus, setRsus] = useState<Rsu[]>([]);
+  const [congestionZones, setCongestionZones] = useState<CongestionZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -37,12 +37,12 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       try {
         setIsLoading(true);
         // Use mock data for development
-        const vehiclesData = getMockData(vehiclesEndpoint);
-        const rsusData = getMockData(rsuEndpoint);
-        let congestionData: any[] = [];
+        const vehiclesData = getMockData(vehiclesEndpoint) as Vehicle[];
+        const rsusData = getMockData(rsuEndpoint) as Rsu[];
+        let congestionData: CongestionZone[] = [];
         
         if (congestionZonesEndpoint) {
-          congestionData = getMockData(congestionZonesEndpoint);
+          congestionData = getMockData(congestionZonesEndpoint) as CongestionZone[];
         }
         
         setVehicles(vehiclesData);
@@ -96,9 +96,10 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 
       // Initialize map if not already initialized
       if (!googleMapRef.current) {
+        // Hyderabad coordinates: 17.3850° N, 78.4867° E
         googleMapRef.current = new window.google.maps.Map(mapRef.current, {
-          center: { lat: 37.7749, lng: -122.4194 },
-          zoom: 11,
+          center: { lat: 17.3850, lng: 78.4867 },
+          zoom: 12,
           styles: [
             {
               featureType: "administrative",
@@ -124,9 +125,32 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 
       // Add RSU markers (blue)
       rsus.forEach((rsu, index) => {
-        // Generate pseudo-random coordinates based on index
-        const lat = 37.7749 + (index * 0.01) % 0.1 - 0.05;
-        const lng = -122.4194 + (index * 0.02) % 0.2 - 0.1;
+        // Generate Hyderabad-based coordinates using RSU location
+        let lat, lng;
+        
+        // Assign specific coordinates based on RSU locations in Hyderabad
+        switch(rsu.location) {
+          case "Hitech City":
+            lat = 17.4435; 
+            lng = 78.3772;
+            break;
+          case "Gachibowli":
+            lat = 17.4401;
+            lng = 78.3489;
+            break;
+          case "Banjara Hills":
+            lat = 17.4134;
+            lng = 78.4321;
+            break;
+          case "Secunderabad":
+            lat = 17.4399;
+            lng = 78.4983;
+            break;
+          default:
+            // For any other locations, generate nearby coordinates
+            lat = 17.3850 + (index * 0.01) % 0.1 - 0.05;
+            lng = 78.4867 + (index * 0.02) % 0.2 - 0.1;
+        }
         
         // Create marker
         const rsuMarker = new window.google.maps.Marker({
@@ -160,9 +184,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 
       // Add vehicle markers
       vehicles.forEach((vehicle, index) => {
-        // Generate pseudo-random coordinates based on index
-        const lat = 37.7749 + (index * 0.015) % 0.15 - 0.075;
-        const lng = -122.4194 + (index * 0.025) % 0.25 - 0.125;
+        // Generate pseudo-random coordinates around Hyderabad
+        const lat = 17.3850 + (index * 0.015) % 0.15 - 0.075;
+        const lng = 78.4867 + (index * 0.025) % 0.25 - 0.125;
         
         // Color based on trust score
         let fillColor = "#9CA3AF"; // Default gray
@@ -210,14 +234,39 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       });
       
       // Add congestion zone heatmap if data is available
-      if (congestionZones.length > 0) {
-        const heatmapData = congestionZones.map(zone => ({
-          location: new window.google.maps.LatLng(
-            37.7749 + (zone.id * 0.01) % 0.1 - 0.05,
-            -122.4194 + (zone.id * 0.02) % 0.2 - 0.1
-          ),
-          weight: zone.level || 1
-        }));
+      if (congestionZones.length > 0 && window.google.maps.visualization) {
+        // Define specific coordinates for congestion zones based on location names
+        const heatmapData = congestionZones.map(zone => {
+          let lat, lng;
+          
+          switch(zone.location) {
+            case "Hitech City":
+              lat = 17.4435; 
+              lng = 78.3772;
+              break;
+            case "Gachibowli":
+              lat = 17.4401;
+              lng = 78.3489;
+              break;
+            case "Banjara Hills":
+              lat = 17.4134;
+              lng = 78.4321;
+              break;
+            case "Secunderabad":
+              lat = 17.4399;
+              lng = 78.4983;
+              break;
+            default:
+              // Default to city center with some variation
+              lat = 17.3850 + (zone.id * 0.01) % 0.1 - 0.05;
+              lng = 78.4867 + (zone.id * 0.02) % 0.2 - 0.1;
+          }
+          
+          return {
+            location: new window.google.maps.LatLng(lat, lng),
+            weight: zone.level || 1
+          };
+        });
         
         const heatmap = new window.google.maps.visualization.HeatmapLayer({
           data: heatmapData,
@@ -233,7 +282,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   return (
     <Card className="w-full overflow-hidden">
       <CardHeader className="bg-white border-b">
-        <CardTitle>Traffic Map</CardTitle>
+        <CardTitle>Hyderabad Traffic Map</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {isLoading || !mapLoaded ? (

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { fetchData, getMockData } from "@/lib/api";
+import { fetchData, getMockData, TrustLedgerEntry } from "@/lib/api";
 import {
   Table,
   TableBody,
@@ -17,7 +17,7 @@ interface TrustLedgerTableProps {
 }
 
 const TrustLedgerTable: React.FC<TrustLedgerTableProps> = ({ dataEndpoint }) => {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<TrustLedgerEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,10 +25,7 @@ const TrustLedgerTable: React.FC<TrustLedgerTableProps> = ({ dataEndpoint }) => 
       try {
         setIsLoading(true);
         // Use mock data for development
-        const responseData = getMockData(dataEndpoint);
-        
-        // In production, use actual API
-        // const responseData = await fetchData(dataEndpoint as any);
+        const responseData = getMockData(dataEndpoint) as TrustLedgerEntry[];
         
         if (Array.isArray(responseData)) {
           // Sort by timestamp descending (most recent first)

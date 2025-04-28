@@ -9,6 +9,7 @@ import Vehicles from "./pages/Vehicles";
 import Rsus from "./pages/Rsus";
 import Anomalies from "./pages/Anomalies";
 import TrustLedger from "./pages/TrustLedger";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="/rsus" element={<Rsus />} />
           <Route path="/anomalies" element={<Anomalies />} />
           <Route path="/trust-ledger" element={<TrustLedger />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { fetchData, getMockData } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchData, getMockData, Anomaly } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -12,13 +11,22 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface AnomalyChartProps {
   dataEndpoint: string;
 }
 
+interface AnomalyChartData {
+  type: string;
+  count: number;
+  critical: number;
+  high: number;
+  medium: number;
+}
+
 const AnomalyChart: React.FC<AnomalyChartProps> = ({ dataEndpoint }) => {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<AnomalyChartData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -26,10 +34,7 @@ const AnomalyChart: React.FC<AnomalyChartProps> = ({ dataEndpoint }) => {
       try {
         setIsLoading(true);
         // Use mock data for development
-        const responseData = getMockData(dataEndpoint);
-        
-        // In production, use actual API
-        // const responseData = await fetchData(dataEndpoint as any);
+        const responseData = getMockData(dataEndpoint) as Anomaly[];
         
         if (Array.isArray(responseData)) {
           // Process data for the chart - group by type
@@ -57,7 +62,7 @@ const AnomalyChart: React.FC<AnomalyChartProps> = ({ dataEndpoint }) => {
               acc.push(newItem);
             }
             return acc;
-          }, [] as any[]);
+          }, [] as AnomalyChartData[]);
           
           setData(aggregatedData);
         }
