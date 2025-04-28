@@ -42,5 +42,12 @@ export const useMapData = (initialVehicles = [], initialRsus = [], initialConges
     fetchData();
   }, [fetchData]);
 
-  return { vehicles, rsus, congestionData, isLoading, fetchData };
+  // Return both state and setter functions
+  return { 
+    vehicles, setVehicles, 
+    rsus, setRsus, 
+    congestionData, setCongestionData, 
+    isLoading, setIsLoading,
+    fetchData 
+  };
 };

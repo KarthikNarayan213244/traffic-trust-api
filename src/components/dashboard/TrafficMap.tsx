@@ -4,7 +4,7 @@ import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
 import { libraries } from "./map/constants";
-import { Vehicle } from "@/services/api";
+import { Vehicle, fetchVehicles, fetchCongestionData } from "@/services/api";
 import SimulationControls from "./SimulationControls";
 import ApiKeyControl from "./ApiKeyControl";
 import { useMapData } from "@/hooks/useMapData";
@@ -26,7 +26,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 }) => {
   // Custom hooks to manage state
   const { apiKey, handleApiKeySet } = useMapApiKey();
-  const { vehicles, rsus, congestionData, isLoading } = useMapData(
+  const { vehicles, rsus, congestionData, isLoading, setVehicles, setCongestionData } = useMapData(
     initialVehicles, 
     initialRsus, 
     initialCongestionData, 
@@ -67,7 +67,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       clearInterval(vehicleInterval);
       clearInterval(congestionInterval);
     };
-  }, [isSimulationRunning]);
+  }, [isSimulationRunning, setVehicles, setCongestionData]);
 
   // Show loading spinner
   if (initialLoading && isLoading) {
