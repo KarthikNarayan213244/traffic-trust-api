@@ -45,7 +45,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
 
-  // Set up interval for data updates when live updates are running
+  // Set up interval for data updates when simulation is running
   useEffect(() => {
     if (!isSimulationRunning) return;
 

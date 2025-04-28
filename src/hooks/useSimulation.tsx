@@ -8,13 +8,13 @@ export const useSimulation = (initiallyRunning = false) => {
   const [selectedAmbulance, setSelectedAmbulance] = useState<Vehicle | null>(null);
   const [destination, setDestination] = useState<google.maps.LatLngLiteral | null>(null);
 
-  // Toggle live updates
+  // Toggle simulation
   const toggleSimulation = () => {
     setIsSimulationRunning(prev => !prev);
     toast({
-      title: !isSimulationRunning ? "Live Updates Enabled" : "Live Updates Paused",
+      title: !isSimulationRunning ? "Simulation Started" : "Simulation Paused",
       description: !isSimulationRunning ? 
-        "Real-time data updates enabled. Vehicles update every 5 seconds, congestion every minute." : 
+        "Live data updates enabled. Vehicles update every 5 seconds, congestion every minute." : 
         "Data updates paused.",
     });
   };

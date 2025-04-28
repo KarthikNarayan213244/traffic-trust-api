@@ -25,9 +25,9 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({
         className={isSimulationRunning ? "bg-red-100" : "bg-green-100"}
       >
         {isSimulationRunning ? (
-          <><Pause className="mr-1" size={16} /> Pause Live Updates</>
+          <><Pause className="mr-1" size={16} /> Pause Simulation</>
         ) : (
-          <><Play className="mr-1" size={16} /> Start Live Updates</>
+          <><Play className="mr-1" size={16} /> Start Simulation</>
         )}
       </Button>
       
