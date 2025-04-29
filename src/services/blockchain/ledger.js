@@ -18,40 +18,14 @@ export const getTrustLedger = async () => {
       const contract = getContract();
       const ledger = await contract.getTrustLedger();
       
-      // Transform the data to match our application format with detailed trust information
-      return ledger.map((entry, index) => {
-        // Generate consistent transaction ID
-        const txId = `TX${String(index + 1).padStart(5, '0')}`;
-        
-        // Create vehicle ID with a consistent format (HYD for Hyderabad)
-        const vehicleId = entry.vehicleId || `HYD${String(index + 1).padStart(3, '0')}`;
-        
-        // Generate realistic trust score values
-        const baseScore = 75 + Math.floor(Math.random() * 15);
-        const scoreChange = Math.random() > 0.7 ? 
-          Math.floor(1 + Math.random() * 5) :  // positive change
-          -Math.floor(1 + Math.random() * 3);  // negative change
-        
-        // Parse or generate amount value (converting from wei to a reasonable value)
-        const amountValue = entry.amount ? 
-          ethers.utils.formatEther(entry.amount) : 
-          (0.1 + Math.random() * 0.9).toFixed(1);
-          
-        // Format timestamp properly
-        const timestamp = entry.timestamp?.toNumber() ? 
-          new Date(entry.timestamp.toNumber() * 1000) : 
-          new Date(Date.now() - (index * 86400000)); // Each entry one day apart
-        
-        return {
-          tx_id: txId,
-          vehicle_id: vehicleId,
-          action: "Trust Stake",
-          amount: parseFloat(amountValue),
-          timestamp: timestamp.toISOString(),
-          old_value: baseScore,
-          new_value: baseScore + scoreChange
-        };
-      });
+      // Transform the data to match our application format
+      return ledger.map((entry, index) => ({
+        tx_id: `0x${Math.random().toString(16).substring(2, 10)}${Date.now().toString(16)}${index}`,
+        vehicle_id: entry.vehicleId,
+        action: "Trust Stake",
+        amount: parseInt(ethers.utils.formatEther(entry.amount)) * 100,
+        timestamp: new Date(entry.timestamp.toNumber() * 1000).toISOString(),
+      }));
     } catch (contractError) {
       console.warn("Contract call failed, using mock data:", contractError);
       throw contractError; // Let it fall through to the mock data
@@ -59,44 +33,29 @@ export const getTrustLedger = async () => {
   } catch (error) {
     console.error("Error getting trust ledger:", error);
     
-    // Generate more realistic and consistent mock data
-    const mockEntries = [];
+    // Generate random timestamps for more realistic data
     const now = Date.now();
     const dayInMs = 86400000;
     
-    for (let i = 0; i < 8; i++) {
-      // Create consistent transaction IDs
-      const txId = `TX${String(i + 1).padStart(5, '0')}`;
+    // Return mock data with different timestamps if contract call fails
+    return Array.from({ length: 5 }).map((_, index) => {
+      const randomDaysAgo = Math.floor(Math.random() * 7); // Random days from 0-7
+      const randomHours = Math.floor(Math.random() * 24); // Random hours
+      const randomMinutes = Math.floor(Math.random() * 60); // Random minutes
       
-      // Create consistent vehicle IDs (HYD for Hyderabad)
-      const vehicleId = `HYD${String(i + 1).padStart(3, '0')}`;
+      const timestamp = new Date(now - (randomDaysAgo * dayInMs) - (randomHours * 3600000) - (randomMinutes * 60000));
       
-      // Each entry is one day apart
-      const timestamp = new Date(now - (i * dayInMs));
+      const vehiclePrefix = Math.random() > 0.5 ? "TS" : "AM";
+      const vehicleNumber = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+      const vehicleLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
       
-      // Generate realistic trust score values
-      const baseScore = 75 + Math.floor(Math.random() * 15);
-      const scoreChange = Math.random() > 0.6 ? 
-        Math.floor(1 + Math.random() * 5) :  // positive change
-        -Math.floor(1 + Math.random() * 3);  // negative change
-        
-      // Realistic stake amounts (most between 0.1 and 1.0)
-      const amount = (0.1 + Math.random() * 0.9).toFixed(1);
-      
-      mockEntries.push({
-        tx_id: txId,
-        vehicle_id: vehicleId,
+      return {
+        tx_id: `0x${Math.random().toString(16).substring(2, 15)}${Date.now().toString(16).substring(8)}`,
+        vehicle_id: `${vehiclePrefix}${vehicleNumber}-${Math.floor(1000 + Math.random() * 9000)}-${vehicleLetter}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`,
         action: "Trust Stake",
-        amount: parseFloat(amount),
-        timestamp: timestamp.toISOString(),
-        old_value: baseScore,
-        new_value: baseScore + scoreChange
-      });
-    }
-    
-    // Sort by timestamp (newest first)
-    return mockEntries.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+        amount: Math.floor(70 + Math.random() * 30), // Random amount between 70 and 100
+        timestamp: timestamp.toISOString()
+      };
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort by timestamp (newest first)
   }
 };
