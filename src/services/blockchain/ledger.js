@@ -43,13 +43,14 @@ export const getTrustLedger = async () => {
     // Generate 20 mock entries with realistic data
     for (let i = 0; i < 20; i++) {
       const oldValue = Math.floor(Math.random() * 30) + 60; // 60-90
-      const change = Math.floor(Math.random() * 20) - 10; // -10 to +10
+      const change = Math.floor(Math.random() * 20) - 5; // -5 to +15 with a bias towards positive changes
       const newValue = Math.max(0, Math.min(100, oldValue + change));
+      const actions = ["Trust Stake", "Trust Update", "Certificate Renewal"];
       
       mockData.push({
         tx_id: `0x${Math.random().toString(16).substring(2, 40)}`, 
         vehicle_id: `${vehiclePrefixes[Math.floor(Math.random() * vehiclePrefixes.length)]}-${Math.floor(Math.random() * 9000) + 1000}`, 
-        action: "Trust Stake",
+        action: actions[Math.floor(Math.random() * actions.length)],
         amount: Math.floor(Math.random() * 50) + 1, // 1-50 tokens
         old_value: oldValue,
         new_value: newValue,

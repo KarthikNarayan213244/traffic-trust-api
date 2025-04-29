@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 interface BlockchainLedgerProps {
   data: any[];
@@ -44,6 +45,18 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
     }
   };
 
+  // Get badge color based on trust score change
+  const getTrustBadge = (oldValue: number, newValue: number) => {
+    const difference = newValue - oldValue;
+    if (difference > 0) {
+      return <Badge className="bg-green-500">+{difference}</Badge>;
+    } else if (difference < 0) {
+      return <Badge className="bg-red-500">{difference}</Badge>;
+    } else {
+      return <Badge className="bg-gray-400">0</Badge>;
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -67,15 +80,16 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Transaction ID</TableHead>
-                <TableHead>Vehicle ID</TableHead>
-                <TableHead>Staked Amount</TableHead>
-                <TableHead>Timestamp</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead>Vehicle</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Trust Change</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10">
+                  <TableCell colSpan={5} className="text-center py-10">
                     <div className="flex justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary" />
                     </div>
@@ -83,7 +97,7 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
                 </TableRow>
               ) : isError ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10">
+                  <TableCell colSpan={5} className="text-center py-10">
                     <div className="flex flex-col items-center space-y-4">
                       <p>Failed to load blockchain data</p>
                       <Button 
@@ -98,7 +112,7 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
                 </TableRow>
               ) : data.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10">
+                  <TableCell colSpan={5} className="text-center py-10">
                     <div className="flex flex-col items-center space-y-4">
                       <p>No blockchain trust entries yet</p>
                       <Button 
@@ -117,10 +131,19 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
                     <TableCell className="font-mono text-xs">
                       {entry.tx_id}
                     </TableCell>
-                    <TableCell>{entry.vehicle_id}</TableCell>
-                    <TableCell>{entry.amount}</TableCell>
                     <TableCell>
                       {formatTimestamp(entry.timestamp)}
+                    </TableCell>
+                    <TableCell>{entry.vehicle_id}</TableCell>
+                    <TableCell>{entry.action || "Trust Stake"}</TableCell>
+                    <TableCell>
+                      {entry.old_value !== undefined && entry.new_value !== undefined ? (
+                        getTrustBadge(entry.old_value, entry.new_value)
+                      ) : entry.amount ? (
+                        <Badge className="bg-blue-500">{entry.amount}</Badge>
+                      ) : (
+                        <span>—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
