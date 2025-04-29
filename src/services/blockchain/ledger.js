@@ -3,6 +3,66 @@ import { ethers } from 'ethers';
 import { toast } from "@/hooks/use-toast";
 import { getContract, initReadonlyProvider } from './provider';
 
+// Function to get consistent mock data
+const getConsistentMockData = () => {
+  // Check if we have stored mock data in localStorage
+  const storedMockData = localStorage.getItem('blockchain_mock_ledger');
+  if (storedMockData) {
+    try {
+      return JSON.parse(storedMockData);
+    } catch (error) {
+      console.error("Error parsing stored mock data:", error);
+      // Continue to generate new mock data if parsing fails
+    }
+  }
+  
+  // Generate consistent mock data
+  const mockData = [];
+  const vehiclePrefixes = ['TS07', 'TS08', 'TS09', 'TS10'];
+  const now = Date.now();
+  const seed = 12345; // Fixed seed for consistent randomness
+  
+  // Simple deterministic random function using seed
+  const seededRandom = (max, min = 0) => {
+    const x = Math.sin(seed * (mockData.length + 1)) * 10000;
+    return Math.floor((x - Math.floor(x)) * (max - min) + min);
+  };
+  
+  // Generate 20 mock entries with consistent data
+  for (let i = 0; i < 20; i++) {
+    const oldValue = 60 + seededRandom(30); // 60-90
+    const change = seededRandom(20) - 5; // -5 to +15 with bias towards positive
+    const newValue = Math.max(0, Math.min(100, oldValue + change));
+    const actions = ["Trust Stake", "Trust Update", "Certificate Renewal"];
+    const vehiclePrefix = vehiclePrefixes[seededRandom(vehiclePrefixes.length)];
+    const vehicleNumber = 1000 + seededRandom(9000);
+    
+    mockData.push({
+      tx_id: `0x${(1000000 + i).toString(16)}${(900000000 + i * 1000).toString(16)}`, 
+      vehicle_id: `${vehiclePrefix}-${vehicleNumber}`, 
+      action: actions[i % actions.length], // Cycle through actions deterministically
+      amount: 1 + seededRandom(50), // 1-50 tokens
+      old_value: oldValue,
+      new_value: newValue,
+      timestamp: new Date(now - (i * 3600000)).toISOString() // Entries 1 hour apart
+    });
+  }
+  
+  // Sort by timestamp (newest first)
+  const sortedData = mockData.sort((a, b) => 
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+  
+  // Store in localStorage for consistency across reloads
+  try {
+    localStorage.setItem('blockchain_mock_ledger', JSON.stringify(sortedData));
+  } catch (error) {
+    console.error("Error storing mock data in localStorage:", error);
+  }
+  
+  return sortedData;
+};
+
 export const getTrustLedger = async () => {
   try {
     // Initialize readonly provider if not already connected with a wallet
@@ -35,29 +95,7 @@ export const getTrustLedger = async () => {
   } catch (error) {
     console.error("Error getting trust ledger:", error);
     
-    // Generate more realistic mock data
-    const mockData = [];
-    const vehiclePrefixes = ['TS07', 'TS08', 'TS09', 'TS10'];
-    const now = Date.now();
-    
-    // Generate 20 mock entries with realistic data
-    for (let i = 0; i < 20; i++) {
-      const oldValue = Math.floor(Math.random() * 30) + 60; // 60-90
-      const change = Math.floor(Math.random() * 20) - 5; // -5 to +15 with a bias towards positive changes
-      const newValue = Math.max(0, Math.min(100, oldValue + change));
-      const actions = ["Trust Stake", "Trust Update", "Certificate Renewal"];
-      
-      mockData.push({
-        tx_id: `0x${Math.random().toString(16).substring(2, 40)}`, 
-        vehicle_id: `${vehiclePrefixes[Math.floor(Math.random() * vehiclePrefixes.length)]}-${Math.floor(Math.random() * 9000) + 1000}`, 
-        action: actions[Math.floor(Math.random() * actions.length)],
-        amount: Math.floor(Math.random() * 50) + 1, // 1-50 tokens
-        old_value: oldValue,
-        new_value: newValue,
-        timestamp: new Date(now - Math.floor(Math.random() * 86400000 * 2)).toISOString() // Random time in past 48 hours
-      });
-    }
-    
-    return mockData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    // Use consistent mock data instead of generating random data each time
+    return getConsistentMockData();
   }
 };
