@@ -39,7 +39,7 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({
         {isSimulationRunning ? (
           <><Pause className="mr-1" size={16} /> Pause Simulation</>
         ) : (
-          <><Play className="mr-1" size={16} /> Start Simulation</>
+          <><Play className="mr-1" size={16} /> Real Time Monitoring</>
         )}
       </Button>
       
