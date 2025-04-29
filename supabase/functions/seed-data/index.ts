@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -21,9 +20,13 @@ function generateVehicleId() {
 // Function to generate a random name
 function generateRandomName() {
   const firstNames = ["Raj", "Priya", "Amit", "Sunita", "Vikram", "Ananya", "Karan", "Deepa", 
-                      "Arjun", "Meera", "Sanjay", "Neha", "Rahul", "Pooja", "Vijay", "Kavita"];
+                      "Arjun", "Meera", "Sanjay", "Neha", "Rahul", "Pooja", "Vijay", "Kavita",
+                      "Aditya", "Shreya", "Rohan", "Nisha", "Gaurav", "Divya", "Ajay", "Ritu",
+                      "Sachin", "Swati", "Vivek", "Anjali", "Alok", "Anita", "Manish", "Preeti"];
   const lastNames = ["Kumar", "Sharma", "Patel", "Reddy", "Singh", "Gupta", "Das", "Joshi", 
-                     "Nair", "Verma", "Malhotra", "Rao", "Kapoor", "Chopra", "Mehta", "Iyer"];
+                     "Nair", "Verma", "Malhotra", "Rao", "Kapoor", "Chopra", "Mehta", "Iyer",
+                     "Agarwal", "Pillai", "Bhat", "Desai", "Menon", "Shah", "Johar", "Bajaj",
+                     "Chatterjee", "Banerjee", "Saxena", "Trivedi", "Chawla", "Khanna", "Basu", "Ganguly"];
   
   return `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
 }
@@ -48,30 +51,99 @@ function generateMockVehicles(count: number) {
     { name: "Begumpet", lat: 17.4439, lng: 78.4630 },
     { name: "Abids", lat: 17.3899, lng: 78.4746 },
     { name: "Charminar", lat: 17.3616, lng: 78.4747 },
-    { name: "Uppal", lat: 17.4012, lng: 78.5595 }
+    { name: "Uppal", lat: 17.4012, lng: 78.5595 },
+    { name: "Miyapur", lat: 17.4924, lng: 78.3421 },
+    { name: "Manikonda", lat: 17.4106, lng: 78.3752 },
+    { name: "Shamshabad", lat: 17.2399, lng: 78.4312 },
+    { name: "Mehdipatnam", lat: 17.3948, lng: 78.4520 },
+    { name: "Paradise Circle", lat: 17.4432, lng: 78.4982 },
+    { name: "Punjagutta", lat: 17.4256, lng: 78.4502 },
+    { name: "Koti", lat: 17.3824, lng: 78.4800 },
+    { name: "Lakdikapul", lat: 17.4066, lng: 78.4625 },
+    { name: "Film Nagar", lat: 17.4134, lng: 78.4142 },
+    { name: "Kondapur", lat: 17.4609, lng: 78.3610 },
+    { name: "Sainikpuri", lat: 17.4945, lng: 78.5466 },
+    { name: "Karkhana", lat: 17.4544, lng: 78.5001 },
+    { name: "Moosapet", lat: 17.4645, lng: 78.4298 },
+    { name: "Malkajgiri", lat: 17.4516, lng: 78.5266 },
+    { name: "Bowenpally", lat: 17.4709, lng: 78.4983 }
   ];
   
-  const vehicleTypes = ["Car", "Truck", "Bus", "Two-Wheeler", "Auto-Rickshaw", "Taxi", "Ambulance", "Police Vehicle"];
+  const vehicleTypes = [
+    { type: "Car", weight: 60 }, 
+    { type: "Truck", weight: 10 },
+    { type: "Bus", weight: 8 },
+    { type: "Two-Wheeler", weight: 18 },
+    { type: "Auto-Rickshaw", weight: 8 }, 
+    { type: "Taxi", weight: 4 },
+    { type: "Ambulance", weight: 1 }, 
+    { type: "Police Vehicle", weight: 1 }
+  ];
   
+  // Generate weighted random selection function
+  function weightedRandom(items: { type: string; weight: number }[]): string {
+    const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (const item of items) {
+      random -= item.weight;
+      if (random <= 0) {
+        return item.type;
+      }
+    }
+    
+    return items[0].type; // Fallback
+  }
+  
+  // Current time to use as reference
+  const now = new Date();
+  const twoDaysAgo = new Date(now);
+  twoDaysAgo.setHours(now.getHours() - 48);
+  
+  // Generate historical data points for the last 48 hours
   for (let i = 0; i < count; i++) {
-    // Choose a random area
-    const area = hyderabadAreas[Math.floor(Math.random() * hyderabadAreas.length)];
+    // Choose a random area with some weighted distribution to create clusters
+    const areaIndex = Math.floor(Math.random() * hyderabadAreas.length);
+    const area = hyderabadAreas[areaIndex];
     
     // Add small random offset to create realistic distribution
     const latVariation = (Math.random() * 0.02) - 0.01;
     const lngVariation = (Math.random() * 0.02) - 0.01;
     
+    // Create a random timestamp within the last 48 hours
+    const timestamp = new Date(
+      twoDaysAgo.getTime() + Math.random() * (now.getTime() - twoDaysAgo.getTime())
+    );
+    
+    // Get hour of the day to simulate traffic patterns
+    const hour = timestamp.getHours();
+    
+    // Adjust speed based on time of day (rush hours vs. off-peak)
+    let speedRange = { min: 20, max: 60 }; // Default
+    
+    if ((hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20)) {
+      // Rush hour: slower speeds
+      speedRange = { min: 5, max: 40 };
+    } else if (hour >= 23 || hour <= 5) {
+      // Late night: faster speeds
+      speedRange = { min: 30, max: 80 };
+    }
+    
+    const vehicleType = weightedRandom(vehicleTypes);
+    const trustScoreBase = vehicleType === "Ambulance" || vehicleType === "Police Vehicle" ? 85 : 60;
+    
     const vehicle = {
       vehicle_id: generateVehicleId(),
       owner_name: generateRandomName(),
-      vehicle_type: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
-      trust_score: Math.floor(60 + Math.random() * 41), // 60-100
+      vehicle_type: vehicleType,
+      trust_score: Math.floor(trustScoreBase + Math.random() * (100 - trustScoreBase)), // Higher base for emergency vehicles
       lat: area.lat + latVariation,
       lng: area.lng + lngVariation,
-      speed: Math.floor(10 + Math.random() * 70), // 10-80 km/h
+      speed: Math.floor(speedRange.min + Math.random() * (speedRange.max - speedRange.min)),
       heading: Math.floor(Math.random() * 360),
       location: area.name,
-      status: Math.random() > 0.05 ? "Active" : "Inactive" // 5% chance of being inactive
+      status: Math.random() > 0.05 ? "Active" : "Inactive", // 5% chance of being inactive
+      timestamp: timestamp.toISOString()
     };
     vehicles.push(vehicle);
   }
@@ -104,8 +176,27 @@ function generateMockRSUs(count: number) {
     { name: "Mehdipatnam Bus Terminal", lat: 17.3938, lng: 78.4350 },
     { name: "Panjagutta Circle", lat: 17.4236, lng: 78.4475 },
     { name: "Paradise Circle", lat: 17.4417, lng: 78.4992 },
-    { name: "Basheerbagh Junction", lat: 17.4000, lng: 78.4769 }
+    { name: "Basheerbagh Junction", lat: 17.4000, lng: 78.4769 },
+    { name: "Miyapur Metro Station", lat: 17.4924, lng: 78.3421 },
+    { name: "Manikonda Road Junction", lat: 17.4106, lng: 78.3752 },
+    { name: "Shamshabad Airport Road", lat: 17.2399, lng: 78.4312 },
+    { name: "Malakpet Race Course", lat: 17.3748, lng: 78.5107 },
+    { name: "Kachiguda Railway Station", lat: 17.4014, lng: 78.5110 },
+    { name: "Tank Bund Road", lat: 17.4227, lng: 78.4698 },
+    { name: "Himayat Nagar Road", lat: 17.4064, lng: 78.4766 },
+    { name: "Necklace Road", lat: 17.4156, lng: 78.4671 },
+    { name: "SR Nagar", lat: 17.4414, lng: 78.4390 },
+    { name: "DLF Cybercity", lat: 17.4488, lng: 78.3765 }
   ];
+  
+  // Add additional strategic junctions at major intersections
+  for (let i = 0; i < 70; i++) {
+    locations.push({
+      name: `Junction ${i+31}`,
+      lat: 17.3616 + (Math.random() * 0.2 - 0.1),
+      lng: 78.4747 + (Math.random() * 0.2 - 0.1)
+    });
+  }
   
   // Use strategic locations first, then generate random ones if needed
   for (let i = 0; i < count; i++) {
@@ -152,21 +243,40 @@ function generateMockAnomalies(count: number, vehicleIds: string[]) {
     "License Plate Mismatch",
     "Toll Evasion",
     "Restricted Zone Entry",
-    "Traffic Signal Violation"
+    "Traffic Signal Violation",
+    "Unregistered Vehicle",
+    "Emergency Braking",
+    "Reckless Driving",
+    "Improper Lane Change",
+    "Unsafe Following Distance"
   ];
   
   const severities = ["Low", "Medium", "High", "Critical"];
+  const severityWeights = [0.4, 0.3, 0.2, 0.1]; // Weights for Low, Medium, High, Critical
   const statuses = ["Detected", "Under Investigation", "Resolved", "False Alarm"];
   
   const now = new Date();
-  const oneWeekAgo = new Date(now);
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const twoDaysAgo = new Date(now);
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+  
+  // Create a weighted random function for severity
+  function weightedSeverity() {
+    const rand = Math.random();
+    let sum = 0;
+    
+    for (let i = 0; i < severityWeights.length; i++) {
+      sum += severityWeights[i];
+      if (rand <= sum) return severities[i];
+    }
+    
+    return severities[0]; // Fallback
+  }
   
   for (let i = 0; i < count; i++) {
     // Generate a random timestamp within the last week
-    const randomTime = new Date(oneWeekAgo.getTime() + Math.random() * (now.getTime() - oneWeekAgo.getTime()));
+    const randomTime = new Date(twoDaysAgo.getTime() + Math.random() * (now.getTime() - twoDaysAgo.getTime()));
     const type = types[Math.floor(Math.random() * types.length)];
-    const severity = severities[Math.floor(Math.random() * severities.length)];
+    const severity = weightedSeverity();
     const vehicleId = vehicleIds[Math.floor(Math.random() * vehicleIds.length)];
     
     // Generate specific messages based on type
@@ -202,6 +312,21 @@ function generateMockAnomalies(count: number, vehicleIds: string[]) {
       case "Traffic Signal Violation":
         message = `Vehicle crossed intersection during red signal phase`;
         break;
+      case "Unregistered Vehicle":
+        message = `Vehicle detected without valid registration in the system`;
+        break;
+      case "Emergency Braking":
+        message = `Vehicle performed sudden braking, potential hazard detected`;
+        break;
+      case "Reckless Driving":
+        message = `Multiple driving violations detected within short timeframe`;
+        break;
+      case "Improper Lane Change":
+        message = `Vehicle changed lanes without signaling, cutting off other vehicles`;
+        break;
+      case "Unsafe Following Distance":
+        message = `Vehicle following too closely at ${Math.floor(40 + Math.random() * 40)} km/h`;
+        break;
       default:
         message = `Anomaly detected at ${randomTime.toLocaleTimeString()}`;
     }
@@ -224,8 +349,8 @@ function generateMockAnomalies(count: number, vehicleIds: string[]) {
 function generateMockTrustLedger(count: number, vehicleIds: string[]) {
   const trustLedger = [];
   const now = new Date();
-  const oneMonthAgo = new Date(now);
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  const twoDaysAgo = new Date(now);
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
   
   const actions = [
     "Trust Score Update",
@@ -236,12 +361,18 @@ function generateMockTrustLedger(count: number, vehicleIds: string[]) {
     "Verified Documentation",
     "RSU Verification Success",
     "Blockchain Attestation",
-    "Emergency Vehicle Priority"
+    "Emergency Vehicle Priority",
+    "Toll Payment Verification",
+    "Traffic Signal Compliance",
+    "Speed Limit Compliance",
+    "Lane Discipline Reward",
+    "Junction Cooperation",
+    "Incident Reporting"
   ];
   
   for (let i = 0; i < count; i++) {
     // Generate a random timestamp within the last month
-    const randomTime = new Date(oneMonthAgo.getTime() + Math.random() * (now.getTime() - oneMonthAgo.getTime()));
+    const randomTime = new Date(twoDaysAgo.getTime() + Math.random() * (now.getTime() - twoDaysAgo.getTime()));
     
     const action = actions[Math.floor(Math.random() * actions.length)];
     let oldValue, newValue, details;
@@ -292,6 +423,36 @@ function generateMockTrustLedger(count: number, vehicleIds: string[]) {
         newValue = 99;
         details = "Emergency service vehicle status confirmed";
         break;
+      case "Toll Payment Verification":
+        oldValue = Math.floor(60 + Math.random() * 30);
+        newValue = Math.min(100, oldValue + 1);
+        details = "Automated toll payment processed correctly";
+        break;
+      case "Traffic Signal Compliance":
+        oldValue = Math.floor(70 + Math.random() * 20);
+        newValue = Math.min(100, oldValue + 2);
+        details = "Vehicle consistently respects traffic signals";
+        break;
+      case "Speed Limit Compliance":
+        oldValue = Math.floor(65 + Math.random() * 25);
+        newValue = Math.min(100, oldValue + 1);
+        details = "Speed within limits in school and hospital zones";
+        break;
+      case "Lane Discipline Reward":
+        oldValue = Math.floor(60 + Math.random() * 30);
+        newValue = Math.min(100, oldValue + 1);
+        details = "Proper lane usage and signaling observed";
+        break;
+      case "Junction Cooperation":
+        oldValue = Math.floor(65 + Math.random() * 25);
+        newValue = Math.min(100, oldValue + 1);
+        details = "Cooperative behavior at congested junction";
+        break;
+      case "Incident Reporting":
+        oldValue = Math.floor(70 + Math.random() * 20);
+        newValue = Math.min(100, oldValue + 2);
+        details = "Driver reported road hazard through connected system";
+        break;
       default:
         oldValue = Math.floor(50 + Math.random() * 50);
         newValue = Math.floor(50 + Math.random() * 50);
@@ -319,6 +480,7 @@ function generateMockTrustLedger(count: number, vehicleIds: string[]) {
 
 // Generate mock congestion data with realistic Hyderabad zones
 function generateMockCongestion(count: number) {
+  // Expanded list of traffic zones in Hyderabad
   const congestionZones = [
     { name: "Hitech City Junction", lat: 17.4435, lng: 78.3772 },
     { name: "Gachibowli Flyover", lat: 17.4401, lng: 78.3489 },
@@ -342,55 +504,71 @@ function generateMockCongestion(count: number) {
     { name: "Basheerbagh Junction", lat: 17.4000, lng: 78.4769 }
   ];
   
+  // Add more zones to reach desired count
+  for (let i = 0; i < Math.max(0, count - congestionZones.length); i++) {
+    // Base around Hyderabad city center
+    const centerLat = 17.3850;
+    const centerLng = 78.4867;
+    
+    // Random offset but keep within reasonable city limits
+    const latOffset = (Math.random() * 0.3) - 0.15;
+    const lngOffset = (Math.random() * 0.3) - 0.15;
+    
+    congestionZones.push({
+      name: `Traffic Zone ${i + 21}`,
+      lat: centerLat + latOffset,
+      lng: centerLng + lngOffset
+    });
+  }
+  
   const congestion = [];
   const now = new Date();
+  const twoDaysAgo = new Date(now);
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
   
-  // Use either the specified count or all defined zones, whichever is smaller
-  const zoneCount = Math.min(count, congestionZones.length);
-  
-  // Morning rush hour time simulation (around 9 AM)
-  const morningRushHour = new Date(now);
-  morningRushHour.setHours(9, 0, 0, 0);
-  
-  // Evening rush hour time simulation (around 6 PM)
-  const eveningRushHour = new Date(now);
-  eveningRushHour.setHours(18, 0, 0, 0);
-  
-  // Current time in hours
-  const currentHour = now.getHours();
-  
-  for (let i = 0; i < zoneCount; i++) {
-    const zone = congestionZones[i];
+  // Generate multiple entries for each zone over time
+  for (const zone of congestionZones.slice(0, count)) {
+    // Create entries at 5-minute intervals over the last 48 hours
+    const intervalMinutes = 5;
+    let currentTime = new Date(twoDaysAgo);
     
-    // Congestion level depends on time of day
-    let baseCongestionLevel;
-    
-    // Simulate higher congestion during rush hours
-    if ((currentHour >= 8 && currentHour <= 10) || (currentHour >= 17 && currentHour <= 19)) {
-      // Rush hour - higher congestion
-      baseCongestionLevel = 70 + Math.floor(Math.random() * 30); // 70-100
-    } else if ((currentHour >= 11 && currentHour <= 15) || (currentHour >= 22 || currentHour <= 5)) {
-      // Off-peak hours - lower congestion
-      baseCongestionLevel = 10 + Math.floor(Math.random() * 30); // 10-40
-    } else {
-      // Normal hours - moderate congestion
-      baseCongestionLevel = 40 + Math.floor(Math.random() * 30); // 40-70
+    while (currentTime <= now) {
+      // Current time in hours
+      const currentHour = currentTime.getHours();
+      
+      // Congestion level depends on time of day
+      let baseCongestionLevel;
+      
+      // Simulate higher congestion during rush hours
+      if ((currentHour >= 8 && currentHour <= 10) || (currentHour >= 17 && currentHour <= 19)) {
+        // Rush hour - higher congestion
+        baseCongestionLevel = 70 + Math.floor(Math.random() * 30); // 70-100
+      } else if ((currentHour >= 11 && currentHour <= 15) || (currentHour >= 22 || currentHour <= 5)) {
+        // Off-peak hours - lower congestion
+        baseCongestionLevel = 10 + Math.floor(Math.random() * 30); // 10-40
+      } else {
+        // Normal hours - moderate congestion
+        baseCongestionLevel = 40 + Math.floor(Math.random() * 30); // 40-70
+      }
+      
+      // Key traffic hotspots always have higher congestion
+      if (["Hitech City Junction", "Ameerpet Metro Station", "Panjagutta Circle", "LB Nagar Circle"].includes(zone.name)) {
+        baseCongestionLevel = Math.min(100, baseCongestionLevel + 15);
+      }
+      
+      // Using congestion_level (the actual field name in our database) instead of level
+      const entry = {
+        zone_name: zone.name,
+        lat: zone.lat,
+        lng: zone.lng,
+        congestion_level: baseCongestionLevel,
+        updated_at: currentTime.toISOString()
+      };
+      congestion.push(entry);
+      
+      // Increment time by interval
+      currentTime = new Date(currentTime.getTime() + (intervalMinutes * 60000));
     }
-    
-    // Key traffic hotspots always have higher congestion
-    if (["Hitech City Junction", "Ameerpet Metro Station", "Panjagutta Circle", "LB Nagar Circle"].includes(zone.name)) {
-      baseCongestionLevel = Math.min(100, baseCongestionLevel + 15);
-    }
-    
-    // Using congestion_level (the actual field name in our database) instead of level
-    const entry = {
-      zone_name: zone.name,
-      lat: zone.lat,
-      lng: zone.lng,
-      congestion_level: baseCongestionLevel,
-      updated_at: now.toISOString()
-    };
-    congestion.push(entry);
   }
   
   return congestion;
@@ -414,13 +592,13 @@ serve(async (req) => {
     }
     
     const clearExisting = body.clear === true;
-    const vehicleCount = parseInt(body.vehicles) || 1000;
+    const vehicleCount = parseInt(body.vehicles) || 10000;
     const rsuCount = parseInt(body.rsus) || 200;
     const anomalyCount = parseInt(body.anomalies) || 1000;
     const trustCount = parseInt(body.trustEntries) || 1000;
-    const congestionCount = parseInt(body.congestionEntries) || 20;
+    const congestionCount = parseInt(body.congestionEntries) || 500;
     
-    console.log(`Processing seed request: Clear existing=${clearExisting}, Vehicles=${vehicleCount}, RSUs=${rsuCount}, Anomalies=${anomalyCount}, Trust=${trustCount}, Congestion=${congestionCount}`);
+    console.log(`Processing high-volume seed request: Clear existing=${clearExisting}, Vehicles=${vehicleCount}, RSUs=${rsuCount}, Anomalies=${anomalyCount}, Trust=${trustCount}, Congestion=${congestionCount}`);
     
     // Create a Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
@@ -448,21 +626,47 @@ serve(async (req) => {
     // Generate vehicles
     console.log(`Generating ${vehicleCount} vehicles...`);
     const vehicles = generateMockVehicles(vehicleCount);
-    const { error: vehiclesError } = await supabase.from('vehicles').insert(vehicles);
-    if (vehiclesError) {
-      console.error("Error inserting vehicles:", vehiclesError);
-      throw new Error(`Error inserting vehicles: ${vehiclesError.message}`);
+    
+    // Insert in batches to avoid timeouts
+    const BATCH_SIZE = 500;
+    const vehicleBatches = [];
+    
+    for (let i = 0; i < vehicles.length; i += BATCH_SIZE) {
+      const batch = vehicles.slice(i, i + BATCH_SIZE);
+      vehicleBatches.push(batch);
     }
+    
+    console.log(`Splitting vehicles into ${vehicleBatches.length} batches...`);
+    
+    for (let i = 0; i < vehicleBatches.length; i++) {
+      console.log(`Inserting vehicle batch ${i+1}/${vehicleBatches.length}...`);
+      const { error } = await supabase.from('vehicles').insert(vehicleBatches[i]);
+      if (error) {
+        console.error(`Error inserting vehicle batch ${i+1}:`, error);
+        throw new Error(`Error inserting vehicles: ${error.message}`);
+      }
+    }
+    
     console.log(`Successfully inserted ${vehicles.length} vehicles`);
     
     // Generate RSUs
     console.log(`Generating ${rsuCount} RSUs...`);
     const rsus = generateMockRSUs(rsuCount);
-    const { error: rsusError } = await supabase.from('rsus').insert(rsus);
-    if (rsusError) {
-      console.error("Error inserting RSUs:", rsusError);
-      throw new Error(`Error inserting RSUs: ${rsusError.message}`);
+    
+    // Insert RSUs in batches if needed
+    const rsuBatches = [];
+    for (let i = 0; i < rsus.length; i += BATCH_SIZE) {
+      rsuBatches.push(rsus.slice(i, i + BATCH_SIZE));
     }
+    
+    for (let i = 0; i < rsuBatches.length; i++) {
+      const { error } = await supabase.from('rsus').insert(rsuBatches[i]);
+      if (error) {
+        console.error(`Error inserting RSU batch ${i+1}:`, error);
+        throw new Error(`Error inserting RSUs: ${error.message}`);
+      }
+    }
+    
     console.log(`Successfully inserted ${rsus.length} RSUs`);
     
     // Extract vehicle IDs for reference
@@ -473,7 +677,6 @@ serve(async (req) => {
     const anomalies = generateMockAnomalies(anomalyCount, vehicleIds);
     
     // Insert anomalies in batches to avoid timeout
-    const BATCH_SIZE = 200;
     for (let i = 0; i < anomalies.length; i += BATCH_SIZE) {
       const batch = anomalies.slice(i, i + BATCH_SIZE);
       const { error: anomaliesError } = await supabase.from('anomalies').insert(batch);
@@ -481,7 +684,7 @@ serve(async (req) => {
         console.error(`Error inserting anomalies batch ${i/BATCH_SIZE + 1}:`, anomaliesError);
         throw new Error(`Error inserting anomalies: ${anomaliesError.message}`);
       }
-      console.log(`Successfully inserted batch ${i/BATCH_SIZE + 1} of anomalies (${batch.length} records)`);
+      console.log(`Successfully inserted batch ${Math.floor(i/BATCH_SIZE) + 1} of anomalies (${batch.length} records)`);
     }
     
     // Generate trust ledger entries
@@ -496,24 +699,31 @@ serve(async (req) => {
         console.error(`Error inserting trust ledger batch ${i/BATCH_SIZE + 1}:`, trustError);
         throw new Error(`Error inserting trust ledger entries: ${trustError.message}`);
       }
-      console.log(`Successfully inserted batch ${i/BATCH_SIZE + 1} of trust ledger entries (${batch.length} records)`);
+      console.log(`Successfully inserted batch ${Math.floor(i/BATCH_SIZE) + 1} of trust ledger entries (${batch.length} records)`);
     }
     
     // Generate congestion data
-    console.log(`Generating ${congestionCount} congestion entries...`);
+    console.log(`Generating ${congestionCount} congestion zones with historical data...`);
     const congestionEntries = generateMockCongestion(congestionCount);
-    const { error: congestionError } = await supabase.from('zones_congestion').insert(congestionEntries);
-    if (congestionError) {
-      console.error("Error inserting congestion data:", congestionError);
-      throw new Error(`Error inserting congestion data: ${congestionError.message}`);
+    
+    // Insert congestion data in batches
+    for (let i = 0; i < congestionEntries.length; i += BATCH_SIZE) {
+      const batch = congestionEntries.slice(i, i + BATCH_SIZE);
+      const { error: congestionError } = await supabase.from('zones_congestion').insert(batch);
+      if (congestionError) {
+        console.error(`Error inserting congestion batch ${i/BATCH_SIZE + 1}:`, congestionError);
+        throw new Error(`Error inserting congestion data: ${congestionError.message}`);
+      }
+      console.log(`Successfully inserted batch ${Math.floor(i/BATCH_SIZE) + 1} of congestion entries (${batch.length} records)`);
     }
+    
     console.log(`Successfully inserted ${congestionEntries.length} congestion entries`);
     
     // Return success response
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Database seeded successfully",
+        message: "High-volume database seeded successfully",
         counts: {
           vehicles: vehicles.length,
           rsus: rsus.length,
