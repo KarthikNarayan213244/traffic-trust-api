@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { connectWallet, getConnectedAddress, isMetaMaskAvailable } from "@/services/blockchain";
+import { connectWallet, getConnectedAddress } from "@/services/blockchain";
 import { Wallet, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -17,42 +17,29 @@ const WalletConnectButton = () => {
   const [address, setAddress] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [showWalletDialog, setShowWalletDialog] = useState(false);
-  const [metaMaskDetected, setMetaMaskDetected] = useState(false);
 
   useEffect(() => {
-    // Check if MetaMask is available
-    setMetaMaskDetected(isMetaMaskAvailable());
-    
     // Check if wallet is already connected on component mount
     const connectedAddress = getConnectedAddress();
     if (connectedAddress) {
       setAddress(connectedAddress);
     }
     
-    // Listen for account changes
+    // Listen for account changes from window.ethereum
     const handleAccountsChanged = (accounts) => {
-      if (accounts?.length === 0) {
+      if (accounts.length === 0) {
         setAddress(null);
-      } else if (accounts?.length > 0) {
+      } else {
         setAddress(accounts[0]);
       }
     };
     
-    if (isMetaMaskAvailable()) {
+    if (window.ethereum) {
       window.ethereum.on('accountsChanged', handleAccountsChanged);
-      
-      // Check if already connected
-      window.ethereum.request({ method: 'eth_accounts' })
-        .then(accounts => {
-          if (accounts.length > 0) {
-            setAddress(accounts[0]);
-          }
-        })
-        .catch(console.error);
     }
     
     return () => {
-      if (isMetaMaskAvailable()) {
+      if (window.ethereum) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
@@ -69,7 +56,7 @@ const WalletConnectButton = () => {
     }
 
     // Check if MetaMask is installed
-    if (!isMetaMaskAvailable()) {
+    if (!window.ethereum) {
       setShowWalletDialog(true);
       return;
     }
@@ -80,6 +67,10 @@ const WalletConnectButton = () => {
       
       if (connectedAddress) {
         setAddress(connectedAddress);
+        toast({
+          title: "Wallet Connected",
+          description: `Successfully connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`,
+        });
       }
     } catch (error) {
       console.error("Failed to connect wallet:", error);
@@ -172,12 +163,12 @@ const WalletConnectButton = () => {
               onClick={() => {
                 setShowWalletDialog(false);
                 toast({
-                  title: "Using View-Only Mode",
-                  description: "You'll be able to use the application without a real wallet connection",
+                  title: "Using Simulated Mode",
+                  description: "You'll be able to use simulated blockchain features without a real wallet",
                 });
               }}
             >
-              Continue in View-Only Mode
+              Continue in Simulation Mode
             </Button>
           </DialogFooter>
         </DialogContent>

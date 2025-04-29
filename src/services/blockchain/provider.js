@@ -23,21 +23,11 @@ export const initReadonlyProvider = () => {
   }
 };
 
-// Check if MetaMask is available
-export const isMetaMaskAvailable = () => {
-  return typeof window !== 'undefined' && window.ethereum && window.ethereum.isMetaMask;
-};
-
 export const connectWallet = async () => {
   try {
     // Check if MetaMask is installed
-    if (!isMetaMaskAvailable()) {
+    if (!window.ethereum) {
       console.log("MetaMask not installed");
-      toast({
-        title: "MetaMask Not Found",
-        description: "Please install MetaMask browser extension to connect your wallet.",
-        variant: "destructive",
-      });
       throw new Error("MetaMask not installed");
     }
     
@@ -67,7 +57,7 @@ export const connectWallet = async () => {
         toast({
           title: "Wrong Network",
           description: "Please connect to Goerli testnet in your wallet",
-          variant: "warning",
+          variant: "destructive",
         });
         
         // Try to switch to Goerli
@@ -86,11 +76,9 @@ export const connectWallet = async () => {
           // Get the network again to confirm switch
           const updatedNetwork = await provider.getNetwork();
           console.log("After switch, connected to:", updatedNetwork.name, updatedNetwork.chainId);
-          
-          toast({
-            title: "Network Changed",
-            description: `Successfully switched to ${updatedNetwork.name}`,
-          });
+          if (updatedNetwork.chainId !== 5) {
+            throw new Error("Failed to switch to Goerli network");
+          }
         } catch (switchError) {
           console.error("Failed to switch network:", switchError);
           // Keep the address but note that we're not on Goerli
@@ -104,13 +92,13 @@ export const connectWallet = async () => {
       
       toast({
         title: "Wallet Connected",
-        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`,
+        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)} on ${network.name}`,
       });
       
       return connectedAddress;
     } catch (requestError) {
       console.error("Error requesting accounts:", requestError);
-      throw new Error(requestError.message || "User rejected the connection request");
+      throw new Error("User rejected the connection request");
     }
   } catch (error) {
     console.error("Error connecting wallet:", error);
@@ -124,43 +112,27 @@ export const connectWallet = async () => {
   }
 };
 
-// Set up event listeners for wallet connection changes
-export const setupWalletEventListeners = () => {
-  if (isMetaMaskAvailable()) {
-    // Listen for account changes
-    window.ethereum.on('accountsChanged', (accounts) => {
-      if (accounts.length === 0) {
-        // User disconnected their wallet
-        console.log("Wallet disconnected");
-        connectedAddress = null;
-        toast({
-          title: "Wallet Disconnected",
-          description: "Your wallet has been disconnected",
-        });
-      } else {
-        // User switched accounts
-        connectedAddress = accounts[0];
-        console.log("Switched to account:", connectedAddress);
-        toast({
-          title: "Account Changed",
-          description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`,
-        });
-      }
-    });
-
-    // Listen for network changes
-    window.ethereum.on('chainChanged', (chainId) => {
-      console.log("Network changed to:", chainId);
-      
-      // Force a page refresh to ensure all components update
-      window.location.reload();
-    });
-  }
-};
-
-// Call this function when the app initializes
-if (typeof window !== 'undefined') {
-  setupWalletEventListeners();
+// Listen for account changes
+if (typeof window !== 'undefined' && window.ethereum) {
+  window.ethereum.on('accountsChanged', (accounts) => {
+    if (accounts.length === 0) {
+      // User disconnected their wallet
+      console.log("Wallet disconnected");
+      connectedAddress = null;
+      toast({
+        title: "Wallet Disconnected",
+        description: "Your wallet has been disconnected",
+      });
+    } else {
+      // User switched accounts
+      connectedAddress = accounts[0];
+      console.log("Switched to account:", connectedAddress);
+      toast({
+        title: "Account Changed",
+        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`,
+      });
+    }
+  });
 }
 
 // Get the connected address without triggering a wallet connection
