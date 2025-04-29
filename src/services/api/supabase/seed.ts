@@ -2,16 +2,8 @@
 import { supabase } from "./client";
 import { toast } from "@/hooks/use-toast";
 
-interface SeedOptions {
-  vehicles?: number;
-  rsus?: number;
-  anomalies?: number; 
-  trustEntries?: number;
-  congestionEntries?: number;
-}
-
 // Add a utility function to seed the database
-export async function seedDatabaseWithTestData(clearExisting = false, options: SeedOptions = {}) {
+export async function seedDatabaseWithTestData(clearExisting = false) {
   try {
     console.log("Starting database seeding process...");
     toast({
@@ -36,25 +28,16 @@ export async function seedDatabaseWithTestData(clearExisting = false, options: S
       console.log("No authentication token available, proceeding without authentication");
     }
     
-    // Set default values for options
-    const {
-      vehicles = 10000,
-      rsus = 200,
-      anomalies = 1000,
-      trustEntries = 1000,
-      congestionEntries = 50
-    } = options;
-    
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         clear: clearExisting,
-        vehicles,
-        rsus,
-        anomalies,
-        trustEntries,
-        congestionEntries
+        vehicles: 1000,
+        rsus: 200,
+        anomalies: 1000,
+        trustEntries: 1000,
+        congestionEntries: 50
       })
     });
     
@@ -86,7 +69,7 @@ export async function seedDatabaseWithTestData(clearExisting = false, options: S
     console.log("Seeding completed successfully:", result);
     toast({
       title: "Database Seeded Successfully",
-      description: `Added ${result.counts?.vehicles.toLocaleString() || 'many'} vehicles, ${result.counts?.rsus.toLocaleString() || 'many'} RSUs, and more data to the database.`,
+      description: `Added ${result.counts?.vehicles || 'many'} vehicles, ${result.counts?.rsus || 'many'} RSUs, and more data to the database.`,
     });
     return result;
   } catch (error: any) {
