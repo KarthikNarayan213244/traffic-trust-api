@@ -91,23 +91,23 @@ const Dashboard: React.FC = () => {
   const seedDatabase = async () => {
     setIsSeeding(true);
     toast({
-      title: "Refreshing Data",
-      description: "Please wait while we update the system with fresh data...",
+      title: "Seeding Database",
+      description: "Please wait while we populate the database with sample data...",
     });
     
     try {
       const result = await seedDatabaseWithTestData(true);
       toast({
-        title: "System Data Updated Successfully",
+        title: "Database Seeded Successfully",
         description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
       });
       
       await loadAllData();
     } catch (error) {
-      console.error("Error refreshing data:", error);
+      console.error("Error seeding database:", error);
       toast({
         title: "Error",
-        description: `Failed to update system data: ${error.message || "Unknown error"}. Please try again.`,
+        description: `Failed to seed database: ${error.message || "Unknown error"}. Please try again.`,
         variant: "destructive",
       });
     } finally {
@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold">Hyderabad Traffic Trust Platform</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">LIVE</span>
+              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">BETA</span>
               <span className="text-xs text-muted-foreground">v1.0.0</span>
             </div>
           </div>
@@ -187,7 +187,7 @@ const Dashboard: React.FC = () => {
               className="flex items-center gap-2"
             >
               <Database className={`h-4 w-4 ${isSeeding ? 'animate-pulse' : ''}`} />
-              <span>{isSeeding ? 'Updating...' : 'Update Data'}</span>
+              <span>{isSeeding ? 'Seeding...' : 'Seed Database'}</span>
             </Button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { fetchTrustLedger } from "@/services/api";
 import { getTrustLedger, getConnectedAddress } from "@/services/blockchain";
 import { toast } from "@/hooks/use-toast";
@@ -9,12 +9,12 @@ export const useTrustLedger = () => {
   const [blockchainData, setBlockchainData] = useState<any[]>([]);
   const [isApiLoading, setIsApiLoading] = useState<boolean>(true);
   const [isApiError, setIsApiError] = useState<boolean>(false);
-  const [isBlockchainLoading, setIsBlockchainLoading] = useState<boolean>(true);
+  const [isBlockchainLoading, setIsBlockchainLoading] = useState<boolean>(false);
   const [isBlockchainError, setIsBlockchainError] = useState<boolean>(false);
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [etherscanUrl, setEtherscanUrl] = useState<string>('');
 
-  const loadApiData = useCallback(async () => {
+  const loadApiData = async () => {
     try {
       setIsApiLoading(true);
       setIsApiError(false);
@@ -31,9 +31,9 @@ export const useTrustLedger = () => {
     } finally {
       setIsApiLoading(false);
     }
-  }, []);
+  };
 
-  const loadBlockchainData = useCallback(async () => {
+  const loadBlockchainData = async () => {
     try {
       setIsBlockchainLoading(true);
       setIsBlockchainError(false);
@@ -53,58 +53,25 @@ export const useTrustLedger = () => {
     } catch (error) {
       console.error("Error fetching blockchain trust ledger:", error);
       setIsBlockchainError(true);
-      
-      // Don't show toast when failing initially as this is expected when no wallet is connected
-      if (isBlockchainLoading === false) {
-        toast({
-          title: "Error",
-          description: "Failed to load blockchain trust ledger. Please connect your wallet and try again.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: "Failed to load blockchain trust ledger. Please connect your wallet and try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsBlockchainLoading(false);
     }
-  }, [isBlockchainLoading]);
+  };
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = () => {
     loadApiData();
     loadBlockchainData();
-  }, [loadApiData, loadBlockchainData]);
+  };
 
-  // Add auto refresh functionality
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      // Only auto-refresh API data, not blockchain data (which requires manual wallet interaction)
-      loadApiData();
-    }, 30000); // Refresh every 30 seconds
-    
-    return () => clearInterval(intervalId);
-  }, [loadApiData]);
-
-  // Initial data load
   useEffect(() => {
     loadApiData();
     loadBlockchainData();
-    
-    // Listen for blockchain events
-    const handleAccountsChanged = () => {
-      loadBlockchainData();
-    };
-    
-    // Safely access window.ethereum with type checking
-    if (typeof window !== 'undefined' && window.ethereum) {
-      window.ethereum.on("accountsChanged", handleAccountsChanged);
-      
-      return () => {
-        if (window.ethereum) {
-          window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-        }
-      };
-    }
-    
-    return undefined;
-  }, [loadApiData, loadBlockchainData]);
+  }, []);
 
   return {
     apiData,
