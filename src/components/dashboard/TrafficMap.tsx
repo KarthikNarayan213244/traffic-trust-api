@@ -5,12 +5,13 @@ import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
 import { libraries } from "./map/constants";
 import { Vehicle } from "@/services/api/types";
-import { fetchVehicles, fetchCongestionData } from "@/services/api";
+import { fetchVehicles, fetchCongestionData, fetchRSUs, fetchAnomalies } from "@/services/api";
 import SimulationControls from "./SimulationControls";
 import ApiKeyControl from "./ApiKeyControl";
 import { useMapData } from "@/hooks/useMapData";
 import { useSimulation } from "@/hooks/useSimulation";
 import { useMapApiKey } from "@/hooks/useMapApiKey";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TrafficMapProps {
   vehicles?: any[];
@@ -27,15 +28,16 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 }) => {
   // Custom hooks to manage state
   const { apiKey, handleApiKeySet } = useMapApiKey();
-  const { vehicles, rsus, congestionData, isLoading, setVehicles, setCongestionData } = useMapData(
+  const { vehicles, rsus, congestionData, isLoading, setVehicles, setRsus, setCongestionData } = useMapData(
     initialVehicles, 
     initialRsus, 
     initialCongestionData, 
     initialLoading
   );
   const { 
-    isSimulationRunning, selectedAmbulance, destination, 
-    toggleSimulation, handleAmbulanceSelect, handleDestinationSelect, resetRouting 
+    isSimulationRunning, selectedAmbulance, destination, simulationSpeed,
+    toggleSimulation, handleAmbulanceSelect, handleDestinationSelect, resetRouting,
+    changeSimulationSpeed, getIntervals 
   } = useSimulation();
 
   // Only initialize Google Maps when we have an API key
@@ -49,33 +51,57 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   useEffect(() => {
     if (!isSimulationRunning) return;
 
+    const intervals = getIntervals();
+    
     const vehicleInterval = setInterval(() => {
-      fetchVehicles().then(data => {
-        setVehicles(data);
+      fetchVehicles({ limit: 1000 }).then(data => {
+        if (Array.isArray(data)) {
+          setVehicles(data);
+          console.log(`Updated ${data.length} vehicles`);
+        }
       }).catch(error => {
         console.error("Error updating vehicles:", error);
       });
-    }, 5000); // Update vehicles every 5 seconds
+    }, intervals.vehicles);
 
     const congestionInterval = setInterval(() => {
-      fetchCongestionData().then(data => {
-        setCongestionData(data);
+      fetchCongestionData({ limit: 500 }).then(data => {
+        if (Array.isArray(data)) {
+          setCongestionData(data);
+          console.log(`Updated ${data.length} congestion data points`);
+        }
       }).catch(error => {
         console.error("Error updating congestion data:", error);
       });
-    }, 60000); // Update congestion every minute
+    }, intervals.congestion);
+    
+    const rsuInterval = setInterval(() => {
+      fetchRSUs({ limit: 100 }).then(data => {
+        if (Array.isArray(data)) {
+          setRsus(data);
+          console.log(`Updated ${data.length} RSUs`);
+        }
+      }).catch(error => {
+        console.error("Error updating RSUs:", error);
+      });
+    }, intervals.rsus);
 
     return () => {
       clearInterval(vehicleInterval);
       clearInterval(congestionInterval);
+      clearInterval(rsuInterval);
     };
-  }, [isSimulationRunning, setVehicles, setCongestionData]);
+  }, [isSimulationRunning, setVehicles, setRsus, setCongestionData, getIntervals]);
 
-  // Show loading spinner
+  // Show loading skeleton
   if (initialLoading && isLoading) {
     return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
       </div>
     );
   }
@@ -121,8 +147,10 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         <SimulationControls
           isSimulationRunning={isSimulationRunning}
           selectedAmbulance={selectedAmbulance}
+          simulationSpeed={simulationSpeed}
           toggleSimulation={toggleSimulation}
           resetRouting={resetRouting}
+          changeSimulationSpeed={changeSimulationSpeed}
         />
         
         <ApiKeyControl

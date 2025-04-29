@@ -18,7 +18,8 @@ export const useTrustLedger = () => {
     try {
       setIsApiLoading(true);
       setIsApiError(false);
-      const data = await fetchTrustLedger();
+      const data = await fetchTrustLedger({ limit: 1000 });
+      console.log("API trust ledger data loaded:", data?.length || 0);
       setApiData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching API trust ledger:", error);
@@ -42,6 +43,7 @@ export const useTrustLedger = () => {
       setConnectedWallet(address);
       
       const data = await getTrustLedger();
+      console.log("Blockchain trust ledger data loaded:", data?.length || 0);
       setBlockchainData(Array.isArray(data) ? data : []);
       
       const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS || 

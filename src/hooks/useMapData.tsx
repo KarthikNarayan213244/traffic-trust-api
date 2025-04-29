@@ -15,15 +15,18 @@ export const useMapData = (initialVehicles = [], initialRsus = [], initialConges
     setIsLoading(true);
     try {
       // Fetch vehicles data
-      const vehiclesData = await fetchVehicles();
+      const vehiclesData = await fetchVehicles({ limit: 1000 });
+      console.log(`Loaded ${vehiclesData?.length || 0} vehicles`);
       setVehicles(vehiclesData);
       
       // Fetch RSUs data
-      const rsusData = await fetchRSUs();
+      const rsusData = await fetchRSUs({ limit: 100 });
+      console.log(`Loaded ${rsusData?.length || 0} RSUs`);
       setRsus(rsusData);
       
       // Fetch congestion data
-      const congestionData = await fetchCongestionData();
+      const congestionData = await fetchCongestionData({ limit: 500 });
+      console.log(`Loaded ${congestionData?.length || 0} congestion data points`);
       setCongestionData(congestionData);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -40,6 +43,14 @@ export const useMapData = (initialVehicles = [], initialRsus = [], initialConges
   // Initial data load
   useEffect(() => {
     fetchData();
+    
+    // Set up a refresh interval for data
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60000); // Refresh every minute
+    
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   // Return both state and setter functions
