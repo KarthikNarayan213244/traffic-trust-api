@@ -33,22 +33,29 @@ export const getTrustLedger = async () => {
   } catch (error) {
     console.error("Error getting trust ledger:", error);
     
-    // Return mock data if contract call fails
-    return [
-      { 
-        tx_id: "0x7a23b5ef8742c16d3b6eb0b42128f69081592bad", 
-        vehicle_id: "TS07-2345-AB", 
-        action: "Trust Stake", 
-        amount: 95, 
-        timestamp: new Date().toISOString() 
-      },
-      { 
-        tx_id: "0x5bf1c6dde8dc48c21799e23751b612acf4d6d93c", 
-        vehicle_id: "TS08-5678-CD", 
-        action: "Trust Stake", 
-        amount: 88, 
-        timestamp: new Date(Date.now() - 86400000).toISOString() 
-      }
-    ];
+    // Generate random timestamps for more realistic data
+    const now = Date.now();
+    const dayInMs = 86400000;
+    
+    // Return mock data with different timestamps if contract call fails
+    return Array.from({ length: 5 }).map((_, index) => {
+      const randomDaysAgo = Math.floor(Math.random() * 7); // Random days from 0-7
+      const randomHours = Math.floor(Math.random() * 24); // Random hours
+      const randomMinutes = Math.floor(Math.random() * 60); // Random minutes
+      
+      const timestamp = new Date(now - (randomDaysAgo * dayInMs) - (randomHours * 3600000) - (randomMinutes * 60000));
+      
+      const vehiclePrefix = Math.random() > 0.5 ? "TS" : "AM";
+      const vehicleNumber = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+      const vehicleLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+      
+      return {
+        tx_id: `0x${Math.random().toString(16).substring(2, 15)}${Date.now().toString(16).substring(8)}`,
+        vehicle_id: `${vehiclePrefix}${vehicleNumber}-${Math.floor(1000 + Math.random() * 9000)}-${vehicleLetter}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`,
+        action: "Trust Stake",
+        amount: Math.floor(70 + Math.random() * 30), // Random amount between 70 and 100
+        timestamp: timestamp.toISOString()
+      };
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Sort by timestamp (newest first)
   }
 };
