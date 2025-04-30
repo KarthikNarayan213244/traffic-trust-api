@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import { GoogleMap, LoadScript, Marker, InfoWindow, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
 import { useMapApiKey } from "@/hooks/useMapApiKey";
 import { useSimulation } from "@/hooks/useSimulation";
-import { MapApiKeyForm } from "@/components/dashboard/MapApiKeyForm";
+import MapApiKeyForm from "@/components/dashboard/MapApiKeyForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";

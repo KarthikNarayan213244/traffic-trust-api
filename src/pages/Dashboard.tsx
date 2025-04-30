@@ -101,7 +101,15 @@ const Dashboard: React.FC = () => {
     }
   }, [initialDataChecked, vehicles.length, rsus.length]);
 
-  const seedDatabase = async (showToasts = true) => {
+  const seedDatabase = async (event?: React.MouseEvent) => {
+    // If called from an event handler, prevent default behavior
+    if (event) {
+      event.preventDefault();
+    }
+    
+    // Determine if we should show toasts based on whether this is a user action
+    const showToasts = !!event;
+    
     setIsSeeding(true);
     if (showToasts) {
       toast({
