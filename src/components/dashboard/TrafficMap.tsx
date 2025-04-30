@@ -17,6 +17,7 @@ import {
   processVehiclesForAnomalies, 
   updateTrustScores 
 } from "@/services/ml";
+import { toast } from "@/hooks/use-toast";
 
 interface TrafficMapProps {
   vehicles?: any[];
@@ -48,6 +49,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   } = useMLSimulation();
   
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
+  const [showApiKeyPrompt, setShowApiKeyPrompt] = useState<boolean>(false);
 
   // Only initialize Google Maps when we have an API key
   const { isLoaded, loadError } = useJsApiLoader({
@@ -55,6 +57,19 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     libraries,
     id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
+
+  // Check if we need to prompt for API key
+  useEffect(() => {
+    if (!apiKey) {
+      // Only show the prompt after a delay to avoid immediate popup
+      const timer = setTimeout(() => {
+        setShowApiKeyPrompt(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setShowApiKeyPrompt(false);
+    }
+  }, [apiKey]);
 
   // Set up interval for data updates and ML inference when monitoring is active
   useEffect(() => {
@@ -189,12 +204,21 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     );
   }
 
-  // Show API key form if no key is set
-  if (!apiKey) {
+  // Show API key form if no key is set and prompt is active
+  if (!apiKey && showApiKeyPrompt) {
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50 flex-col">
         <p className="text-lg mb-4">Google Maps API Key Required</p>
-        <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+        <MapApiKeyForm 
+          onApiKeySet={(key) => {
+            handleApiKeySet(key);
+            toast({
+              title: "API Key Saved",
+              description: "Your Google Maps API key has been saved. It will be used for all future sessions."
+            });
+          }}
+          initialOpen={true}
+        />
       </div>
     );
   }
@@ -208,18 +232,30 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
           <p className="text-sm text-gray-500 mt-2">
             Please check your internet connection and API key, then try again
           </p>
-          <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+          <div className="mt-4">
+            <MapApiKeyForm onApiKeySet={handleApiKeySet} initialOpen={true} />
+          </div>
         </div>
       </div>
     );
   }
 
-  // Show message if Google Maps is not loaded yet
-  if (!isLoaded) {
+  // Show message if Google Maps is not loaded yet but we have an API key
+  if (!isLoaded && apiKey) {
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         <span className="ml-3">Loading maps...</span>
+      </div>
+    );
+  }
+
+  // If we're still waiting for the API key but not showing prompt yet, show a loading state
+  if (!apiKey && !showApiKeyPrompt) {
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <span className="ml-3">Initializing...</span>
       </div>
     );
   }
