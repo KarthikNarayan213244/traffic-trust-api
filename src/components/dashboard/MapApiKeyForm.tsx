@@ -12,46 +12,36 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { API_KEY_STORAGE_KEY } from "./map/constants";
-import { Loader2 } from "lucide-react";
 
 interface MapApiKeyFormProps {
   onApiKeySet: (apiKey: string) => void;
-  initialOpen?: boolean;
-  keyLoading?: boolean;
 }
 
-const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ 
-  onApiKeySet, 
-  initialOpen = false, 
-  keyLoading = false 
-}) => {
+const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
   const [apiKey, setApiKey] = useState<string>("");
   const [showDialog, setShowDialog] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
   
   // Check if API key exists in localStorage on component mount
   useEffect(() => {
     const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    
-    // Only open dialog automatically if no API key is found and initialOpen is true
-    if (!storedApiKey && initialOpen) {
-      setShowDialog(true);
-    }
-    
     if (storedApiKey) {
       setApiKey(storedApiKey);
+      // Don't automatically call onApiKeySet here to avoid multiple initializations
+      // Only set it when the user explicitly clicks Save
+    } else {
+      setShowDialog(true);
     }
-  }, [initialOpen]);
+  }, []);
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
-      setIsSaving(true);
+      localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
       onApiKeySet(apiKey.trim());
       setShowDialog(false);
-      
-      // The toast will now be handled in the useMapApiKey hook
-      
-      setTimeout(() => setIsSaving(false), 300);
+      toast({
+        title: "API Key Saved",
+        description: "Google Maps is now ready to use.",
+      });
     } else {
       toast({
         title: "API Key Required",
@@ -70,26 +60,19 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({
       <Button
         variant="outline"
         size="sm"
+        className="absolute top-3 left-3 z-10 bg-white/90"
         onClick={handleUpdateApiKey}
-        disabled={keyLoading}
       >
-        {keyLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Updating Maps API Key...
-          </>
-        ) : (
-          "Update Maps API Key"
-        )}
+        Update Maps API Key
       </Button>
 
-      <Dialog open={showDialog} onOpenChange={(open) => !isSaving && setShowDialog(open)}>
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Google Maps API Key</DialogTitle>
             <DialogDescription>
               Enter your Google Maps API key to enable the traffic map functionality. 
-              The key will be stored in your browser's local storage for future sessions.
+              The key will be stored in your browser's local storage.
             </DialogDescription>
           </DialogHeader>
           
@@ -99,7 +82,6 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               type="password"
-              disabled={isSaving}
             />
             <p className="mt-2 text-xs text-gray-500">
               You can get an API key from the{" "}
@@ -116,19 +98,10 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)} disabled={isSaving}>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveApiKey} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save API Key"
-              )}
-            </Button>
+            <Button onClick={handleSaveApiKey}>Save API Key</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

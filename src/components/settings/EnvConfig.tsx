@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { API_KEY_STORAGE_KEY } from "@/components/dashboard/map/constants";
-import { useMapApiKey } from "@/hooks/useMapApiKey";
 
 // Define environment variable keys for our app
 const ENV_KEYS = {
@@ -18,9 +16,6 @@ const ENV_KEYS = {
 
 // Retrieve values from localStorage if they exist
 const getStoredValue = (key: string) => {
-  if (key === ENV_KEYS.GOOGLE_MAPS_API_KEY) {
-    return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
-  }
   return localStorage.getItem(`env_${key}`) || '';
 };
 
@@ -30,7 +25,6 @@ const EnvConfig: React.FC = () => {
   const [contractAddress, setContractAddress] = useState(getStoredValue(ENV_KEYS.CONTRACT_ADDRESS) || '');
   const [mapsApiKey, setMapsApiKey] = useState(getStoredValue(ENV_KEYS.GOOGLE_MAPS_API_KEY) || '');
   const [isSaving, setIsSaving] = useState(false);
-  const { handleApiKeySet } = useMapApiKey();
 
   // Save values to localStorage and notify user
   const handleSave = () => {
@@ -41,16 +35,12 @@ const EnvConfig: React.FC = () => {
       localStorage.setItem(`env_${ENV_KEYS.API_URL}`, apiUrl);
       localStorage.setItem(`env_${ENV_KEYS.RPC_URL}`, rpcUrl);
       localStorage.setItem(`env_${ENV_KEYS.CONTRACT_ADDRESS}`, contractAddress);
-      
-      // Update the Maps API key using the same mechanism as the dialog
-      if (mapsApiKey.trim()) {
-        handleApiKeySet(mapsApiKey.trim());
-      }
+      localStorage.setItem(`env_${ENV_KEYS.GOOGLE_MAPS_API_KEY}`, mapsApiKey);
       
       // Inform the user about the reload requirement
       toast({
         title: "Configuration Saved",
-        description: "Environment variables have been saved. Maps API key is applied immediately.",
+        description: "Environment variables have been saved. Please reload the application for changes to take effect.",
       });
     } catch (error) {
       console.error("Error saving configuration:", error);
@@ -125,9 +115,7 @@ const EnvConfig: React.FC = () => {
             onChange={(e) => setMapsApiKey(e.target.value)}
             type="password"
           />
-          <p className="text-xs text-muted-foreground">
-            Required for map display. This will be used across the application.
-          </p>
+          <p className="text-xs text-muted-foreground">Required for map display</p>
         </div>
       </CardContent>
       <CardFooter>

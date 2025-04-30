@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -23,7 +22,6 @@ const Dashboard: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isSeeding, setIsSeeding] = useState(false);
-  const [initialDataChecked, setInitialDataChecked] = useState(false);
 
   const loadAllData = useCallback(async () => {
     setIsLoading(true);
@@ -78,17 +76,6 @@ const Dashboard: React.FC = () => {
       }
       
       setLastUpdated(new Date());
-
-      // Auto-seed if no data is found during initial load
-      if (!initialDataChecked && 
-          vehiclesResult.status === 'fulfilled' && 
-          vehicles.length === 0 && 
-          rsusResult.status === 'fulfilled' && 
-          rsus.length === 0) {
-        console.log("No data found during initial load, auto-seeding database");
-        setInitialDataChecked(true);
-        seedDatabaseSilently(); // Call the silent seeding function instead
-      }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast({
@@ -99,25 +86,9 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [initialDataChecked, vehicles.length, rsus.length]);
+  }, []);
 
-  // Separate function for silent seeding (no event parameter)
-  const seedDatabaseSilently = async () => {
-    setIsSeeding(true);
-    try {
-      await seedDatabaseWithTestData(true);
-      await loadAllData();
-    } catch (error: any) {
-      console.error("Error seeding database silently:", error);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
-  // User-triggered seeding with event parameter
-  const seedDatabase = async (event: React.MouseEvent) => {
-    event.preventDefault();
-    
+  const seedDatabase = async () => {
     setIsSeeding(true);
     toast({
       title: "Seeding Database",
@@ -132,7 +103,7 @@ const Dashboard: React.FC = () => {
       });
       
       await loadAllData();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error seeding database:", error);
       toast({
         title: "Error",
@@ -149,7 +120,6 @@ const Dashboard: React.FC = () => {
   }, [loadAllData]);
   
   useEffect(() => {
-    // Start auto-refresh immediately
     if (autoRefresh && !refreshInterval) {
       const interval = setInterval(() => {
         loadAllData();
