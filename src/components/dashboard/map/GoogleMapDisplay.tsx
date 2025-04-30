@@ -40,6 +40,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const [isCalculatingDirections, setIsCalculatingDirections] = useState<boolean>(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const { apiKey } = useMapApiKey();
+  const [lastRouteRequest, setLastRouteRequest] = useState<string>('');
 
   // Handle map load
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
@@ -58,23 +59,61 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     }
   }, [selectedAmbulance, onMapClick]);
 
-  // Get directions when ambulance and destination are selected or when optimizedRoute changes
+  // Reset directions when ambulance or destination change
   useEffect(() => {
     if (selectedAmbulance && destination) {
-      // Clear previous directions
+      const requestKey = `${selectedAmbulance.vehicle_id}-${destination.lat.toFixed(6)}-${destination.lng.toFixed(6)}`;
+      
+      // Only recalculate if this is a new request
+      if (requestKey !== lastRouteRequest) {
+        setLastRouteRequest(requestKey);
+        setDirections(null);
+        setDirectionsStatus(null);
+        setIsCalculatingDirections(true);
+      }
+    } else {
+      setLastRouteRequest('');
       setDirections(null);
       setDirectionsStatus(null);
-      setIsCalculatingDirections(true);
+      setIsCalculatingDirections(false);
     }
   }, [selectedAmbulance, destination, optimizedRoute]);
+
+  // Prepare optimized waypoints for directions service
+  const optimizedWaypoints = useMemo(() => {
+    if (!optimizedRoute || optimizedRoute.length === 0) {
+      return [];
+    }
+    
+    // Only use a reasonable number of waypoints (max 8) to avoid overloading the API
+    // and to ensure we get a realistic route that the API can optimize
+    const waypointCount = Math.min(optimizedRoute.length, 8);
+    const step = optimizedRoute.length / waypointCount;
+    
+    const waypoints = [];
+    for (let i = 0; i < waypointCount; i++) {
+      const index = Math.floor(i * step);
+      if (index < optimizedRoute.length) {
+        const point = optimizedRoute[index];
+        waypoints.push({
+          location: new google.maps.LatLng(point.lat, point.lng),
+          stopover: false
+        });
+      }
+    }
+    
+    return waypoints;
+  }, [optimizedRoute]);
 
   // Directions callback
   const directionsCallback = useCallback(
     (result: google.maps.DirectionsResult | null, status: google.maps.DirectionsStatus) => {
+      console.log("Directions API response:", status, result?.routes?.length || 0, "routes");
       setIsCalculatingDirections(false);
+      setDirectionsStatus(status);
+      
       if (result !== null && status === google.maps.DirectionsStatus.OK) {
         setDirections(result);
-        setDirectionsStatus(status);
         
         // Pan to fit the route
         if (map && result.routes[0]?.bounds) {
@@ -82,23 +121,10 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         }
       } else {
         console.error(`Directions request failed: ${status}`);
-        setDirectionsStatus(status);
       }
     },
     [map]
   );
-
-  // Prepare optimized waypoints for directions service
-  const optimizedWaypoints = useMemo(() => {
-    if (!optimizedRoute || !optimizedRoute.length) {
-      return [];
-    }
-    
-    return optimizedRoute.map(point => ({
-      location: new google.maps.LatLng(point.lat, point.lng),
-      stopover: false
-    }));
-  }, [optimizedRoute]);
 
   // Focus the map on the route when available
   useEffect(() => {
@@ -107,15 +133,10 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
       bounds.extend(new google.maps.LatLng(selectedAmbulance.lat, selectedAmbulance.lng));
       bounds.extend(new google.maps.LatLng(destination.lat, destination.lng));
       
-      if (optimizedRoute) {
-        optimizedRoute.forEach(point => {
-          bounds.extend(new google.maps.LatLng(point.lat, point.lng));
-        });
-      }
-      
-      map.fitBounds(bounds);
+      // Add a bit of padding around the bounds
+      map.fitBounds(bounds, 50); // 50 pixels of padding
     }
-  }, [map, selectedAmbulance, destination, optimizedRoute]);
+  }, [map, selectedAmbulance, destination]);
 
   return (
     <div className="h-[400px] relative">
@@ -153,7 +174,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
               optimizeWaypoints: true,
               waypoints: optimizedWaypoints,
               provideRouteAlternatives: true,
-              avoidTolls: optimizedRoute ? optimizedRoute.length > 0 : false,
+              avoidTolls: optimizedWaypoints.length > 0,
               avoidFerries: true
             }}
             callback={directionsCallback}

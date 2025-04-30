@@ -22,6 +22,7 @@ export const useMLSimulation = (initiallyRunning = false) => {
     optimizationConfidence: number;
   } | null>(null);
   const [optimizedRoute, setOptimizedRoute] = useState<google.maps.LatLngLiteral[] | null>(null);
+  const [currentCongestionData, setCurrentCongestionData] = useState<any[]>([]);
   
   // Use our ML models hook
   const { isModelLoading, modelsLoaded, modelLoadingProgress } = useMLModels();
@@ -84,6 +85,7 @@ export const useMLSimulation = (initiallyRunning = false) => {
   const handleDestinationSelect = async (latLng: google.maps.LatLngLiteral, congestionData: any[] = []) => {
     if (selectedAmbulance) {
       setDestination(latLng);
+      setCurrentCongestionData(congestionData);
       
       // Get optimized route if models are loaded
       if (modelsLoaded) {
@@ -117,12 +119,22 @@ export const useMLSimulation = (initiallyRunning = false) => {
               description: `Route optimized with ${Math.round(routeResult.optimizationConfidence * 100)}% confidence.`,
             });
           } else {
+            // Even with no waypoints, we still need to set an optimized route to trigger the directions API
             setOptimizedRoute([]);
+            toast({
+              title: "Standard Route Calculated",
+              description: "No congestion detected. Using standard routing.",
+            });
           }
         } catch (error) {
           console.error("Error optimizing route:", error);
           setOptimizedRouteParams(null);
-          setOptimizedRoute(null);
+          setOptimizedRoute([]);
+          toast({
+            title: "Routing Error",
+            description: "Using standard Google Maps routing as fallback.",
+            variant: "destructive",
+          });
         }
       } else {
         toast({
@@ -139,6 +151,7 @@ export const useMLSimulation = (initiallyRunning = false) => {
     setDestination(null);
     setOptimizedRoute(null);
     setOptimizedRouteParams(null);
+    setCurrentCongestionData([]);
   };
 
   return {
