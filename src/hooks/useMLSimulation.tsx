@@ -18,7 +18,7 @@ export const useMLSimulation = (initiallyRunning = false) => {
   const [optimizedRouteParams, setOptimizedRouteParams] = useState<{
     waypoints: google.maps.DirectionsWaypoint[];
     routePreference: google.maps.TravelMode;
-    avoidances: google.maps.DirectionsRoutePreference[];
+    avoidances: string[];
     optimizationConfidence: number;
   } | null>(null);
   const [optimizedRoute, setOptimizedRoute] = useState<google.maps.LatLngLiteral[] | null>(null);

@@ -60,7 +60,7 @@ export const optimizeRoute = async (
 ): Promise<{
   waypoints: google.maps.DirectionsWaypoint[];
   routePreference: google.maps.TravelMode;
-  avoidances: google.maps.DirectionsRoutePreference[];
+  avoidances: string[];
   optimizationConfidence: number;
 }> => {
   try {
@@ -98,15 +98,15 @@ export const optimizeRoute = async (
     // Generate waypoints to avoid congestion
     const waypoints: google.maps.DirectionsWaypoint[] = [];
     
+    // Calculate direct route vector
+    const directVector = {
+      lat: destination.lat - origin.lat,
+      lng: destination.lng - origin.lng
+    };
+    const directDistance = Math.sqrt(directVector.lat * directVector.lat + directVector.lng * directVector.lng);
+    
     // If we have congestion data, create strategic waypoints to route around congestion
     if (congestionHotspots.length > 0) {
-      // Calculate direct route vector
-      const directVector = {
-        lat: destination.lat - origin.lat,
-        lng: destination.lng - origin.lng
-      };
-      const directDistance = Math.sqrt(directVector.lat * directVector.lat + directVector.lng * directVector.lng);
-      
       // Find points perpendicular to direct route that avoid congestion
       congestionHotspots.forEach(hotspot => {
         // Check if hotspot is near the direct route
@@ -175,11 +175,11 @@ export const optimizeRoute = async (
     }
     
     // Set avoidances based on urgency and congestion
-    const avoidances: google.maps.DirectionsRoutePreference[] = [];
+    const avoidances: string[] = [];
     
     // High urgency ambulances avoid tolls for speed
     if (urgencyLevel > 0.8) {
-      avoidances.push(google.maps.DirectionsRoutePreference.LESS_WALKING);
+      avoidances.push('tolls');
     }
     
     // Avoid highways if there's significant congestion data suggesting highway issues
@@ -188,7 +188,7 @@ export const optimizeRoute = async (
     ).length;
     
     if (highwayCongestion > 3) {
-      avoidances.push(google.maps.DirectionsRoutePreference.AVOID_HIGHWAYS);
+      avoidances.push('highways');
     }
     
     return {
