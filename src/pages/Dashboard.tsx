@@ -87,7 +87,7 @@ const Dashboard: React.FC = () => {
           rsus.length === 0) {
         console.log("No data found during initial load, auto-seeding database");
         setInitialDataChecked(true);
-        seedDatabase(false); // Silent seeding without user prompts
+        seedDatabaseSilently(); // Call the silent seeding function instead
       }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -101,42 +101,44 @@ const Dashboard: React.FC = () => {
     }
   }, [initialDataChecked, vehicles.length, rsus.length]);
 
-  const seedDatabase = async (event?: React.MouseEvent) => {
-    // If called from an event handler, prevent default behavior
-    if (event) {
-      event.preventDefault();
+  // Separate function for silent seeding (no event parameter)
+  const seedDatabaseSilently = async () => {
+    setIsSeeding(true);
+    try {
+      await seedDatabaseWithTestData(true);
+      await loadAllData();
+    } catch (error: any) {
+      console.error("Error seeding database silently:", error);
+    } finally {
+      setIsSeeding(false);
     }
-    
-    // Determine if we should show toasts based on whether this is a user action
-    const showToasts = !!event;
+  };
+
+  // User-triggered seeding with event parameter
+  const seedDatabase = async (event: React.MouseEvent) => {
+    event.preventDefault();
     
     setIsSeeding(true);
-    if (showToasts) {
-      toast({
-        title: "Seeding Database",
-        description: "Please wait while we populate the database with sample data...",
-      });
-    }
+    toast({
+      title: "Seeding Database",
+      description: "Please wait while we populate the database with sample data...",
+    });
     
     try {
       const result = await seedDatabaseWithTestData(true);
-      if (showToasts) {
-        toast({
-          title: "Database Seeded Successfully",
-          description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
-        });
-      }
+      toast({
+        title: "Database Seeded Successfully",
+        description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
+      });
       
       await loadAllData();
     } catch (error: any) {
       console.error("Error seeding database:", error);
-      if (showToasts) {
-        toast({
-          title: "Error",
-          description: `Failed to seed database: ${error.message || "Unknown error"}. Please try again.`,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: `Failed to seed database: ${error.message || "Unknown error"}. Please try again.`,
+        variant: "destructive",
+      });
     } finally {
       setIsSeeding(false);
     }

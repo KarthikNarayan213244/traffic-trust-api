@@ -86,7 +86,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   }, []);
   
   // Function to handle map clicks for setting destination
-  const handleMapClick = useCallback((event: google.maps.MapMouseEvent) => {
+  const handleMapClick = useCallback((event) => {
     if (selectedAmbulance && isSimulationRunning) {
       handleDestinationSelect({
         lat: event.latLng.lat(),
@@ -97,16 +97,16 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   
   // Function to calculate directions
   const calculateRoute = useCallback(() => {
-    if (selectedAmbulance && destination) {
-      const directionsService = new google.maps.DirectionsService();
+    if (selectedAmbulance && destination && window.google) {
+      const directionsService = new window.google.maps.DirectionsService();
       directionsService.route(
         {
           origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
           destination: destination,
-          travelMode: google.maps.TravelMode.DRIVING,
+          travelMode: window.google.maps.TravelMode.DRIVING,
         },
         (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK) {
+          if (status === window.google.maps.DirectionsStatus.OK) {
             setDirections(result);
             setError(null);
           } else {
@@ -120,7 +120,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   
   // Trigger route calculation when ambulance or destination changes
   useEffect(() => {
-    if (selectedAmbulance && destination) {
+    if (selectedAmbulance && destination && window.google) {
       calculateRoute();
     }
   }, [selectedAmbulance, destination, calculateRoute]);
@@ -255,8 +255,33 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     );
   }
   
+  // Fix for the google not defined error - render safe placeholder when no API key
+  if (!apiKey) {
+    return (
+      <div className="h-[600px] w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
+          <h3 className="text-lg font-medium">Loading Map</h3>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Please wait while the map initializes...
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <LoadScript googleMapsApiKey={apiKey}>
+    <LoadScript googleMapsApiKey={apiKey} loadingElement={
+      <div className="h-[600px] w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
+          <h3 className="text-lg font-medium">Loading Google Maps</h3>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Please wait...
+          </p>
+        </div>
+      </div>
+    }>
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={hyderabadCoordinates}
@@ -286,51 +311,64 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
           />
         )}
         
-        {/* Vehicle Markers */}
-        {vehicles.map((vehicle) => (
-          <Marker
-            key={vehicle.vehicle_id}
-            position={{ lat: vehicle.lat, lng: vehicle.lng }}
-            onClick={() => setSelectedVehicle(vehicle)}
-            icon={{
-              url: "/car-marker.svg",
-              scaledSize: new google.maps.Size(30, 30),
-            }}
-          />
-        ))}
+        {/* Vehicle Markers - Accessing google safely */}
+        {vehicles.map((vehicle) => {
+          // Only create markers once Google Maps API is loaded
+          if (!window.google) return null;
+          
+          return (
+            <Marker
+              key={vehicle.vehicle_id}
+              position={{ lat: vehicle.lat, lng: vehicle.lng }}
+              onClick={() => setSelectedVehicle(vehicle)}
+              icon={{
+                url: "/car-marker.svg",
+                scaledSize: new window.google.maps.Size(30, 30),
+              }}
+            />
+          );
+        })}
         
-        {/* RSU Markers */}
-        {rsus.map((rsu) => (
-          <Marker
-            key={rsu.rsu_id}
-            position={{ lat: rsu.lat, lng: rsu.lng }}
-            icon={{
-              url: "/rsu-marker.svg",
-              scaledSize: new google.maps.Size(30, 30),
-            }}
-          />
-        ))}
+        {/* RSU Markers - Accessing google safely */}
+        {rsus.map((rsu) => {
+          // Only create markers once Google Maps API is loaded
+          if (!window.google) return null;
+          
+          return (
+            <Marker
+              key={rsu.rsu_id}
+              position={{ lat: rsu.lat, lng: rsu.lng }}
+              icon={{
+                url: "/rsu-marker.svg",
+                scaledSize: new window.google.maps.Size(30, 30),
+              }}
+            />
+          );
+        })}
         
-        {/* Congestion Heatmap (Placeholder) */}
-        {congestionData.map(zone => (
-          <div
-            key={zone.id}
-            style={{
-              position: 'absolute',
-              left: `${((zone.lng - hyderabadCoordinates.lng) / 0.1) * 50 + 50}%`,
-              top: `${((zone.lat - hyderabadCoordinates.lat) / 0.1) * 50 + 50}%`,
-              width: `${zone.congestion_level}%`,
-              height: `${zone.congestion_level}%`,
-              backgroundColor: `rgba(255, 0, 0, ${zone.congestion_level / 100})`,
-              borderRadius: '50%',
-              pointerEvents: 'none',
-              transform: 'translate(-50%, -50%)',
-            }}
-          />
-        ))}
+        {/* Congestion Indicators */}
+        {congestionData.map(zone => {
+          // These don't rely on google API so they're safe to render
+          return (
+            <div
+              key={zone.id}
+              style={{
+                position: 'absolute',
+                left: `${((zone.lng - hyderabadCoordinates.lng) / 0.1) * 50 + 50}%`,
+                top: `${((zone.lat - hyderabadCoordinates.lat) / 0.1) * 50 + 50}%`,
+                width: `${zone.congestion_level}%`,
+                height: `${zone.congestion_level}%`,
+                backgroundColor: `rgba(255, 0, 0, ${zone.congestion_level / 100})`,
+                borderRadius: '50%',
+                pointerEvents: 'none',
+                transform: 'translate(-50%, -50%)',
+              }}
+            />
+          );
+        })}
         
-        {/* Selected Vehicle InfoWindow */}
-        {selectedVehicle && (
+        {/* Selected Vehicle InfoWindow - Accessing google safely */}
+        {selectedVehicle && window.google && (
           <InfoWindow
             position={{ lat: selectedVehicle.lat, lng: selectedVehicle.lng }}
             onCloseClick={() => setSelectedVehicle(null)}

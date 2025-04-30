@@ -19,6 +19,13 @@ if (initialApiKey === null) {
   console.log(`Map API key initialized: ${initialApiKey ? 'Found' : 'Not found'}`);
 }
 
+// Add Google Maps API type to window object
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
 export const useMapApiKey = () => {
   const [apiKey, setApiKey] = useState<string>(initialApiKey || "");
   const [keyLoading, setKeyLoading] = useState(false);
