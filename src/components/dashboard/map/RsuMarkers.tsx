@@ -21,6 +21,12 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
           lng: rsu.lng || (defaultCenter.lng + (Math.random() * 0.12 - 0.06)),
         };
         
+        // Determine RSU appearance based on status and coverage
+        const isActive = rsu.status === "Active";
+        const fillColor = isActive ? "#4ADE80" : "#94A3B8";
+        const strokeColor = isActive ? "#22C55E" : "#64748B";
+        const coverage = rsu.coverage_radius || 500;
+        
         return (
           <React.Fragment key={rsu.rsu_id}>
             <Marker
@@ -28,22 +34,24 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
               icon={{
                 path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
                 scale: 6,
-                fillColor: rsu.status === "Active" ? "#4ADE80" : "#94A3B8",
+                fillColor: fillColor,
                 fillOpacity: 0.9,
                 strokeWeight: 1,
                 strokeColor: "#FFFFFF",
+                rotation: rsu.heading || 0
               }}
-              title={`${rsu.rsu_id} - ${rsu.location}`}
+              title={`${rsu.rsu_id} - ${rsu.location || 'Unknown Location'}`}
             />
             <Circle
               center={position}
-              radius={rsu.coverage_radius || 500}
+              radius={coverage}
               options={{
-                strokeColor: rsu.status === "Active" ? "#4ADE80" : "#94A3B8",
+                strokeColor: strokeColor,
                 strokeOpacity: 0.8,
-                strokeWeight: 1,
-                fillColor: rsu.status === "Active" ? "#4ADE80" : "#94A3B8",
+                strokeWeight: 1.5,
+                fillColor: fillColor,
                 fillOpacity: 0.15,
+                clickable: false,
               }}
             />
           </React.Fragment>
