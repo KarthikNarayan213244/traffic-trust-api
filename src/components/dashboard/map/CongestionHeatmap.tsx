@@ -16,6 +16,11 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
       return [];
     }
     
+    if (!window.google) {
+      console.log("Google Maps API not loaded yet in CongestionHeatmap");
+      return [];
+    }
+    
     console.log(`Processing ${congestionData.length} congestion data points for heatmap:`, congestionData[0]);
     
     return congestionData.map(zone => {
@@ -39,6 +44,11 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
   // No congestion data, don't render anything
   if (!congestionData || !congestionData.length) {
     console.log("No congestion data to render heatmap");
+    return null;
+  }
+  
+  if (!window.google) {
+    console.log("Google Maps API not loaded yet");
     return null;
   }
 

@@ -26,7 +26,7 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
   const animationDuration = 5000;
 
   useEffect(() => {
-    if (!isSimulationRunning || vehicles.length === 0) {
+    if (!isSimulationRunning || vehicles.length === 0 || !window.google) {
       return;
     }
 
@@ -85,6 +85,8 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
   }, [vehicles, isSimulationRunning]);
 
   const getVehicleIcon = (vehicle: Vehicle, isSelected: boolean) => {
+    if (!window.google) return null;
+    
     const scale = isSelected ? 12 : 8;
     const strokeWeight = isSelected ? 3 : 1;
     
@@ -135,24 +137,41 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
     }
   };
 
+  if (!window.google) {
+    console.log("Google Maps API not loaded yet in VehicleMarkers");
+    return null;
+  }
+
   return (
     <>
       {vehicles.map((vehicle) => {
         const isAmbulance = vehicle.vehicle_type?.toLowerCase() === 'ambulance';
         const isSelected = vehicle.vehicle_id === selectedAmbulanceId;
         
-        const position = isSimulationRunning && animatedPositions.has(vehicle.vehicle_id)
-          ? animatedPositions.get(vehicle.vehicle_id)
-          : new google.maps.LatLng(
-              vehicle.lat || (defaultCenter.lat + (Math.random() * 0.1 - 0.05)),
-              vehicle.lng || (defaultCenter.lng + (Math.random() * 0.1 - 0.05))
-            );
+        let position;
+        
+        try {
+          position = isSimulationRunning && animatedPositions.has(vehicle.vehicle_id)
+            ? animatedPositions.get(vehicle.vehicle_id)
+            : new google.maps.LatLng(
+                vehicle.lat || (defaultCenter.lat + (Math.random() * 0.1 - 0.05)),
+                vehicle.lng || (defaultCenter.lng + (Math.random() * 0.1 - 0.05))
+              );
+        } catch (error) {
+          console.error("Error creating LatLng for vehicle:", vehicle, error);
+          return null;
+        }
+        
+        if (!position) return null;
+        
+        const icon = getVehicleIcon(vehicle, isSelected);
+        if (!icon) return null;
         
         return (
           <Marker
             key={vehicle.vehicle_id}
             position={position}
-            icon={getVehicleIcon(vehicle, isSelected)}
+            icon={icon}
             title={`${vehicle.vehicle_id} - ${vehicle.vehicle_type} - Trust: ${vehicle.trust_score}`}
             onClick={() => isAmbulance && handleAmbulanceClick(vehicle)}
             clickable={isAmbulance}

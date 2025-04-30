@@ -44,6 +44,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 
   // Handle map load
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
+    console.log("Google Map loaded successfully");
     mapRef.current = mapInstance;
     setMap(mapInstance);
   }, []);
@@ -61,6 +62,11 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 
   // Reset directions when ambulance or destination change
   useEffect(() => {
+    if (!window.google) {
+      console.log("Google Maps API not loaded yet in directions effect");
+      return;
+    }
+
     if (selectedAmbulance && destination) {
       const requestKey = `${selectedAmbulance.vehicle_id}-${destination.lat.toFixed(6)}-${destination.lng.toFixed(6)}`;
       
@@ -81,28 +87,33 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 
   // Prepare optimized waypoints for directions service
   const optimizedWaypoints = useMemo(() => {
-    if (!optimizedRoute || optimizedRoute.length === 0) {
+    if (!optimizedRoute || optimizedRoute.length === 0 || !window.google) {
       return [];
     }
     
-    // Only use a reasonable number of waypoints (max 8) to avoid overloading the API
-    // and to ensure we get a realistic route that the API can optimize
-    const waypointCount = Math.min(optimizedRoute.length, 8);
-    const step = optimizedRoute.length / waypointCount;
-    
-    const waypoints = [];
-    for (let i = 0; i < waypointCount; i++) {
-      const index = Math.floor(i * step);
-      if (index < optimizedRoute.length) {
-        const point = optimizedRoute[index];
-        waypoints.push({
-          location: new google.maps.LatLng(point.lat, point.lng),
-          stopover: false
-        });
+    try {
+      // Only use a reasonable number of waypoints (max 8) to avoid overloading the API
+      // and to ensure we get a realistic route that the API can optimize
+      const waypointCount = Math.min(optimizedRoute.length, 8);
+      const step = optimizedRoute.length / waypointCount;
+      
+      const waypoints = [];
+      for (let i = 0; i < waypointCount; i++) {
+        const index = Math.floor(i * step);
+        if (index < optimizedRoute.length) {
+          const point = optimizedRoute[index];
+          waypoints.push({
+            location: new google.maps.LatLng(point.lat, point.lng),
+            stopover: false
+          });
+        }
       }
+      
+      return waypoints;
+    } catch (error) {
+      console.error("Error creating waypoints:", error);
+      return [];
     }
-    
-    return waypoints;
   }, [optimizedRoute]);
 
   // Directions callback
@@ -128,15 +139,31 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 
   // Focus the map on the route when available
   useEffect(() => {
-    if (map && selectedAmbulance && destination) {
+    if (!window.google || !map || !selectedAmbulance || !destination) {
+      return;
+    }
+
+    try {
       const bounds = new google.maps.LatLngBounds();
       bounds.extend(new google.maps.LatLng(selectedAmbulance.lat, selectedAmbulance.lng));
       bounds.extend(new google.maps.LatLng(destination.lat, destination.lng));
       
       // Add a bit of padding around the bounds
       map.fitBounds(bounds, 50); // 50 pixels of padding
+    } catch (error) {
+      console.error("Error fitting bounds:", error);
     }
   }, [map, selectedAmbulance, destination]);
+
+  if (!window.google) {
+    console.log("Google Maps API not loaded yet in GoogleMapDisplay render");
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <span className="ml-3">Initializing maps...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[400px] relative">
@@ -165,7 +192,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         <CongestionHeatmap congestionData={congestionData} />
         
         {/* Use Google Maps Directions service with optimized waypoints */}
-        {selectedAmbulance && destination && apiKey && isCalculatingDirections && (
+        {window.google && selectedAmbulance && destination && apiKey && isCalculatingDirections && (
           <DirectionsService
             options={{
               origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },

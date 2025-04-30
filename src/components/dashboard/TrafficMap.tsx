@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -243,17 +242,20 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         />
       </div>
 
-      <GoogleMapDisplay 
-        vehicles={vehicles} 
-        rsus={rsus} 
-        congestionData={congestionData} 
-        isLiveMonitoring={isLiveMonitoring}
-        selectedAmbulance={selectedAmbulance}
-        onAmbulanceSelect={handleAmbulanceSelect}
-        destination={destination}
-        optimizedRoute={optimizedRoute}
-        onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
-      />
+      {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
+      {isLoaded && (
+        <GoogleMapDisplay 
+          vehicles={vehicles} 
+          rsus={rsus} 
+          congestionData={congestionData} 
+          isLiveMonitoring={isLiveMonitoring}
+          selectedAmbulance={selectedAmbulance}
+          onAmbulanceSelect={handleAmbulanceSelect}
+          destination={destination}
+          optimizedRoute={optimizedRoute}
+          onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
+        />
+      )}
       
       {modelsLoaded && isLiveMonitoring && (
         <div className="flex justify-end text-xs text-muted-foreground">
