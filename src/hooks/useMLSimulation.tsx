@@ -15,6 +15,12 @@ export const useMLSimulation = (initiallyRunning = false) => {
   const [selectedAmbulance, setSelectedAmbulance] = useState<Vehicle | null>(null);
   const [destination, setDestination] = useState<google.maps.LatLngLiteral | null>(null);
   const [modelAccuracy, setModelAccuracy] = useState<'standard' | 'high' | 'experimental'>('standard');
+  const [optimizedRouteParams, setOptimizedRouteParams] = useState<{
+    waypoints: google.maps.DirectionsWaypoint[];
+    routePreference: google.maps.TravelMode;
+    avoidances: google.maps.DirectionsRoutePreference[];
+    optimizationConfidence: number;
+  } | null>(null);
   const [optimizedRoute, setOptimizedRoute] = useState<google.maps.LatLngLiteral[] | null>(null);
   
   // Use our ML models hook
@@ -93,17 +99,29 @@ export const useMLSimulation = (initiallyRunning = false) => {
           };
           
           const routeResult = await optimizeRoute(origin, latLng, 1.0, congestionData);
+          setOptimizedRouteParams(routeResult);
           
           if (routeResult.waypoints && routeResult.waypoints.length > 0) {
-            setOptimizedRoute(routeResult.waypoints);
+            // Extract coordinates from waypoints for visualization
+            const waypointCoords = routeResult.waypoints.map(wp => {
+              const location = wp.location as google.maps.LatLng;
+              return { 
+                lat: location.lat(), 
+                lng: location.lng() 
+              };
+            });
+            setOptimizedRoute(waypointCoords);
             
             toast({
               title: "ML-Optimized Route Calculated",
               description: `Route optimized with ${Math.round(routeResult.optimizationConfidence * 100)}% confidence.`,
             });
+          } else {
+            setOptimizedRoute([]);
           }
         } catch (error) {
           console.error("Error optimizing route:", error);
+          setOptimizedRouteParams(null);
           setOptimizedRoute(null);
         }
       } else {
@@ -120,6 +138,7 @@ export const useMLSimulation = (initiallyRunning = false) => {
     setSelectedAmbulance(null);
     setDestination(null);
     setOptimizedRoute(null);
+    setOptimizedRouteParams(null);
   };
 
   return {
@@ -128,6 +147,7 @@ export const useMLSimulation = (initiallyRunning = false) => {
     destination,
     modelAccuracy,
     optimizedRoute,
+    optimizedRouteParams,
     isModelLoading,
     modelsLoaded,
     modelLoadingProgress,

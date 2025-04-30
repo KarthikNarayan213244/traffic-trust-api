@@ -37,6 +37,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
+  const [isCalculatingDirections, setIsCalculatingDirections] = useState<boolean>(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const { apiKey } = useMapApiKey();
 
@@ -57,42 +58,64 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     }
   }, [selectedAmbulance, onMapClick]);
 
-  // Get directions when ambulance and destination are selected
+  // Get directions when ambulance and destination are selected or when optimizedRoute changes
   useEffect(() => {
     if (selectedAmbulance && destination) {
       // Clear previous directions
       setDirections(null);
       setDirectionsStatus(null);
+      setIsCalculatingDirections(true);
     }
-  }, [selectedAmbulance, destination]);
+  }, [selectedAmbulance, destination, optimizedRoute]);
 
   // Directions callback
   const directionsCallback = useCallback(
     (result: google.maps.DirectionsResult | null, status: google.maps.DirectionsStatus) => {
+      setIsCalculatingDirections(false);
       if (result !== null && status === google.maps.DirectionsStatus.OK) {
         setDirections(result);
         setDirectionsStatus(status);
+        
+        // Pan to fit the route
+        if (map && result.routes[0]?.bounds) {
+          map.fitBounds(result.routes[0].bounds);
+        }
       } else {
         console.error(`Directions request failed: ${status}`);
         setDirectionsStatus(status);
       }
     },
-    []
+    [map]
   );
 
-  // Prepare optimized route for rendering if available
-  const optimizedRouteCoordinates = useMemo(() => {
-    if (!selectedAmbulance || !destination || !optimizedRoute?.length) {
-      return null;
+  // Prepare optimized waypoints for directions service
+  const optimizedWaypoints = useMemo(() => {
+    if (!optimizedRoute || !optimizedRoute.length) {
+      return [];
     }
     
-    // Create a complete path from origin through waypoints to destination
-    return [
-      { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
-      ...optimizedRoute,
-      destination
-    ];
-  }, [selectedAmbulance, destination, optimizedRoute]);
+    return optimizedRoute.map(point => ({
+      location: new google.maps.LatLng(point.lat, point.lng),
+      stopover: false
+    }));
+  }, [optimizedRoute]);
+
+  // Focus the map on the route when available
+  useEffect(() => {
+    if (map && selectedAmbulance && destination) {
+      const bounds = new google.maps.LatLngBounds();
+      bounds.extend(new google.maps.LatLng(selectedAmbulance.lat, selectedAmbulance.lng));
+      bounds.extend(new google.maps.LatLng(destination.lat, destination.lng));
+      
+      if (optimizedRoute) {
+        optimizedRoute.forEach(point => {
+          bounds.extend(new google.maps.LatLng(point.lat, point.lng));
+        });
+      }
+      
+      map.fitBounds(bounds);
+    }
+  }, [map, selectedAmbulance, destination, optimizedRoute]);
 
   return (
     <div className="h-[400px] relative">
@@ -121,46 +144,31 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         {/* Congestion heatmap */}
         <CongestionHeatmap congestionData={congestionData} />
         
-        {/* ML-optimized route if available */}
-        {optimizedRouteCoordinates && (
-          <Polyline
-            path={optimizedRouteCoordinates}
-            options={{
-              strokeColor: '#00A3FF',
-              strokeWeight: 6,
-              strokeOpacity: 0.8,
-              geodesic: true,
-              icons: [{
-                icon: {
-                  path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                  scale: 3,
-                  strokeColor: '#FFFFFF'
-                },
-                offset: '0',
-                repeat: '80px'
-              }]
-            }}
-          />
-        )}
-        
-        {/* Standard directions service and renderer (fallback) */}
-        {selectedAmbulance && destination && !optimizedRouteCoordinates && apiKey && (
+        {/* Use Google Maps Directions service with optimized waypoints */}
+        {selectedAmbulance && destination && apiKey && isCalculatingDirections && (
           <DirectionsService
             options={{
               origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
               destination: destination,
               travelMode: google.maps.TravelMode.DRIVING,
-              optimizeWaypoints: true
+              optimizeWaypoints: true,
+              waypoints: optimizedWaypoints,
+              provideRouteAlternatives: true,
+              avoidTolls: optimizedRoute ? optimizedRoute.length > 0 : false,
+              avoidFerries: true
             }}
             callback={directionsCallback}
           />
         )}
         
-        {!optimizedRouteCoordinates && directions && (
+        {/* Render the directions once received */}
+        {directions && (
           <DirectionsRenderer
             options={{
               directions: directions,
-              markerOptions: { visible: false },
+              markerOptions: { 
+                visible: false  // Hide default markers
+              },
               polylineOptions: {
                 strokeColor: '#0055FF',
                 strokeWeight: 6,
