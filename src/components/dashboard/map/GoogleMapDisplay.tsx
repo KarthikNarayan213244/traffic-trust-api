@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { GoogleMap, DirectionsService, DirectionsRenderer, Polyline } from "@react-google-maps/api";
 import VehicleMarkers from "./VehicleMarkers";
 import RsuMarkers from "./RsuMarkers";
@@ -110,7 +110,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         {/* Vehicle markers */}
         <VehicleMarkers 
           vehicles={vehicles} 
-          isLiveMonitoring={isLiveMonitoring} 
+          isSimulationRunning={isLiveMonitoring} 
           onAmbulanceSelect={onAmbulanceSelect}
           selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
         />
@@ -175,7 +175,8 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
       <MapStatsOverlay 
         vehiclesCount={vehicles.length} 
         rsusCount={rsus.length} 
-        isMLEnabled={isLiveMonitoring}
+        congestionZones={congestionData.length > 0 ? Math.ceil(congestionData.length / 3) : 0}
+        anomaliesCount={vehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
       />
       
       {selectedAmbulance && (
@@ -184,7 +185,6 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
           destination={destination} 
           directionsStatus={directionsStatus}
           apiKey={apiKey}
-          isMLOptimized={!!optimizedRouteCoordinates}
         />
       )}
     </div>

@@ -24,10 +24,8 @@ export const useMLModels = () => {
       await tf.setBackend('webgl');
       console.log("TensorFlow.js backend:", tf.getBackend());
       
-      // Register progress callback
-      tf.registerCallbackTracker(({ progress }) => {
-        setModelLoadingProgress(Math.min(95, progress * 100));
-      });
+      // Update progress manually since registerCallbackTracker doesn't exist
+      setModelLoadingProgress(10);
 
       // Traffic prediction model
       await initTrafficPredictionModel();
