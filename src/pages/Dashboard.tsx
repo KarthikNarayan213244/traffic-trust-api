@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -22,6 +23,7 @@ const Dashboard: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isSeeding, setIsSeeding] = useState(false);
+  const [initialDataChecked, setInitialDataChecked] = useState(false);
 
   const loadAllData = useCallback(async () => {
     setIsLoading(true);
@@ -76,6 +78,17 @@ const Dashboard: React.FC = () => {
       }
       
       setLastUpdated(new Date());
+
+      // Auto-seed if no data is found during initial load
+      if (!initialDataChecked && 
+          vehiclesResult.status === 'fulfilled' && 
+          vehicles.length === 0 && 
+          rsusResult.status === 'fulfilled' && 
+          rsus.length === 0) {
+        console.log("No data found during initial load, auto-seeding database");
+        setInitialDataChecked(true);
+        seedDatabase(false); // Silent seeding without user prompts
+      }
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       toast({
@@ -86,30 +99,36 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [initialDataChecked, vehicles.length, rsus.length]);
 
-  const seedDatabase = async () => {
+  const seedDatabase = async (showToasts = true) => {
     setIsSeeding(true);
-    toast({
-      title: "Seeding Database",
-      description: "Please wait while we populate the database with sample data...",
-    });
+    if (showToasts) {
+      toast({
+        title: "Seeding Database",
+        description: "Please wait while we populate the database with sample data...",
+      });
+    }
     
     try {
       const result = await seedDatabaseWithTestData(true);
-      toast({
-        title: "Database Seeded Successfully",
-        description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
-      });
+      if (showToasts) {
+        toast({
+          title: "Database Seeded Successfully",
+          description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
+        });
+      }
       
       await loadAllData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error seeding database:", error);
-      toast({
-        title: "Error",
-        description: `Failed to seed database: ${error.message || "Unknown error"}. Please try again.`,
-        variant: "destructive",
-      });
+      if (showToasts) {
+        toast({
+          title: "Error",
+          description: `Failed to seed database: ${error.message || "Unknown error"}. Please try again.`,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSeeding(false);
     }
@@ -120,6 +139,7 @@ const Dashboard: React.FC = () => {
   }, [loadAllData]);
   
   useEffect(() => {
+    // Start auto-refresh immediately
     if (autoRefresh && !refreshInterval) {
       const interval = setInterval(() => {
         loadAllData();

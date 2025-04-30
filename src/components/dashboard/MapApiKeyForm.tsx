@@ -12,34 +12,46 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { API_KEY_STORAGE_KEY } from "./map/constants";
+import { Loader2 } from "lucide-react";
 
 interface MapApiKeyFormProps {
   onApiKeySet: (apiKey: string) => void;
   initialOpen?: boolean;
+  keyLoading?: boolean;
 }
 
-const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet, initialOpen = false }) => {
+const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ 
+  onApiKeySet, 
+  initialOpen = false, 
+  keyLoading = false 
+}) => {
   const [apiKey, setApiKey] = useState<string>("");
-  const [showDialog, setShowDialog] = useState<boolean>(initialOpen);
+  const [showDialog, setShowDialog] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   
   // Check if API key exists in localStorage on component mount
   useEffect(() => {
     const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    
+    // Only open dialog automatically if no API key is found and initialOpen is true
+    if (!storedApiKey && initialOpen) {
+      setShowDialog(true);
+    }
+    
     if (storedApiKey) {
       setApiKey(storedApiKey);
-    } else if (initialOpen) {
-      setShowDialog(true);
     }
   }, [initialOpen]);
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
+      setIsSaving(true);
       onApiKeySet(apiKey.trim());
       setShowDialog(false);
-      toast({
-        title: "API Key Saved",
-        description: "Google Maps is now ready to use.",
-      });
+      
+      // The toast will now be handled in the useMapApiKey hook
+      
+      setTimeout(() => setIsSaving(false), 300);
     } else {
       toast({
         title: "API Key Required",
@@ -59,17 +71,25 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet, initialOpen 
         variant="outline"
         size="sm"
         onClick={handleUpdateApiKey}
+        disabled={keyLoading}
       >
-        Update Maps API Key
+        {keyLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Updating Maps API Key...
+          </>
+        ) : (
+          "Update Maps API Key"
+        )}
       </Button>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      <Dialog open={showDialog} onOpenChange={(open) => !isSaving && setShowDialog(open)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Google Maps API Key</DialogTitle>
             <DialogDescription>
               Enter your Google Maps API key to enable the traffic map functionality. 
-              The key will be stored in your browser's local storage.
+              The key will be stored in your browser's local storage for future sessions.
             </DialogDescription>
           </DialogHeader>
           
@@ -79,6 +99,7 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet, initialOpen 
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               type="password"
+              disabled={isSaving}
             />
             <p className="mt-2 text-xs text-gray-500">
               You can get an API key from the{" "}
@@ -95,10 +116,19 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet, initialOpen 
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button variant="outline" onClick={() => setShowDialog(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleSaveApiKey}>Save API Key</Button>
+            <Button onClick={handleSaveApiKey} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save API Key"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

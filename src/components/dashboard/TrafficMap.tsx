@@ -1,302 +1,355 @@
-
-import React, { useEffect, useState } from "react";
-import { useJsApiLoader } from "@react-google-maps/api";
-import MapApiKeyForm from "./MapApiKeyForm";
-import GoogleMapDisplay from "./map/GoogleMapDisplay";
-import { libraries } from "./map/constants";
-import { Vehicle } from "@/services/api/types";
-import { fetchVehicles, fetchCongestionData, fetchRSUs, fetchAnomalies } from "@/services/api";
-import MLControls from "./MLControls";
-import ApiKeyControl from "./ApiKeyControl";
-import { useMapData } from "@/hooks/useMapData";
-import { useMLSimulation } from "@/hooks/useMLSimulation";
+import React, { useState, useEffect, useCallback } from "react";
+import { GoogleMap, LoadScript, Marker, InfoWindow, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
 import { useMapApiKey } from "@/hooks/useMapApiKey";
-import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  updateCongestionData, 
-  processVehiclesForAnomalies, 
-  updateTrustScores 
-} from "@/services/ml";
-import { toast } from "@/hooks/use-toast";
+import { useSimulation } from "@/hooks/useSimulation";
+import { MapApiKeyForm } from "@/components/dashboard/MapApiKeyForm";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { AlertTriangle, Car, MapPin, Navigation, Radio, ShieldCheck, StopCircle } from "lucide-react";
+import { API_KEY_STORAGE_KEY } from "./map/constants";
+import { Loader2 } from "lucide-react";
 
 interface TrafficMapProps {
-  vehicles?: any[];
-  rsus?: any[];
-  isLoading?: boolean;
+  vehicles: any[];
+  rsus: any[];
+  isLoading: boolean;
   congestionData?: any[];
 }
 
-const TrafficMap: React.FC<TrafficMapProps> = ({
-  vehicles: initialVehicles = [],
-  rsus: initialRsus = [],
-  isLoading: initialLoading = false,
-  congestionData: initialCongestionData = []
+const TrafficMap: React.FC<TrafficMapProps> = ({ 
+  vehicles, 
+  rsus, 
+  isLoading, 
+  congestionData = [] 
 }) => {
-  // Custom hooks to manage state
-  const { apiKey, handleApiKeySet } = useMapApiKey();
-  const { vehicles, rsus, congestionData, anomalies, isLoading, setVehicles, setRsus, setCongestionData, setAnomalies } = useMapData(
-    initialVehicles, 
-    initialRsus, 
-    initialCongestionData, 
-    initialLoading
-  );
+  const { apiKey, handleApiKeySet, keyLoading } = useMapApiKey();
+  const [showKeyPrompt, setShowKeyPrompt] = useState(false);
+  
+  // Show key prompt only after a small delay if no API key is found
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (!apiKey) {
+      // Wait a moment before showing the prompt to avoid flickering
+      timer = setTimeout(() => {
+        setShowKeyPrompt(true);
+      }, 1000);
+    } else {
+      setShowKeyPrompt(false);
+    }
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [apiKey]);
+  
+  const mapContainerStyle = {
+    width: '100%',
+    height: '600px',
+  };
+  
+  const hyderabadCoordinates = {
+    lat: 17.3850,
+    lng: 78.4867
+  };
+  
+  const mapOptions = {
+    disableDefaultUI: true,
+    zoomControl: true,
+    streetViewControl: false,
+    mapTypeControl: false,
+    fullscreenControl: false,
+  };
+  
+  const [map, setMap] = useState(null);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [directions, setDirections] = useState(null);
+  const [error, setError] = useState(null);
   
   const { 
-    isLiveMonitoring, selectedAmbulance, destination, modelAccuracy, optimizedRoute,
-    isModelLoading, modelsLoaded, modelLoadingProgress,
-    toggleLiveMonitoring, handleAmbulanceSelect, handleDestinationSelect, resetRouting,
-    changeModelAccuracy, getIntervals 
-  } = useMLSimulation();
+    isSimulationRunning, 
+    selectedAmbulance, 
+    destination, 
+    handleAmbulanceSelect, 
+    handleDestinationSelect, 
+    resetRouting 
+  } = useSimulation();
   
-  const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
-  const [showApiKeyPrompt, setShowApiKeyPrompt] = useState<boolean>(false);
+  const onLoad = useCallback(function callback(map) {
+    setMap(map)
+  }, []);
 
-  // Only initialize Google Maps when we have an API key
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey || "",  // Use empty string if no key is available
-    libraries,
-    id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
-  });
-
-  // Check if we need to prompt for API key
-  useEffect(() => {
-    if (!apiKey) {
-      // Only show the prompt after a delay to avoid immediate popup
-      const timer = setTimeout(() => {
-        setShowApiKeyPrompt(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setShowApiKeyPrompt(false);
-    }
-  }, [apiKey]);
-
-  // Set up interval for data updates and ML inference when monitoring is active
-  useEffect(() => {
-    if (!isLiveMonitoring || isModelLoading) return;
-
-    const intervals = getIntervals();
-    
-    // First update immediately on start
-    if (modelsLoaded) {
-      (async () => {
-        // Update congestion data with ML predictions
-        const updatedCongestion = await updateCongestionData(congestionData);
-        setCongestionData(updatedCongestion);
-        console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
-        
-        // Process vehicles for anomalies
-        const detectedAnomalies = await processVehiclesForAnomalies(vehicles);
-        if (detectedAnomalies.length > 0) {
-          setAnomalies(prev => [...detectedAnomalies, ...prev]);
-          console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
-        }
-        
-        // Update vehicle trust scores
-        const updatedVehicles = await updateTrustScores(vehicles, anomalies);
-        setVehicles(updatedVehicles);
-        console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
-      })();
-    }
-    
-    // Vehicle data update interval
-    const vehicleInterval = setInterval(() => {
-      fetchVehicles({ limit: 1000 }).then(data => {
-        if (Array.isArray(data)) {
-          setVehicles(data);
-          console.log(`Updated ${data.length} vehicles`);
-          
-          // If ML models are loaded, process vehicles for anomalies
-          if (modelsLoaded) {
-            processVehiclesForAnomalies(data).then(detectedAnomalies => {
-              if (detectedAnomalies.length > 0) {
-                setAnomalies(prev => [...detectedAnomalies, ...prev]);
-                console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
-              }
-            });
-          }
-        }
-      }).catch(error => {
-        console.error("Error updating vehicles:", error);
+  const onUnmount = useCallback(function callback() {
+    setMap(null)
+  }, []);
+  
+  // Function to handle map clicks for setting destination
+  const handleMapClick = useCallback((event: google.maps.MapMouseEvent) => {
+    if (selectedAmbulance && isSimulationRunning) {
+      handleDestinationSelect({
+        lat: event.latLng.lat(),
+        lng: event.latLng.lng(),
       });
-    }, intervals.vehicles);
-
-    // Congestion data update with ML prediction interval
-    const congestionInterval = setInterval(() => {
-      fetchCongestionData({ limit: 500 }).then(async data => {
-        if (Array.isArray(data)) {
-          // If ML models are loaded, use them to update congestion predictions
-          if (modelsLoaded) {
-            const updatedCongestion = await updateCongestionData(data);
-            setCongestionData(updatedCongestion);
-            console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+    }
+  }, [selectedAmbulance, isSimulationRunning, handleDestinationSelect]);
+  
+  // Function to calculate directions
+  const calculateRoute = useCallback(() => {
+    if (selectedAmbulance && destination) {
+      const directionsService = new google.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
+          destination: destination,
+          travelMode: google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK) {
+            setDirections(result);
+            setError(null);
           } else {
-            setCongestionData(data);
-            console.log(`Updated ${data.length} congestion data points`);
+            setError(status);
+            console.error(`Error fetching directions ${result}`);
           }
         }
-      }).catch(error => {
-        console.error("Error updating congestion data:", error);
-      });
-    }, intervals.congestion);
-    
-    // RSU data update interval
-    const rsuInterval = setInterval(() => {
-      fetchRSUs({ limit: 100 }).then(data => {
-        if (Array.isArray(data)) {
-          setRsus(data);
-          console.log(`Updated ${data.length} RSUs`);
-        }
-      }).catch(error => {
-        console.error("Error updating RSUs:", error);
-      });
-    }, intervals.rsus);
-    
-    // ML model update countdown
-    const countdownInterval = setInterval(() => {
-      setMlUpdateCountdown(prev => {
-        if (prev <= 0) {
-          return Math.floor(intervals.modelUpdate / 1000);
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    // ML model update interval (more intensive analysis)
-    const mlUpdateInterval = setInterval(() => {
-      if (modelsLoaded) {
-        console.log("Running comprehensive ML model updates...");
-        
-        // Update trust scores based on all data
-        updateTrustScores(vehicles, anomalies).then(updatedVehicles => {
-          setVehicles(updatedVehicles);
-          console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
-        });
-        
-        setMlUpdateCountdown(Math.floor(intervals.modelUpdate / 1000));
-      }
-    }, intervals.modelUpdate);
-
-    return () => {
-      clearInterval(vehicleInterval);
-      clearInterval(congestionInterval);
-      clearInterval(rsuInterval);
-      clearInterval(mlUpdateInterval);
-      clearInterval(countdownInterval);
-    };
-  }, [
-    isLiveMonitoring, modelsLoaded, isModelLoading, 
-    setVehicles, setRsus, setCongestionData, setAnomalies,
-    vehicles, congestionData, anomalies, 
-    getIntervals
-  ]);
-
-  // Show loading skeleton
-  if (initialLoading && isLoading) {
-    return (
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-10 w-40" />
-          <Skeleton className="h-10 w-32" />
+      );
+    }
+  }, [selectedAmbulance, destination]);
+  
+  // Trigger route calculation when ambulance or destination changes
+  useEffect(() => {
+    if (selectedAmbulance && destination) {
+      calculateRoute();
+    }
+  }, [selectedAmbulance, destination, calculateRoute]);
+  
+  // InfoWindow content component
+  const MapInfoOverlay = ({ vehicle }) => (
+    <Card className="w-[350px] shadow-md">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Car className="h-4 w-4" />
+          <span>{vehicle.owner_name}</span>
+        </CardTitle>
+        <CardDescription>
+          Vehicle ID: {vehicle.vehicle_id}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Type</p>
+          <p className="text-blue-500">{vehicle.vehicle_type}</p>
         </div>
-        <Skeleton className="h-[400px] w-full" />
-      </div>
-    );
-  }
-
-  // Show API key form if no key is set and prompt is active
-  if (!apiKey && showApiKeyPrompt) {
-    return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50 flex-col">
-        <p className="text-lg mb-4">Google Maps API Key Required</p>
-        <MapApiKeyForm 
-          onApiKeySet={(key) => {
-            handleApiKeySet(key);
-            toast({
-              title: "API Key Saved",
-              description: "Your Google Maps API key has been saved. It will be used for all future sessions."
-            });
-          }}
-          initialOpen={true}
-        />
-      </div>
-    );
-  }
-
-  // Show error if Google Maps failed to load
-  if (loadError) {
-    return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50">
-        <div className="text-center p-4">
-          <h3 className="text-lg font-medium text-red-600">Failed to load Google Maps</h3>
-          <p className="text-sm text-gray-500 mt-2">
-            Please check your internet connection and API key, then try again
-          </p>
-          <div className="mt-4">
-            <MapApiKeyForm onApiKeySet={handleApiKeySet} initialOpen={true} />
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Location</p>
+          <p>{vehicle.location}</p>
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Trust Score</p>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-green-500" />
+            <span>{vehicle.trust_score}</span>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // Show message if Google Maps is not loaded yet but we have an API key
-  if (!isLoaded && apiKey) {
-    return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <span className="ml-3">Loading maps...</span>
-      </div>
-    );
-  }
-
-  // If we're still waiting for the API key but not showing prompt yet, show a loading state
-  if (!apiKey && !showApiKeyPrompt) {
-    return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <span className="ml-3">Initializing...</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <MLControls
-          isLiveMonitoring={isLiveMonitoring}
-          selectedAmbulance={selectedAmbulance}
-          modelAccuracy={modelAccuracy}
-          toggleLiveMonitoring={toggleLiveMonitoring}
-          resetRouting={resetRouting}
-          changeModelAccuracy={changeModelAccuracy}
-          modelProgress={isModelLoading ? modelLoadingProgress : 100}
-        />
-        
-        <ApiKeyControl
-          apiKey={apiKey}
-          onApiKeySet={handleApiKeySet}
-        />
-      </div>
-
-      <GoogleMapDisplay 
-        vehicles={vehicles} 
-        rsus={rsus} 
-        congestionData={congestionData} 
-        isLiveMonitoring={isLiveMonitoring}
-        selectedAmbulance={selectedAmbulance}
-        onAmbulanceSelect={handleAmbulanceSelect}
-        destination={destination}
-        optimizedRoute={optimizedRoute}
-        onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
-      />
-      
-      {modelsLoaded && isLiveMonitoring && (
-        <div className="flex justify-end text-xs text-muted-foreground">
-          <span>ML Model Update in: {mlUpdateCountdown}s</span>
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Speed</p>
+          <p>{vehicle.speed} km/h</p>
         </div>
-      )}
-    </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Status</p>
+          <p className={vehicle.status === 'Active' ? 'text-green-500' : 'text-red-500'}>{vehicle.status}</p>
+        </div>
+      </CardContent>
+      <CardContent className="flex items-center justify-between">
+        {isSimulationRunning && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleAmbulanceSelect(vehicle)}
+            disabled={selectedAmbulance !== null}
+          >
+            <Navigation className="mr-2 h-4 w-4" />
+            {selectedAmbulance ? 'Ambulance Selected' : 'Select as Ambulance'}
+          </Button>
+        )}
+        {vehicle.status !== 'Active' && (
+          <div className="text-red-500 flex items-center gap-1">
+            <StopCircle className="h-4 w-4" />
+            <span>Inactive</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+  
+  // Emergency Route Panel
+  const EmergencyRoutePanel = () => (
+    <Card className="absolute top-4 left-4 z-10 w-[350px]">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold">Emergency Route</CardTitle>
+        <CardDescription>
+          {selectedAmbulance ? 
+            `Route from ${selectedAmbulance.owner_name} to destination` : 
+            'Select an ambulance and a destination to calculate the route.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {selectedAmbulance && destination ? (
+          <>
+            <div className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-blue-500" />
+              <span>Ambulance: {selectedAmbulance.owner_name}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-red-500" />
+              <span>Destination: {destination.lat.toFixed(4)}, {destination.lng.toFixed(4)}</span>
+            </div>
+            {error && (
+              <div className="text-red-500">
+                Error: {error}
+              </div>
+            )}
+          </>
+        ) : (
+          <p>No route calculated.</p>
+        )}
+      </CardContent>
+      <CardContent className="flex justify-between">
+        <Button variant="outline" size="sm" onClick={resetRouting} disabled={!selectedAmbulance}>
+          Reset Route
+        </Button>
+      </CardContent>
+    </Card>
+  );
+  
+  // Show a prompt to enter API key if none is found
+  if (!apiKey && showKeyPrompt) {
+    return (
+      <div className="h-[600px] w-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="text-center p-6 max-w-md">
+          <h3 className="text-lg font-medium mb-3">Google Maps API Key Required</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            To display the traffic map, please provide your Google Maps API key. 
+            This will be saved for future sessions.
+          </p>
+          <MapApiKeyForm onApiKeySet={handleApiKeySet} initialOpen={true} keyLoading={keyLoading} />
+        </div>
+      </div>
+    );
+  }
+  
+  // Show loading state while API key is being processed
+  if (keyLoading) {
+    return (
+      <div className="h-[600px] w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin mx-auto mb-4 text-primary" />
+          <h3 className="text-lg font-medium">Initializing Map</h3>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Applying your Google Maps API key...
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <LoadScript googleMapsApiKey={apiKey}>
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={hyderabadCoordinates}
+        zoom={12}
+        options={mapOptions}
+        onLoad={onLoad}
+        onUnmount={onUnmount}
+        onClick={handleMapClick}
+      >
+        {/* Emergency Route Panel */}
+        {selectedAmbulance && destination && (
+          <EmergencyRoutePanel />
+        )}
+        
+        {/* Render directions if available */}
+        {directions && (
+          <DirectionsRenderer
+            directions={directions}
+            options={{
+              polylineOptions: {
+                strokeColor: "#2563eb",
+                strokeOpacity: 0.7,
+                strokeWeight: 5,
+              },
+              suppressMarkers: true,
+            }}
+          />
+        )}
+        
+        {/* Vehicle Markers */}
+        {vehicles.map((vehicle) => (
+          <Marker
+            key={vehicle.vehicle_id}
+            position={{ lat: vehicle.lat, lng: vehicle.lng }}
+            onClick={() => setSelectedVehicle(vehicle)}
+            icon={{
+              url: "/car-marker.svg",
+              scaledSize: new google.maps.Size(30, 30),
+            }}
+          />
+        ))}
+        
+        {/* RSU Markers */}
+        {rsus.map((rsu) => (
+          <Marker
+            key={rsu.rsu_id}
+            position={{ lat: rsu.lat, lng: rsu.lng }}
+            icon={{
+              url: "/rsu-marker.svg",
+              scaledSize: new google.maps.Size(30, 30),
+            }}
+          />
+        ))}
+        
+        {/* Congestion Heatmap (Placeholder) */}
+        {congestionData.map(zone => (
+          <div
+            key={zone.id}
+            style={{
+              position: 'absolute',
+              left: `${((zone.lng - hyderabadCoordinates.lng) / 0.1) * 50 + 50}%`,
+              top: `${((zone.lat - hyderabadCoordinates.lat) / 0.1) * 50 + 50}%`,
+              width: `${zone.congestion_level}%`,
+              height: `${zone.congestion_level}%`,
+              backgroundColor: `rgba(255, 0, 0, ${zone.congestion_level / 100})`,
+              borderRadius: '50%',
+              pointerEvents: 'none',
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
+        ))}
+        
+        {/* Selected Vehicle InfoWindow */}
+        {selectedVehicle && (
+          <InfoWindow
+            position={{ lat: selectedVehicle.lat, lng: selectedVehicle.lng }}
+            onCloseClick={() => setSelectedVehicle(null)}
+          >
+            <MapInfoOverlay vehicle={selectedVehicle} />
+          </InfoWindow>
+        )}
+        
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="absolute top-4 left-4 bg-white p-4 rounded-md shadow-md z-10">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Loading Traffic Data...</span>
+            </div>
+            <Progress value={50} className="mt-2" />
+          </div>
+        )}
+      </GoogleMap>
+    </LoadScript>
   );
 };
 
