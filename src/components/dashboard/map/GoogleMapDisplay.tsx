@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { GoogleMap, DirectionsService, DirectionsRenderer } from "@react-google-maps/api";
+import { GoogleMap, DirectionsService, DirectionsRenderer, Polyline } from "@react-google-maps/api";
 import VehicleMarkers from "./VehicleMarkers";
 import RsuMarkers from "./RsuMarkers";
 import CongestionHeatmap from "./CongestionHeatmap";
@@ -15,9 +15,10 @@ interface GoogleMapDisplayProps {
   vehicles: any[];
   rsus: any[];
   congestionData: any[];
-  isSimulationRunning?: boolean;
+  isLiveMonitoring?: boolean;
   selectedAmbulance: Vehicle | null;
   destination: google.maps.LatLngLiteral | null;
+  optimizedRoute: google.maps.LatLngLiteral[] | null;
   onAmbulanceSelect: (vehicle: Vehicle) => void;
   onMapClick: (latLng: google.maps.LatLngLiteral) => void;
 }
@@ -26,9 +27,10 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   vehicles,
   rsus,
   congestionData,
-  isSimulationRunning = false,
+  isLiveMonitoring = false,
   selectedAmbulance,
   destination,
+  optimizedRoute,
   onAmbulanceSelect,
   onMapClick
 }) => {
@@ -78,6 +80,20 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     []
   );
 
+  // Prepare optimized route for rendering if available
+  const optimizedRouteCoordinates = useMemo(() => {
+    if (!selectedAmbulance || !destination || !optimizedRoute?.length) {
+      return null;
+    }
+    
+    // Create a complete path from origin through waypoints to destination
+    return [
+      { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
+      ...optimizedRoute,
+      destination
+    ];
+  }, [selectedAmbulance, destination, optimizedRoute]);
+
   return (
     <div className="h-[400px] relative">
       <GoogleMap
@@ -94,7 +110,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         {/* Vehicle markers */}
         <VehicleMarkers 
           vehicles={vehicles} 
-          isSimulationRunning={isSimulationRunning} 
+          isLiveMonitoring={isLiveMonitoring} 
           onAmbulanceSelect={onAmbulanceSelect}
           selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
         />
@@ -105,8 +121,30 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         {/* Congestion heatmap */}
         <CongestionHeatmap congestionData={congestionData} />
         
-        {/* Directions service and renderer */}
-        {selectedAmbulance && destination && apiKey && (
+        {/* ML-optimized route if available */}
+        {optimizedRouteCoordinates && (
+          <Polyline
+            path={optimizedRouteCoordinates}
+            options={{
+              strokeColor: '#00A3FF',
+              strokeWeight: 6,
+              strokeOpacity: 0.8,
+              geodesic: true,
+              icons: [{
+                icon: {
+                  path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                  scale: 3,
+                  strokeColor: '#FFFFFF'
+                },
+                offset: '0',
+                repeat: '80px'
+              }]
+            }}
+          />
+        )}
+        
+        {/* Standard directions service and renderer (fallback) */}
+        {selectedAmbulance && destination && !optimizedRouteCoordinates && apiKey && (
           <DirectionsService
             options={{
               origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
@@ -118,7 +156,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
           />
         )}
         
-        {directions && (
+        {!optimizedRouteCoordinates && directions && (
           <DirectionsRenderer
             options={{
               directions: directions,
@@ -134,7 +172,11 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
       </GoogleMap>
 
       <MapInfoOverlay />
-      <MapStatsOverlay vehiclesCount={vehicles.length} rsusCount={rsus.length} />
+      <MapStatsOverlay 
+        vehiclesCount={vehicles.length} 
+        rsusCount={rsus.length} 
+        isMLEnabled={isLiveMonitoring}
+      />
       
       {selectedAmbulance && (
         <EmergencyRoutePanel 
@@ -142,6 +184,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
           destination={destination} 
           directionsStatus={directionsStatus}
           apiKey={apiKey}
+          isMLOptimized={!!optimizedRouteCoordinates}
         />
       )}
     </div>

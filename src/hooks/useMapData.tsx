@@ -1,6 +1,6 @@
 
 import { useState, useCallback, useEffect } from "react";
-import { fetchVehicles, fetchRSUs, fetchCongestionData } from "@/services/api";
+import { fetchVehicles, fetchRSUs, fetchCongestionData, fetchAnomalies } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 
 export const useMapData = (initialVehicles = [], initialRsus = [], initialCongestionData = [], initialLoading = false) => {
@@ -8,6 +8,7 @@ export const useMapData = (initialVehicles = [], initialRsus = [], initialConges
   const [vehicles, setVehicles] = useState<any[]>(initialVehicles);
   const [rsus, setRsus] = useState<any[]>(initialRsus);
   const [congestionData, setCongestionData] = useState<any[]>(initialCongestionData);
+  const [anomalies, setAnomalies] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(initialLoading);
 
   // Fetch data
@@ -28,6 +29,11 @@ export const useMapData = (initialVehicles = [], initialRsus = [], initialConges
       const congestionData = await fetchCongestionData({ limit: 500 });
       console.log(`Loaded ${congestionData?.length || 0} congestion data points`);
       setCongestionData(congestionData);
+      
+      // Fetch anomalies data
+      const anomaliesData = await fetchAnomalies({ limit: 200 });
+      console.log(`Loaded ${anomaliesData?.length || 0} anomalies`);
+      setAnomalies(anomaliesData);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -58,6 +64,7 @@ export const useMapData = (initialVehicles = [], initialRsus = [], initialConges
     vehicles, setVehicles, 
     rsus, setRsus, 
     congestionData, setCongestionData, 
+    anomalies, setAnomalies,
     isLoading, setIsLoading,
     fetchData 
   };

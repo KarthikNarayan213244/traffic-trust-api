@@ -1,17 +1,22 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
 import { libraries } from "./map/constants";
 import { Vehicle } from "@/services/api/types";
 import { fetchVehicles, fetchCongestionData, fetchRSUs, fetchAnomalies } from "@/services/api";
-import SimulationControls from "./SimulationControls";
+import MLControls from "./MLControls";
 import ApiKeyControl from "./ApiKeyControl";
 import { useMapData } from "@/hooks/useMapData";
-import { useSimulation } from "@/hooks/useSimulation";
+import { useMLSimulation } from "@/hooks/useMLSimulation";
 import { useMapApiKey } from "@/hooks/useMapApiKey";
 import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  updateCongestionData, 
+  processVehiclesForAnomalies, 
+  updateTrustScores 
+} from "@/services/ml";
 
 interface TrafficMapProps {
   vehicles?: any[];
@@ -28,17 +33,21 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 }) => {
   // Custom hooks to manage state
   const { apiKey, handleApiKeySet } = useMapApiKey();
-  const { vehicles, rsus, congestionData, isLoading, setVehicles, setRsus, setCongestionData } = useMapData(
+  const { vehicles, rsus, congestionData, anomalies, isLoading, setVehicles, setRsus, setCongestionData, setAnomalies } = useMapData(
     initialVehicles, 
     initialRsus, 
     initialCongestionData, 
     initialLoading
   );
+  
   const { 
-    isSimulationRunning, selectedAmbulance, destination, simulationSpeed,
-    toggleSimulation, handleAmbulanceSelect, handleDestinationSelect, resetRouting,
-    changeSimulationSpeed, getIntervals 
-  } = useSimulation();
+    isLiveMonitoring, selectedAmbulance, destination, modelAccuracy, optimizedRoute,
+    isModelLoading, modelsLoaded, modelLoadingProgress,
+    toggleLiveMonitoring, handleAmbulanceSelect, handleDestinationSelect, resetRouting,
+    changeModelAccuracy, getIntervals 
+  } = useMLSimulation();
+  
+  const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
 
   // Only initialize Google Maps when we have an API key
   const { isLoaded, loadError } = useJsApiLoader({
@@ -47,34 +56,76 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
 
-  // Set up interval for data updates when simulation is running
+  // Set up interval for data updates and ML inference when monitoring is active
   useEffect(() => {
-    if (!isSimulationRunning) return;
+    if (!isLiveMonitoring || isModelLoading) return;
 
     const intervals = getIntervals();
     
+    // First update immediately on start
+    if (modelsLoaded) {
+      (async () => {
+        // Update congestion data with ML predictions
+        const updatedCongestion = await updateCongestionData(congestionData);
+        setCongestionData(updatedCongestion);
+        console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+        
+        // Process vehicles for anomalies
+        const detectedAnomalies = await processVehiclesForAnomalies(vehicles);
+        if (detectedAnomalies.length > 0) {
+          setAnomalies(prev => [...detectedAnomalies, ...prev]);
+          console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
+        }
+        
+        // Update vehicle trust scores
+        const updatedVehicles = await updateTrustScores(vehicles, anomalies);
+        setVehicles(updatedVehicles);
+        console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
+      })();
+    }
+    
+    // Vehicle data update interval
     const vehicleInterval = setInterval(() => {
       fetchVehicles({ limit: 1000 }).then(data => {
         if (Array.isArray(data)) {
           setVehicles(data);
           console.log(`Updated ${data.length} vehicles`);
+          
+          // If ML models are loaded, process vehicles for anomalies
+          if (modelsLoaded) {
+            processVehiclesForAnomalies(data).then(detectedAnomalies => {
+              if (detectedAnomalies.length > 0) {
+                setAnomalies(prev => [...detectedAnomalies, ...prev]);
+                console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
+              }
+            });
+          }
         }
       }).catch(error => {
         console.error("Error updating vehicles:", error);
       });
     }, intervals.vehicles);
 
+    // Congestion data update with ML prediction interval
     const congestionInterval = setInterval(() => {
-      fetchCongestionData({ limit: 500 }).then(data => {
+      fetchCongestionData({ limit: 500 }).then(async data => {
         if (Array.isArray(data)) {
-          setCongestionData(data);
-          console.log(`Updated ${data.length} congestion data points`);
+          // If ML models are loaded, use them to update congestion predictions
+          if (modelsLoaded) {
+            const updatedCongestion = await updateCongestionData(data);
+            setCongestionData(updatedCongestion);
+            console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+          } else {
+            setCongestionData(data);
+            console.log(`Updated ${data.length} congestion data points`);
+          }
         }
       }).catch(error => {
         console.error("Error updating congestion data:", error);
       });
     }, intervals.congestion);
     
+    // RSU data update interval
     const rsuInterval = setInterval(() => {
       fetchRSUs({ limit: 100 }).then(data => {
         if (Array.isArray(data)) {
@@ -85,13 +136,45 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         console.error("Error updating RSUs:", error);
       });
     }, intervals.rsus);
+    
+    // ML model update countdown
+    const countdownInterval = setInterval(() => {
+      setMlUpdateCountdown(prev => {
+        if (prev <= 0) {
+          return Math.floor(intervals.modelUpdate / 1000);
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    // ML model update interval (more intensive analysis)
+    const mlUpdateInterval = setInterval(() => {
+      if (modelsLoaded) {
+        console.log("Running comprehensive ML model updates...");
+        
+        // Update trust scores based on all data
+        updateTrustScores(vehicles, anomalies).then(updatedVehicles => {
+          setVehicles(updatedVehicles);
+          console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
+        });
+        
+        setMlUpdateCountdown(Math.floor(intervals.modelUpdate / 1000));
+      }
+    }, intervals.modelUpdate);
 
     return () => {
       clearInterval(vehicleInterval);
       clearInterval(congestionInterval);
       clearInterval(rsuInterval);
+      clearInterval(mlUpdateInterval);
+      clearInterval(countdownInterval);
     };
-  }, [isSimulationRunning, setVehicles, setRsus, setCongestionData, getIntervals]);
+  }, [
+    isLiveMonitoring, modelsLoaded, isModelLoading, 
+    setVehicles, setRsus, setCongestionData, setAnomalies,
+    vehicles, congestionData, anomalies, 
+    getIntervals
+  ]);
 
   // Show loading skeleton
   if (initialLoading && isLoading) {
@@ -144,13 +227,14 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
-        <SimulationControls
-          isSimulationRunning={isSimulationRunning}
+        <MLControls
+          isLiveMonitoring={isLiveMonitoring}
           selectedAmbulance={selectedAmbulance}
-          simulationSpeed={simulationSpeed}
-          toggleSimulation={toggleSimulation}
+          modelAccuracy={modelAccuracy}
+          toggleLiveMonitoring={toggleLiveMonitoring}
           resetRouting={resetRouting}
-          changeSimulationSpeed={changeSimulationSpeed}
+          changeModelAccuracy={changeModelAccuracy}
+          modelProgress={isModelLoading ? modelLoadingProgress : 100}
         />
         
         <ApiKeyControl
@@ -163,12 +247,19 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         vehicles={vehicles} 
         rsus={rsus} 
         congestionData={congestionData} 
-        isSimulationRunning={isSimulationRunning}
+        isLiveMonitoring={isLiveMonitoring}
         selectedAmbulance={selectedAmbulance}
         onAmbulanceSelect={handleAmbulanceSelect}
         destination={destination}
-        onMapClick={handleDestinationSelect}
+        optimizedRoute={optimizedRoute}
+        onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
       />
+      
+      {modelsLoaded && isLiveMonitoring && (
+        <div className="flex justify-end text-xs text-muted-foreground">
+          <span>ML Model Update in: {mlUpdateCountdown}s</span>
+        </div>
+      )}
     </div>
   );
 };
