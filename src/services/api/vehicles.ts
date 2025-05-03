@@ -3,21 +3,44 @@ import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { Vehicle } from "./types";
 import { ApiEndpoint } from "./config";
+import { fetchRealTimeTrafficData } from "./external";
+import { isRealTimeDataAvailable } from "./external";
 
 export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
   try {
-    // First try to fetch from Supabase
-    const data = await fetchFromSupabase<"vehicles">("vehicles", options);
-    return data;
-  } catch (error) {
-    console.error("Error fetching vehicles from Supabase:", error);
-    // Fallback to direct API or mock data
+    // First try to use real-time traffic API if configured
+    if (isRealTimeDataAvailable()) {
+      try {
+        const realTimeData = await fetchRealTimeTrafficData();
+        if (realTimeData.vehicles && realTimeData.vehicles.length > 0) {
+          console.log(`Fetched ${realTimeData.vehicles.length} vehicles from real-time API`);
+          return realTimeData.vehicles;
+        }
+      } catch (realTimeError) {
+        console.error("Error fetching vehicles from real-time API:", realTimeError);
+        // Continue to try other data sources
+      }
+    }
+    
+    // Then try to fetch from Supabase
+    try {
+      const data = await fetchFromSupabase<"vehicles">("vehicles", options);
+      return data;
+    } catch (error) {
+      console.error("Error fetching vehicles from Supabase:", error);
+      // Fallback to direct API or mock data
+    }
+
+    // Fallback to direct API
     try {
       return await fetchData("vehicles", options);
     } catch (apiError) {
       console.error("Error fetching vehicles from API:", apiError);
       return getMockVehicles();
     }
+  } catch (error) {
+    console.error("All vehicle data sources failed:", error);
+    return getMockVehicles();
   }
 }
 

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -5,69 +6,38 @@ import TrafficMap from "@/components/dashboard/TrafficMap";
 import AnomalyChart from "@/components/dashboard/AnomalyChart";
 import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
 import SystemHealthMonitor from "@/components/dashboard/SystemHealthMonitor";
+import DataSourceBadge from "@/components/dashboard/DataSourceBadge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Radio, AlertTriangle, Shield, Database, BarChart3, ServerCrash } from "lucide-react";
+import { Car, Radio, AlertTriangle, Shield, Database, BarChart3, ServerCrash, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { seedDatabaseWithTestData } from "@/services/api/supabase";
-import { useRealTimeData, cleanupRealTimeConnections } from "@/hooks/useRealTimeData";
+import { useRealTimeTrafficData } from "@/hooks/useRealTimeTrafficData";
 
 const Dashboard: React.FC = () => {
-  // Using real-time data hooks instead of traditional loading
+  // Using our real-time traffic data hook
   const { 
-    data: vehicles, 
-    isLoading: isVehiclesLoading, 
-    refreshData: refreshVehicles 
-  } = useRealTimeData('vehicle', []);
+    data: trafficData,
+    isLoading,
+    isRefreshing,
+    lastUpdated,
+    refreshData,
+    dataSource,
+    isRealTimeSource
+  } = useRealTimeTrafficData({
+    initialRefreshInterval: 60000, // 1 minute
+    enableAutoRefresh: true
+  });
   
-  const { 
-    data: rsus, 
-    isLoading: isRsusLoading, 
-    refreshData: refreshRsus 
-  } = useRealTimeData('rsu', []);
+  const { vehicles, rsus, congestion: congestionData, anomalies } = trafficData;
   
-  const { 
-    data: anomalies, 
-    isLoading: isAnomaliesLoading, 
-    refreshData: refreshAnomalies 
-  } = useRealTimeData('anomaly', []);
-  
-  // Fix the trust data type to one of the supported types
-  const { 
-    data: trustLedger, 
-    isLoading: isTrustLoading, 
-    refreshData: refreshTrust 
-  } = useRealTimeData('anomaly', []); // Changed from 'trust' to 'anomaly' as a temporary solution
-  
-  const { 
-    data: congestionData, 
-    isLoading: isCongestionLoading, 
-    refreshData: refreshCongestion 
-  } = useRealTimeData('congestion', []);
+  // For trust ledger data (not from real-time APIs)
+  const [trustLedger, setTrustLedger] = useState<any[]>([]);
+  const [isTrustLoading, setIsTrustLoading] = useState<boolean>(false);
 
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isSeeding, setIsSeeding] = useState<boolean>(false);
 
-  // Combined loading state
-  const isLoading = isVehiclesLoading || isRsusLoading || isAnomaliesLoading || isTrustLoading || isCongestionLoading;
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanupRealTimeConnections();
-    };
-  }, []);
-
-  // Refresh all data
-  const refreshAllData = () => {
-    refreshVehicles();
-    refreshRsus();
-    refreshAnomalies();
-    refreshTrust();
-    refreshCongestion();
-    setLastUpdated(new Date());
-  };
-
+  // Seed database
   const seedDatabase = async () => {
     setIsSeeding(true);
     toast({
@@ -82,8 +52,8 @@ const Dashboard: React.FC = () => {
         description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
       });
       
-      refreshAllData();
-    } catch (error) {
+      refreshData();
+    } catch (error: any) {
       console.error("Error seeding database:", error);
       toast({
         title: "Error",
@@ -106,7 +76,11 @@ const Dashboard: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold">Hyderabad Traffic Trust Platform</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">REAL-TIME</span>
+              <DataSourceBadge
+                provider={dataSource.provider}
+                isRealTime={dataSource.isRealTime}
+                apiCredits={dataSource.apiCredits}
+              />
               <span className="text-xs text-muted-foreground">v2.0.0</span>
             </div>
           </div>
@@ -117,12 +91,16 @@ const Dashboard: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={refreshAllData}
-              disabled={isLoading}
+              onClick={refreshData}
+              disabled={isLoading || isRefreshing}
               className="flex items-center gap-2"
             >
-              <ServerCrash className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>Refresh Now</span>
+              {isRefreshing ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <ServerCrash className="h-4 w-4" />
+              )}
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Now'}</span>
             </Button>
             <Button
               variant="secondary"
@@ -141,7 +119,7 @@ const Dashboard: React.FC = () => {
           <KpiCard 
             title="Total Vehicles" 
             value={vehicles.length}
-            isLoading={isVehiclesLoading}
+            isLoading={isLoading}
             icon={Car}
             trend={{
               value: vehicles.length > 100 ? "+12%" : "+0%",
@@ -152,14 +130,14 @@ const Dashboard: React.FC = () => {
             title="Active RSUs" 
             value={rsus.filter(rsu => rsu.status === 'Active').length}
             total={rsus.length}
-            isLoading={isRsusLoading}
+            isLoading={isLoading}
             icon={Radio}
             color="accent"
           />
           <KpiCard 
             title="Recent Anomalies" 
             value={anomalies.length}
-            isLoading={isAnomaliesLoading}
+            isLoading={isLoading}
             icon={AlertTriangle}
             color="danger"
             trend={{
@@ -208,7 +186,7 @@ const Dashboard: React.FC = () => {
             <CardContent>
               <AnomalyChart 
                 data={anomalies} 
-                isLoading={isAnomaliesLoading} 
+                isLoading={isLoading} 
               />
             </CardContent>
           </Card>
