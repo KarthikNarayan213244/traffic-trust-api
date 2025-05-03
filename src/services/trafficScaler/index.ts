@@ -1,4 +1,3 @@
-
 import { Vehicle, RSU, CongestionZone } from '@/services/api/types';
 import { fetchTomTomTrafficFlow, fetchTomTomTrafficIncidents } from '@/services/api/external/tomtomApi';
 import { API_PROVIDERS, HYDERABAD_BOUNDING_BOX } from '@/services/api/external/config';
@@ -181,7 +180,13 @@ class TrafficScaler {
         status,
         trust_score: trustScore,
         owner_name: ownerName,
-        last_seen: new Date().toISOString(),
+        // Fix: replace last_seen with timestamp which is in the Vehicle type
+        timestamp: new Date().toISOString(),
+        // Add missing location property to match Vehicle type
+        location: {
+          lat,
+          lng
+        }
       });
     }
     
@@ -235,10 +240,12 @@ class TrafficScaler {
             lat,
             lng,
             status: Math.random() > 0.05 ? "Active" : "Inactive", // 5% chance of inactive
-            location: `Segment ${segment.id}`,
+            location: {
+              lat,
+              lng
+            }, // Fix: add proper location object instead of string
             coverage_radius: coverage,
             heading,
-            last_seen: new Date().toISOString(),
           });
           
           if (rsus.length >= targetRSUs) break;

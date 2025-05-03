@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -256,7 +255,7 @@ const Dashboard: React.FC = () => {
             isLoading={isLoading}
             icon={Car}
             trend={{
-              value: "3.5M",
+              value: "3.5M", // Fixed: Convert number to string by using quotes
               label: "registered vehicles"
             }}
           />
