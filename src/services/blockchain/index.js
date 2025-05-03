@@ -1,13 +1,15 @@
 
 // Re-export all blockchain functionality from a single entry point
-import { connectWallet, getConnectedAddress } from './provider';
+import { connectWallet, getConnectedAddress, addTrustUpdateListener, getTrustScore } from './provider';
 import { getTrustLedger } from './ledger';
-import { stakeTrust, simulateStakeTrust } from './staking';
+import { updateTrustScore, batchUpdateTrustScores } from './trustScores';
 
 export {
   connectWallet,
   getConnectedAddress,
   getTrustLedger,
-  stakeTrust,
-  simulateStakeTrust
+  updateTrustScore,
+  batchUpdateTrustScores,
+  addTrustUpdateListener,
+  getTrustScore
 };

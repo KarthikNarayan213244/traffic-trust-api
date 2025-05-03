@@ -1,4 +1,3 @@
-
 import * as tf from '@tensorflow/tfjs';
 import { toast } from "@/hooks/use-toast";
 
@@ -15,53 +14,32 @@ const ROUTE_WEIGHTS = {
   TIME_OF_DAY: 0.05
 };
 
-// Initialize and load the enhanced route optimization model
+// Initialize and load the route optimization model
 export const initRouteOptimizationModel = async (): Promise<boolean> => {
-  if (routeModel) return true;
-  if (isModelLoading) return false;
-  
-  isModelLoading = true;
-  
   try {
-    console.log("Loading advanced emergency route optimization model...");
+    console.log("Loading route optimization model...");
     
-    // First try to load a pre-trained model if available
-    try {
-      routeModel = await tf.loadLayersModel('indexeddb://route-optimization-model');
-      console.log("Loaded route optimization model from IndexedDB");
-      isModelLoading = false;
-      return true;
-    } catch (loadError) {
-      console.log("No pre-trained route model found, creating a new one", loadError);
-    }
-    
-    // Create a more sophisticated model for route optimization
+    // Create a simple model for route optimization
     const model = tf.sequential();
     
-    // Input layer with more features for better routing
     model.add(tf.layers.dense({
-      inputShape: [12], // Expanded input features
+      inputShape: [8], // Features: congestion levels, distance, time constraints, etc.
       units: 24,
-      activation: 'relu',
-      kernelRegularizer: tf.regularizers.l1({ l1: 1e-4 })
+      activation: 'relu'
     }));
     
-    // Hidden layers
-    model.add(tf.layers.dropout({ rate: 0.2 }));
     model.add(tf.layers.dense({
       units: 16,
       activation: 'relu'
     }));
     
-    model.add(tf.layers.batchNormalization());
     model.add(tf.layers.dense({
       units: 8,
       activation: 'relu'
     }));
     
-    // Output layer for route parameters
     model.add(tf.layers.dense({
-      units: 6, // More output parameters
+      units: 2, // Output: optimal route parameters
       activation: 'linear'
     }));
     
@@ -70,23 +48,11 @@ export const initRouteOptimizationModel = async (): Promise<boolean> => {
       loss: 'meanSquaredError',
     });
     
-    routeModel = model;
-    
-    // Save the model to IndexedDB for future use
-    await routeModel.save('indexeddb://route-optimization-model');
-    
-    console.log("Advanced route optimization model initialized and saved");
+    console.log("Route optimization model initialized");
     return true;
   } catch (error) {
     console.error("Error initializing route optimization model:", error);
-    toast({
-      title: "ML Model Error",
-      description: "Failed to initialize route optimization model",
-      variant: "destructive",
-    });
     return false;
-  } finally {
-    isModelLoading = false;
   }
 };
 

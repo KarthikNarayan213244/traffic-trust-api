@@ -1,4 +1,3 @@
-
 import * as tf from '@tensorflow/tfjs';
 import { toast } from "@/hooks/use-toast";
 
@@ -24,67 +23,33 @@ const ANOMALY_PATTERNS = {
   EMERGENCY_SITUATION: 'Emergency Situation'
 };
 
-// Initialize and load the enhanced anomaly detection model
+// Initialize and load the anomaly detection model
 export const initAnomalyDetectionModel = async (): Promise<boolean> => {
-  if (anomalyModel) return true;
-  if (isModelLoading) return false;
-  
-  isModelLoading = true;
-  
   try {
-    console.log("Loading enhanced anomaly detection model...");
+    console.log("Loading anomaly detection model...");
     
-    // First try to load a pre-trained model if available
-    try {
-      anomalyModel = await tf.loadLayersModel('indexeddb://anomaly-detection-model');
-      console.log("Loaded anomaly detection model from IndexedDB");
-      isModelLoading = false;
-      return true;
-    } catch (loadError) {
-      console.log("No pre-trained model found, creating a new one", loadError);
-    }
-    
-    // Create a more sophisticated autoencoder model for anomaly detection
+    // Create a simple model architecture for anomaly detection
     const model = tf.sequential();
     
-    // Input layer
     model.add(tf.layers.dense({
-      inputShape: [8], // Expanded input features for better detection
-      units: 16,
-      activation: 'relu',
-      kernelRegularizer: tf.regularizers.l1({ l1: 1e-4 })
+      inputShape: [10], // Features: speed, location, behavior patterns, etc.
+      units: 32,
+      activation: 'relu'
     }));
     
-    // Encoder layers with dropout for robustness
-    model.add(tf.layers.dropout({ rate: 0.2 }));
+    model.add(tf.layers.dense({
+      units: 16,
+      activation: 'relu'
+    }));
+    
     model.add(tf.layers.dense({
       units: 8,
       activation: 'relu'
     }));
     
-    // Bottleneck layer with batch normalization
-    model.add(tf.layers.batchNormalization());
     model.add(tf.layers.dense({
       units: 4,
-      activation: 'relu'
-    }));
-    
-    // Decoder layers
-    model.add(tf.layers.dense({
-      units: 8,
-      activation: 'relu'
-    }));
-    
-    model.add(tf.layers.dropout({ rate: 0.2 }));
-    model.add(tf.layers.dense({
-      units: 16,
-      activation: 'relu'
-    }));
-    
-    // Output layer
-    model.add(tf.layers.dense({
-      units: 8,
-      activation: 'sigmoid'
+      activation: 'sigmoid' // Output probabilities for different anomaly types
     }));
     
     // Compile with advanced optimizer settings
@@ -93,23 +58,11 @@ export const initAnomalyDetectionModel = async (): Promise<boolean> => {
       loss: 'meanSquaredError',
     });
     
-    anomalyModel = model;
-    
-    // Save the model to IndexedDB for future use
-    await anomalyModel.save('indexeddb://anomaly-detection-model');
-    
-    console.log("Enhanced anomaly detection model initialized and saved");
+    console.log("Anomaly detection model initialized");
     return true;
   } catch (error) {
-    console.error("Error initializing enhanced anomaly detection model:", error);
-    toast({
-      title: "ML Model Error",
-      description: "Failed to initialize anomaly detection model",
-      variant: "destructive",
-    });
+    console.error("Error initializing anomaly detection model:", error);
     return false;
-  } finally {
-    isModelLoading = false;
   }
 };
 

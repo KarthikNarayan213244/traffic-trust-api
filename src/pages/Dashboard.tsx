@@ -7,6 +7,7 @@ import AnomalyChart from "@/components/dashboard/AnomalyChart";
 import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
 import SystemHealthMonitor from "@/components/dashboard/SystemHealthMonitor";
 import DataSourceBadge from "@/components/dashboard/DataSourceBadge";
+import VehicleTrustCard from "@/components/dashboard/VehicleTrustCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Car, Radio, AlertTriangle, Shield, Database, BarChart3, ServerCrash, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { toast } from "@/hooks/use-toast";
 import { seedDatabaseWithTestData } from "@/services/api/supabase";
 import { useRealTimeTrafficData } from "@/hooks/useRealTimeTrafficData";
 import { fetchTrustLedger } from "@/services/api";
+import { updateTrustScore, batchUpdateTrustScores } from "@/services/blockchain";
+import { useTrustLedger } from "@/hooks/useTrustLedger";
 
 const Dashboard: React.FC = () => {
   // Using our real-time traffic data hook
@@ -33,27 +36,18 @@ const Dashboard: React.FC = () => {
   
   const { vehicles, rsus, congestion: congestionData, anomalies } = trafficData;
   
-  // For trust ledger data (not from real-time APIs)
-  const [trustLedger, setTrustLedger] = useState<any[]>([]);
-  const [isTrustLoading, setIsTrustLoading] = useState<boolean>(false);
+  // Use the useTrustLedger hook for blockchain data
+  const { 
+    apiData: trustApiData, 
+    blockchainData: trustBlockchainData, 
+    isBlockchainLoading, 
+    handleRefresh: refreshTrustData, 
+    connectedWallet,
+    etherscanUrl
+  } = useTrustLedger();
+  
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
-
-  // Load trust ledger data
-  useEffect(() => {
-    const loadTrustData = async () => {
-      setIsTrustLoading(true);
-      try {
-        const result = await fetchTrustLedger({ limit: 100 });
-        setTrustLedger(result);
-      } catch (error) {
-        console.error("Error loading trust ledger:", error);
-      } finally {
-        setIsTrustLoading(false);
-      }
-    };
-    
-    loadTrustData();
-  }, []);
+  const [isUpdatingTrust, setIsUpdatingTrust] = useState<boolean>(false);
 
   // Seed database
   const seedDatabase = async () => {
@@ -72,17 +66,7 @@ const Dashboard: React.FC = () => {
       
       // Refresh all data
       refreshData();
-      
-      // Reload trust ledger data
-      setIsTrustLoading(true);
-      try {
-        const updatedTrust = await fetchTrustLedger({ limit: 100 });
-        setTrustLedger(updatedTrust);
-      } catch (trustError) {
-        console.error("Error refreshing trust data:", trustError);
-      } finally {
-        setIsTrustLoading(false);
-      }
+      refreshTrustData();
       
     } catch (error: any) {
       console.error("Error seeding database:", error);
@@ -93,6 +77,57 @@ const Dashboard: React.FC = () => {
       });
     } finally {
       setIsSeeding(false);
+    }
+  };
+  
+  // Update trust scores on blockchain
+  const updateTrustScores = async () => {
+    if (vehicles.length === 0) {
+      toast({
+        title: "No Vehicles Available",
+        description: "Cannot update trust scores without vehicle data.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsUpdatingTrust(true);
+    toast({
+      title: "Updating Trust Scores",
+      description: "Submitting trust scores to blockchain. This may take a few moments.",
+    });
+    
+    try {
+      // Prepare trust updates for vehicles with trust scores
+      const updates = vehicles
+        .filter(v => v.trust_score !== undefined)
+        .slice(0, 25) // Limit to 25 vehicles for this demo
+        .map(vehicle => ({
+          vehicleId: vehicle.vehicle_id,
+          score: Math.round(vehicle.trust_score || 75)
+        }));
+      
+      // Submit batch update to blockchain
+      const successCount = await batchUpdateTrustScores(updates);
+      
+      toast({
+        title: "Trust Scores Updated",
+        description: `Successfully updated ${successCount} trust scores on blockchain`,
+        variant: "default",
+      });
+      
+      // Refresh trust data
+      refreshTrustData();
+      
+    } catch (error: any) {
+      console.error("Error updating trust scores on blockchain:", error);
+      toast({
+        title: "Trust Update Failed",
+        description: error.message || "Failed to update trust scores on blockchain",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingTrust(false);
     }
   };
 
@@ -120,7 +155,7 @@ const Dashboard: React.FC = () => {
                   Real-time Updates Active
                 </span>
               )}
-              <span className="text-xs text-muted-foreground">v2.1.0</span>
+              <span className="text-xs text-muted-foreground">v2.2.0</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -150,6 +185,16 @@ const Dashboard: React.FC = () => {
             >
               <Database className={`h-4 w-4 ${isSeeding ? 'animate-pulse' : ''}`} />
               <span>{isSeeding ? 'Seeding...' : 'Seed Traffic Data'}</span>
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={updateTrustScores}
+              disabled={isUpdatingTrust || vehicles.length === 0}
+              className="flex items-center gap-2"
+            >
+              <Shield className={`h-4 w-4 ${isUpdatingTrust ? 'animate-pulse' : ''}`} />
+              <span>{isUpdatingTrust ? 'Updating...' : 'Update Trust On-Chain'}</span>
             </Button>
           </div>
         </div>
@@ -188,8 +233,8 @@ const Dashboard: React.FC = () => {
           />
           <KpiCard 
             title="Trust Updates" 
-            value={trustLedger.length}
-            isLoading={isTrustLoading}
+            value={trustBlockchainData.length || trustApiData.length}
+            isLoading={isBlockchainLoading}
             icon={Shield}
             trend={{
               value: "+15%",
@@ -233,24 +278,36 @@ const Dashboard: React.FC = () => {
             </CardContent>
           </Card>
           
-          <SystemHealthMonitor />
+          <VehicleTrustCard vehicles={vehicles} />
         </div>
         
-        <Card>
-          <CardHeader className="pb-0">
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              <span>Blockchain Trust Ledger</span>
-            </CardTitle>
-            <CardDescription>Real-time trust score changes secured by blockchain</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TrustLedgerTable 
-              data={trustLedger} 
-              isLoading={isTrustLoading} 
-            />
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SystemHealthMonitor />
+          
+          <Card>
+            <CardHeader className="pb-0">
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                <span>Blockchain Trust Ledger</span>
+              </CardTitle>
+              <CardDescription>
+                Real-time trust score changes secured by blockchain
+                {connectedWallet && (
+                  <span className="block text-xs mt-1">
+                    Connected wallet: {connectedWallet.slice(0, 6)}...{connectedWallet.slice(-4)}
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TrustLedgerTable 
+                data={trustBlockchainData.length > 0 ? trustBlockchainData : trustApiData} 
+                isLoading={isBlockchainLoading} 
+                etherscanUrl={etherscanUrl}
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </MainLayout>
   );
