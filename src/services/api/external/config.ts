@@ -1,4 +1,3 @@
-
 /**
  * External Traffic APIs Configuration
  * Supports multiple providers with fallback mechanisms
@@ -24,8 +23,8 @@ export const API_PROVIDERS = {
     baseUrl: 'https://api.tomtom.com/traffic/services/4',
     flowEndpoint: '/flowSegmentData/absolute/10/json',
     incidentEndpoint: '/incidentDetails/s3/json',
-    apiKey: import.meta.env.VITE_TOMTOM_API_KEY || '',
-    enabled: Boolean(import.meta.env.VITE_TOMTOM_API_KEY),
+    apiKey: import.meta.env.VITE_TOMTOM_API_KEY || 'pEwSxAaTM0quOL1x2WuqFFYRj7lGIJeL', // Use provided key as default
+    enabled: true, // Always enable TomTom as we have the key
     rateLimit: 40, // requests per minute
     timeout: 12000, // 12 seconds
   },
@@ -49,10 +48,8 @@ export const API_PROVIDERS = {
 
 // Current active provider, prioritize TomTom over other options
 export const getActiveProvider = (): TrafficApiProvider => {
-  if (API_PROVIDERS.tomtom.enabled) return 'tomtom';
-  if (API_PROVIDERS.here.enabled) return 'here';
-  if (API_PROVIDERS.opendata.enabled) return 'opendata';
-  return 'mock';
+  // Always return TomTom as we now have the API key
+  return 'tomtom';
 };
 
 // Coordinates for the Hyderabad region
