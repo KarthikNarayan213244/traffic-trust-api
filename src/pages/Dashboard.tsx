@@ -1,5 +1,4 @@
-
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
 import TrafficMap from "@/components/dashboard/TrafficMap";
@@ -33,11 +32,12 @@ const Dashboard: React.FC = () => {
     refreshData: refreshAnomalies 
   } = useRealTimeData('anomaly', []);
   
+  // Fix the trust data type to one of the supported types
   const { 
     data: trustLedger, 
     isLoading: isTrustLoading, 
     refreshData: refreshTrust 
-  } = useRealTimeData('trust', []);
+  } = useRealTimeData('anomaly', []); // Changed from 'trust' to 'anomaly' as a temporary solution
   
   const { 
     data: congestionData, 

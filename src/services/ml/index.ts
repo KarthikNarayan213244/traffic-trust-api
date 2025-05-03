@@ -1,6 +1,18 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { initAnomalyDetectionModel, processVehiclesForAnomalies } from "./anomalyDetection";
+import { initTrafficPredictionModel } from "./trafficPrediction";
+import { initTrustScoringModel } from "./trustScoring";
+import { initRouteOptimizationModel } from "./routeOptimization";
+
+// Re-export initialization functions
+export { 
+  initAnomalyDetectionModel, 
+  initTrafficPredictionModel,
+  initTrustScoringModel,
+  initRouteOptimizationModel
+};
 
 // Use for all ML model interactions
 export async function callMLInference(action: string, data: any) {

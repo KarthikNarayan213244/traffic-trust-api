@@ -1,53 +1,56 @@
-
-// Type definitions for the data models
-export type Vehicle = {
+export interface Vehicle {
   vehicle_id: string;
   owner_name: string;
   vehicle_type: string;
-  trust_score: number;
-  lat: number;
-  lng: number;
+  location: {
+    lat: number;
+    lng: number;
+  };
   speed: number;
-  heading?: number;
-  timestamp?: string;
-  location?: string;
-  status?: string;
-};
+  heading: number;
+  trust_score: number;
+  trust_score_change: number;
+  trust_score_confidence: number;
+}
 
-export type Rsu = {
+export interface RSU {
   rsu_id: string;
-  location: string;
-  status: string;
+  location: {
+    lat: number;
+    lng: number;
+  };
+  status: 'Active' | 'Inactive';
   coverage_radius: number;
-  lat: number;
-  lng: number;
-};
+}
 
-export type Anomaly = {
-  id: number | string;
+export interface Anomaly {
+  id: string;
   timestamp: string;
+  vehicle_id: string;
   type: string;
   severity: string;
-  vehicle_id: string;
   message: string;
-  status?: string;
-};
+  status: 'Detected' | 'Resolved';
+  ml_confidence: number;
+}
 
-export type TrustLedgerEntry = {
-  tx_id: string;
+export interface TrustLedgerEntry {
+  id: string;
   timestamp: string;
   vehicle_id: string;
-  action: string;
-  old_value: number;
-  new_value: number;
-  details?: string;
-};
+  old_score: number;
+  new_score: number;
+  change: number;
+  reason: string;
+}
 
-export type CongestionZone = {
-  id: number;
+export interface CongestionZone {
+  id: string;
   zone_name: string;
   lat: number;
   lng: number;
   congestion_level: number;
   updated_at: string;
-};
+  predicted_by_ml?: boolean;
+  ml_confidence?: number;
+}
