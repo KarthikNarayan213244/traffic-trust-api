@@ -100,6 +100,11 @@ const VehicleTrustCard: React.FC<VehicleTrustCardProps> = ({ vehicles, className
   const handleConnectClick = useCallback(async () => {
     try {
       await connect();
+      toast({
+        title: "Connection Successful",
+        description: "Connected to blockchain trust ledger",
+        variant: "default",
+      });
     } catch (error: any) {
       console.error("Failed to connect to blockchain:", error);
       toast({

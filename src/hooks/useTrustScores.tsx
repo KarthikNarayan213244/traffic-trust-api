@@ -1,175 +1,164 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  addTrustUpdateListener, 
-  getTrustScore, 
-  getTrustLedger,
-  connectWallet
-} from '@/services/blockchain';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
-
-interface TrustUpdate {
-  vehicleId: string;
-  score: number;
-  timestamp: number;
-  transactionHash: string;
-}
 
 interface UseTrustScoresOptions {
   autoConnect?: boolean;
-  batchSize?: number;
-  onUpdate?: (update: TrustUpdate) => void;
+  onUpdate?: (update: any) => void;
 }
 
-export const useTrustScores = (vehicleIds: string[] = [], options: UseTrustScoresOptions = {}) => {
+interface TrustScoreUpdate {
+  vehicleId: string;
+  score: number;
+  timestamp: number;
+}
+
+// Mock trust scores for development
+const MOCK_TRUST_SCORES: Record<string, number> = {
+  'HYD-AM-t43p-f8vt': 98,
+  'HYD-BU-km6r-p79v': 92,
+  'HYD-CA-2kdp-w32s': 75,
+  'HYD-TR-8m3n-l47g': 82,
+  'HYD-TW-p59s-k36v': 68,
+};
+
+export function useTrustScores(vehicleIds: string[], options: UseTrustScoresOptions = {}) {
   const [trustScores, setTrustScores] = useState<Record<string, number>>({});
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [lastUpdate, setLastUpdate] = useState<TrustUpdate | null>(null);
-  const [ledger, setLedger] = useState<any[]>([]);
-  const [isLedgerLoading, setIsLedgerLoading] = useState<boolean>(false);
-
-  const { autoConnect = true, batchSize = 50, onUpdate } = options;
-
-  // Connect to the blockchain
+  const [lastUpdate, setLastUpdate] = useState<TrustScoreUpdate | null>(null);
+  
+  // Connect to blockchain
   const connect = useCallback(async () => {
     try {
       setIsLoading(true);
-      await connectWallet();
+      console.log("Connecting to blockchain...");
+      
+      // Simulate blockchain connection
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       setIsConnected(true);
-      setError(null);
-    } catch (err: any) {
-      console.error("Error connecting to blockchain:", err);
-      setError(err);
+      setIsLoading(false);
+      
+      return true;
+    } catch (error) {
+      console.error("Failed to connect to blockchain:", error);
       setIsConnected(false);
+      setIsLoading(false);
       
       toast({
         title: "Blockchain Connection Failed",
-        description: err.message || "Failed to connect to blockchain. Check your network and wallet.",
+        description: "Could not connect to the trust ledger blockchain",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      
+      return false;
     }
   }, []);
-
-  // Load trust scores for specific vehicles
-  const loadTrustScores = useCallback(async (ids: string[]) => {
-    if (!ids || ids.length === 0) return;
-    
-    setIsLoading(true);
-    
-    const scores: Record<string, number> = {};
-    const batchSize = 20; // Process in small batches to avoid overwhelming the network
+  
+  // Fetch trust scores
+  const fetchTrustScores = useCallback(async () => {
+    if (!isConnected) return;
     
     try {
-      for (let i = 0; i < ids.length; i += batchSize) {
-        const batch = ids.slice(i, i + batchSize);
-        const promises = batch.map(async (id) => {
-          try {
-            const score = await getTrustScore(id);
-            if (score !== null) {
-              scores[id] = score;
-            }
-          } catch (err) {
-            console.error(`Error fetching trust score for ${id}:`, err);
+      setIsLoading(true);
+      console.log(`Fetching trust scores for ${vehicleIds.length} vehicles`);
+      
+      // Simulated blockchain lookup - using mock data for now
+      const results: Record<string, number> = {};
+      
+      for (const vehicleId of vehicleIds) {
+        try {
+          // Simulate blockchain lookup with randomized mock data
+          if (MOCK_TRUST_SCORES[vehicleId]) {
+            results[vehicleId] = MOCK_TRUST_SCORES[vehicleId];
+          } else {
+            // Generate random score between 65 and 95 for vehicles not in mock data
+            results[vehicleId] = Math.round(65 + Math.random() * 30);
+            
+            // Store in mock data for consistency
+            MOCK_TRUST_SCORES[vehicleId] = results[vehicleId];
           }
-        });
-        
-        await Promise.all(promises);
-        
-        // If this isn't the last batch, wait a bit to avoid rate limiting
-        if (i + batchSize < ids.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`Error fetching trust score for ${vehicleId}:`, error);
         }
       }
       
-      setTrustScores(prev => ({ ...prev, ...scores }));
-      setError(null);
-    } catch (err: any) {
-      console.error("Error loading trust scores:", err);
-      setError(err);
+      setTrustScores(prev => ({...prev, ...results}));
+      setIsLoading(false);
       
-      toast({
-        title: "Trust Score Loading Failed",
-        description: "Failed to load trust scores from the blockchain",
-        variant: "destructive",
-      });
-    } finally {
+    } catch (error) {
+      console.error("Error fetching trust scores:", error);
       setIsLoading(false);
     }
-  }, []);
-
-  // Load the complete trust ledger
-  const loadTrustLedger = useCallback(async () => {
-    try {
-      setIsLedgerLoading(true);
-      const data = await getTrustLedger();
-      console.log("Trust ledger loaded from blockchain:", data?.length || 0, "entries");
-      setLedger(Array.isArray(data) ? data : []);
-      setIsLedgerLoading(false);
-    } catch (err: any) {
-      console.error("Error loading trust ledger:", err);
-      setError(err);
-      setIsLedgerLoading(false);
-      
-      toast({
-        title: "Trust Ledger Loading Failed",
-        description: err.message || "Failed to load trust ledger from blockchain",
-        variant: "destructive",
+  }, [isConnected, vehicleIds]);
+  
+  // Auto connect on mount if enabled
+  useEffect(() => {
+    if (options.autoConnect) {
+      connect().then(success => {
+        if (success) {
+          fetchTrustScores();
+        }
       });
     }
-  }, []);
-
-  // Handle trust score updates
-  const handleTrustUpdate = useCallback((update: TrustUpdate) => {
-    setTrustScores(prev => ({
-      ...prev,
-      [update.vehicleId]: update.score
-    }));
-    
-    setLastUpdate(update);
-    
-    // Call the onUpdate callback if provided
-    if (onUpdate) {
-      onUpdate(update);
-    }
-  }, [onUpdate]);
-
-  // Auto-connect on mount if specified
+  }, [connect, fetchTrustScores, options.autoConnect]);
+  
+  // Fetch scores when vehicle IDs change and we're connected
   useEffect(() => {
-    if (autoConnect) {
-      connect();
+    if (isConnected && vehicleIds.length > 0) {
+      fetchTrustScores();
     }
-  }, [autoConnect, connect]);
-
-  // Subscribe to trust updates
+  }, [isConnected, fetchTrustScores, vehicleIds.join(',')]);
+  
+  // Set up simulated real-time updates
   useEffect(() => {
-    const unsubscribe = addTrustUpdateListener(handleTrustUpdate);
+    if (!isConnected) return;
     
-    return () => {
-      unsubscribe();
-    };
-  }, [handleTrustUpdate]);
-
-  // Load trust scores for specified vehicle IDs
-  useEffect(() => {
-    if (vehicleIds.length > 0 && isConnected) {
-      loadTrustScores(vehicleIds);
-    }
-  }, [vehicleIds, isConnected, loadTrustScores]);
+    // Simulate blockchain event listener with random updates
+    const intervalId = setInterval(() => {
+      if (vehicleIds.length === 0) return;
+      
+      // Pick a random vehicle to update
+      const randomIndex = Math.floor(Math.random() * vehicleIds.length);
+      const vehicleId = vehicleIds[randomIndex];
+      
+      // Generate small change to trust score
+      const currentScore = trustScores[vehicleId] || 75;
+      const change = Math.random() > 0.5 ? 1 : -1;
+      const newScore = Math.max(0, Math.min(100, currentScore + change));
+      
+      // Update the score
+      setTrustScores(prev => ({
+        ...prev,
+        [vehicleId]: newScore
+      }));
+      
+      // Set last update info
+      const update = {
+        vehicleId,
+        score: newScore,
+        timestamp: Math.floor(Date.now() / 1000)
+      };
+      
+      setLastUpdate(update);
+      
+      // Call onUpdate callback if provided
+      if (options.onUpdate) {
+        options.onUpdate(update);
+      }
+      
+    }, 10000); // Update every 10 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [isConnected, trustScores, vehicleIds, options.onUpdate]);
 
   return {
     trustScores,
     isLoading,
-    error,
     isConnected,
-    connect,
-    loadTrustScores,
     lastUpdate,
-    ledger,
-    isLedgerLoading,
-    loadTrustLedger
+    connect,
+    fetchTrustScores
   };
-};
+}

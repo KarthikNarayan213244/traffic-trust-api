@@ -9,6 +9,8 @@ export function createVehicleIndex(vehicles: Vehicle[]): Map<string, Vehicle[]> 
   const cellSize = 0.01; // Approximately 1km cells at equator
   
   for (const vehicle of vehicles) {
+    if (!vehicle.lat || !vehicle.lng) continue;
+    
     // Create a grid cell identifier based on lat/lng
     const cellX = Math.floor(vehicle.lng / cellSize);
     const cellY = Math.floor(vehicle.lat / cellSize);
@@ -57,7 +59,7 @@ export function filterVehiclesByBounds(
       const cellId = `${cellX}:${cellY}`;
       
       if (vehicleIndex.has(cellId)) {
-        filteredVehicles.push(...vehicleIndex.get(cellId)!);
+        filteredVehicles = filteredVehicles.concat(vehicleIndex.get(cellId)!);
       }
     }
   }

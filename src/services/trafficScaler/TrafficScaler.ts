@@ -2,11 +2,10 @@
 import { TrafficScalerCore } from './core/TrafficScalerCore';
 import { Vehicle, RSU } from '@/services/api/types';
 import { toast } from '@/hooks/use-toast';
-import { fetchTrafficData } from './core/fetchTrafficData';
+import { fetchTrafficData, fetchIncidents, generateAllVehicles } from './core/fetchTrafficData';
 import { createVehicleIndex, filterVehiclesByBounds, filterRSUsByBounds } from './core/vehicleFiltering';
 import { distributeVehicles } from './generators';
 import { generateRSUs } from './generators';
-import { generateAllVehicles } from './core/fetchTrafficData';
 
 /**
  * Main TrafficScaler class with public API
