@@ -2,7 +2,7 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Ambulance, ExternalLink } from "lucide-react";
-import { formatTimestamp } from "./utils";
+import { formatTimestamp } from "@/lib/utils"; // Corrected import path
 import { Vehicle } from "@/services/api";
 
 interface EmergencyRoutePanelProps {
