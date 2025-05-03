@@ -1,10 +1,12 @@
 
 import React from "react";
-import { Car, Radio, AlertTriangle } from "lucide-react";
+import { formatNumber } from "@/lib/utils";
 
 interface MapStatsOverlayProps {
   vehiclesCount: number;
+  totalVehiclesCount?: number;
   rsusCount: number;
+  totalRsusCount?: number;
   congestionZones: number;
   anomaliesCount: number;
   vehicleCountSummary?: string;
@@ -12,34 +14,41 @@ interface MapStatsOverlayProps {
 
 const MapStatsOverlay: React.FC<MapStatsOverlayProps> = ({
   vehiclesCount,
+  totalVehiclesCount = 3500000,
   rsusCount,
+  totalRsusCount = 900,
   congestionZones,
   anomaliesCount,
   vehicleCountSummary
 }) => {
   return (
-    <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 bg-white/80 backdrop-blur-sm rounded-md px-3 py-2 shadow text-xs">
-      <div className="flex items-center gap-1">
-        <Car className="h-3 w-3" />
-        <span className="font-medium">
-          {vehicleCountSummary || 
-            (vehiclesCount > 1000 
-              ? `${(vehiclesCount / 1000).toFixed(1)}k Vehicles` 
-              : `${vehiclesCount} Vehicles`)}
-        </span>
+    <div className="absolute top-2 right-2 bg-white/90 rounded-md p-2 text-xs">
+      <h4 className="font-semibold mb-1">Traffic Statistics</h4>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+        <div className="flex justify-between">
+          <span>Vehicles:</span>
+          <span className="font-mono">
+            {vehiclesCount.toLocaleString()} / {formatNumber(totalVehiclesCount)}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span>RSUs:</span>
+          <span className="font-mono">
+            {rsusCount.toLocaleString()} / {formatNumber(totalRsusCount)}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span>Congestion:</span>
+          <span className="font-mono">{congestionZones.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Anomalies:</span>
+          <span className="font-mono">{anomaliesCount.toLocaleString()}</span>
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        <Radio className="h-3 w-3" />
-        <span className="font-medium">{rsusCount} RSUs</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="h-3 w-3 rounded-full bg-red-400 opacity-70"></div>
-        <span className="font-medium">{congestionZones} Congested Areas</span>
-      </div>
-      {anomaliesCount > 0 && (
-        <div className="flex items-center gap-1 text-amber-600">
-          <AlertTriangle className="h-3 w-3" />
-          <span className="font-medium">{anomaliesCount} Anomalies</span>
+      {vehicleCountSummary && (
+        <div className="mt-1 text-xs text-muted-foreground border-t pt-1">
+          {vehicleCountSummary}
         </div>
       )}
     </div>

@@ -44,14 +44,25 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   // Limit data size to prevent rendering issues
   // Use useMemo to prevent unnecessary recalculations
   const limitedVehicles = useMemo(() => {
-    // Limit to a manageable number (1000 max)
-    return initialVehicles.slice(0, 1000);
-  }, [initialVehicles]);
+    // Start with a more reasonable limit that can be displayed
+    const baseLimit = 10000;
+    
+    // Adjust based on zoom level - show more when zoomed out
+    const zoomFactor = currentZoom < 10 ? 10 : 
+                       currentZoom < 12 ? 5 : 
+                       currentZoom < 14 ? 2 : 1;
+    
+    const limit = baseLimit * zoomFactor;
+    
+    // Apply the calculated limit
+    return initialVehicles.slice(0, limit);
+  }, [initialVehicles, currentZoom]);
   
   const limitedRsus = useMemo(() => {
-    // Limit RSUs to prevent rendering issues
-    return initialRsus.slice(0, 200);
-  }, [initialRsus]);
+    // Show more RSUs when zoomed out
+    const rsuLimit = currentZoom < 12 ? 500 : 200;
+    return initialRsus.slice(0, rsuLimit);
+  }, [initialRsus, currentZoom]);
   
   const limitedCongestionData = useMemo(() => {
     // Limit congestion data
@@ -169,8 +180,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       <MapStatusFooter 
         isLiveMonitoring={isLiveMonitoring}
         vehicleCountSummary={vehicleCountSummary}
-        vehicleCount={limitedVehicles.length}
-        rsuCount={limitedRsus.length}
+        vehicleCount={initialVehicles.length}
+        rsuCount={initialRsus.length}
         lastUpdated={lastUpdated}
       />
     </div>

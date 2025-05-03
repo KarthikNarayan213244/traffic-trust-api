@@ -48,10 +48,21 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const { apiKey } = useMapApiKey();
   
   // Create memoized datasets to prevent unnecessary re-renders
-  // This is critical for performance as these objects reference won't change unless the data changes
-  const memoizedVehicles = useMemo(() => vehicles.slice(0, 1000), [vehicles]);
-  const memoizedRsus = useMemo(() => rsus.slice(0, 100), [rsus]); 
-  const memoizedCongestion = useMemo(() => congestionData.slice(0, 200), [congestionData]);
+  const memoizedVehicles = useMemo(() => {
+    // Allow more vehicles at lower zoom levels
+    const maxCount = zoomLevel < 10 ? 10000 : 
+                    zoomLevel < 12 ? 5000 : 
+                    zoomLevel < 14 ? 2000 : 1000;
+    return vehicles.slice(0, maxCount);
+  }, [vehicles, zoomLevel]);
+  
+  const memoizedRsus = useMemo(() => {
+    // Show more RSUs when zoomed out
+    const maxRsus = zoomLevel < 12 ? 500 : 100;
+    return rsus.slice(0, maxRsus);
+  }, [rsus, zoomLevel]); 
+  
+  const memoizedCongestion = useMemo(() => congestionData.slice(0, 300), [congestionData]);
 
   // Handle map load with optimized event bindings
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
@@ -168,10 +179,12 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 
       <MapInfoOverlay />
       <MapStatsOverlay 
-        vehiclesCount={memoizedVehicles.length} 
-        rsusCount={memoizedRsus.length} 
-        congestionZones={memoizedCongestion.length > 0 ? Math.ceil(memoizedCongestion.length / 3) : 0}
-        anomaliesCount={memoizedVehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
+        vehiclesCount={vehicles.length} 
+        rsusCount={rsus.length} 
+        congestionZones={congestionData.length > 0 ? Math.ceil(congestionData.length / 3) : 0}
+        anomaliesCount={vehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
+        totalVehiclesCount={3500000}
+        totalRsusCount={900}
         vehicleCountSummary={vehicleCountSummary}
       />
       

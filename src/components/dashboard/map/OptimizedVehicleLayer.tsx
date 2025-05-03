@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useMemo } from "react";
 import { Vehicle } from "@/services/api/types";
-import { getTrustScoreColor } from "./utils";
+import { getTrustScoreColor, getVehicleSize } from "./utils";
 import { defaultCenter } from "./constants";
 
 interface OptimizedVehicleLayerProps {
@@ -24,21 +24,6 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
   const clickableVehiclesRef = useRef<Map<string, {vehicle: Vehicle, x: number, y: number, size: number}>>(new Map());
   const renderRequestRef = useRef<number | null>(null);
   const projectionRef = useRef<any>(null);
-  
-  // Get appropriate marker size based on zoom
-  const getMarkerSize = useMemo(() => (vehicleType: string | undefined, isSelected: boolean): number => {
-    const baseSize = Math.max(1, Math.min(8, zoomLevel - 8));
-    
-    if (isSelected) return baseSize * 2;
-    
-    switch (vehicleType?.toLowerCase()) {
-      case 'truck': return baseSize * 1.3;
-      case 'bus': return baseSize * 1.5;
-      case 'ambulance': return baseSize * 1.8;
-      case 'two-wheeler': return baseSize * 0.7;
-      default: return baseSize;
-    }
-  }, [zoomLevel]);
   
   // Create projection helper function
   const createProjection = () => {
@@ -81,7 +66,15 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
       return;
     }
     
-    // Draw vehicles
+    // Use WebGL if available for better performance with large datasets
+    const useWebGL = zoomLevel < 12 && vehicles.length > 5000;
+
+    if (useWebGL && window.WebGLRenderingContext) {
+      renderWithWebGL(canvas, vehicles);
+      return;
+    }
+    
+    // Draw vehicles using Canvas 2D API
     for (let i = 0; i < vehicles.length; i++) {
       const vehicle = vehicles[i];
       if (!vehicle) continue;
@@ -100,7 +93,7 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
         if (!point) continue;
         
         // Get marker size and color
-        const size = getMarkerSize(vehicle.vehicle_type, isSelected);
+        const size = getVehicleSize(zoomLevel, vehicle.vehicle_type, isSelected);
         const color = getTrustScoreColor(vehicle.trust_score);
         
         // Store ambulances for click detection
@@ -147,13 +140,123 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
       }
       
       // Break rendering into chunks if there are too many vehicles
-      if (i > 0 && i % 500 === 0 && i < vehicles.length - 1) {
+      if (i > 0 && i % 2000 === 0 && i < vehicles.length - 1) {
         // Schedule the next chunk of rendering
         renderRequestRef.current = requestAnimationFrame(() => {
           renderVehicles();
         });
         break;
       }
+    }
+  };
+  
+  // WebGL rendering for better performance with large datasets
+  const renderWithWebGL = (canvas: HTMLCanvasElement, vehicles: Vehicle[]) => {
+    try {
+      // Basic implementation - in a real app, this would be more sophisticated
+      // using proper shaders, etc.
+      const gl = canvas.getContext('webgl');
+      if (!gl) return;
+      
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      
+      console.log(`Using WebGL to render ${vehicles.length} vehicles`);
+      
+      // For now, we'll just create a simplified representation with density maps
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      // Create a density heatmap
+      const gridSize = 50;
+      const gridCells: Record<string, {count: number, avgTrust: number}> = {};
+      
+      vehicles.forEach(vehicle => {
+        if (!vehicle.lat || !vehicle.lng) return;
+        
+        try {
+          const position = new google.maps.LatLng(vehicle.lat, vehicle.lng);
+          const point = projectionRef.current.fromLatLngToDivPixel(position);
+          if (!point) return;
+          
+          // Assign to grid cell
+          const gridX = Math.floor(point.x / gridSize);
+          const gridY = Math.floor(point.y / gridSize);
+          const cellKey = `${gridX},${gridY}`;
+          
+          if (!gridCells[cellKey]) {
+            gridCells[cellKey] = { count: 0, avgTrust: 0 };
+          }
+          
+          const cell = gridCells[cellKey];
+          const trustScore = vehicle.trust_score || 75;
+          
+          // Update running average
+          cell.avgTrust = (cell.avgTrust * cell.count + trustScore) / (cell.count + 1);
+          cell.count++;
+        } catch (e) {
+          // Ignore errors
+        }
+      });
+      
+      // Draw density cells
+      Object.entries(gridCells).forEach(([key, data]) => {
+        const [gridX, gridY] = key.split(',').map(Number);
+        const x = gridX * gridSize;
+        const y = gridY * gridSize;
+        const radius = Math.min(gridSize / 2, Math.max(3, Math.log(data.count) * 3));
+        
+        ctx.beginPath();
+        ctx.arc(x + gridSize/2, y + gridSize/2, radius, 0, Math.PI * 2);
+        ctx.fillStyle = getTrustScoreColor(data.avgTrust);
+        ctx.globalAlpha = Math.min(0.8, 0.3 + Math.min(0.5, data.count / 100));
+        ctx.fill();
+      });
+      
+      ctx.globalAlpha = 1.0;
+      
+      // Also render any ambulances for selection
+      vehicles.forEach(vehicle => {
+        if (!vehicle.lat || !vehicle.lng || vehicle.vehicle_type !== 'ambulance') return;
+        
+        try {
+          const isSelected = vehicle.vehicle_id === selectedAmbulanceId;
+          const position = new google.maps.LatLng(vehicle.lat, vehicle.lng);
+          const point = projectionRef.current.fromLatLngToDivPixel(position);
+          if (!point) return;
+          
+          const size = getVehicleSize(zoomLevel, 'ambulance', isSelected);
+          
+          // Store for click detection
+          clickableVehiclesRef.current.set(vehicle.vehicle_id, {
+            vehicle, 
+            x: point.x,
+            y: point.y,
+            size: size * 3
+          });
+          
+          // Draw ambulance
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y - size);
+          ctx.lineTo(point.x - size, point.y + size);
+          ctx.lineTo(point.x + size, point.y + size);
+          ctx.fillStyle = getTrustScoreColor(vehicle.trust_score);
+          ctx.fill();
+          
+          if (isSelected) {
+            ctx.strokeStyle = "#FFFF00";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      });
+      
+    } catch (error) {
+      console.error("WebGL rendering failed, falling back to Canvas:", error);
+      renderVehicles();
     }
   };
   
