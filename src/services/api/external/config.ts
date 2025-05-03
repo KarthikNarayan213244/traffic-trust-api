@@ -1,4 +1,3 @@
-
 /**
  * External Traffic APIs Configuration
  * Supports multiple providers with fallback mechanisms
@@ -31,11 +30,11 @@ export const API_PROVIDERS = {
   },
   // Open Data Platforms (e.g. government transportation APIs)
   opendata: {
-    baseUrl: import.meta.env.VITE_OPENDATA_TRAFFIC_API || '',
+    baseUrl: import.meta.env.VITE_OPENDATA_TRAFFIC_API || 'https://api.data.gov.in/resource/traffic-data',
     flowEndpoint: '/traffic-flow',
     incidentEndpoint: '/incidents',
-    apiKey: import.meta.env.VITE_OPENDATA_API_KEY || '',
-    enabled: Boolean(import.meta.env.VITE_OPENDATA_API_KEY && import.meta.env.VITE_OPENDATA_TRAFFIC_API),
+    apiKey: import.meta.env.VITE_OPENDATA_API_KEY || '579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b',
+    enabled: true, // Enable opendata by default with the provided key
     rateLimit: 30, // requests per minute
     timeout: 15000, // 15 seconds - used for custom timeout handling, not in fetch directly
   },
@@ -49,15 +48,19 @@ export const API_PROVIDERS = {
 
 // Always use TomTom as primary provider since we have a working API key
 export const getActiveProvider = (): TrafficApiProvider => {
+  // Try to use opendata first, then tomtom
+  if (API_PROVIDERS.opendata.enabled && API_PROVIDERS.opendata.apiKey) {
+    return 'opendata';
+  }
   return 'tomtom';
 };
 
-// Coordinates for the Hyderabad region
+// Coordinates for the Hyderabad region - expanded to cover more area
 export const HYDERABAD_BOUNDING_BOX = {
-  north: 17.5450, // north latitude
-  south: 17.3450, // south latitude
-  east: 78.5900,  // east longitude
-  west: 78.3400   // west longitude
+  north: 17.6200, // north latitude (expanded)
+  south: 17.2500, // south latitude (expanded)
+  east: 78.6500,  // east longitude (expanded)
+  west: 78.2500   // west longitude (expanded)
 };
 
 // Rate limiter for API calls

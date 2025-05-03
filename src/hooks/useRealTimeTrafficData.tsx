@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchVehicles, fetchRSUs, fetchCongestionData, fetchAnomalies } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
@@ -9,11 +8,23 @@ import { Vehicle, RSU, CongestionZone, Anomaly } from "@/services/api/types";
 interface UseRealTimeTrafficDataProps {
   initialRefreshInterval?: number; // in milliseconds
   enableAutoRefresh?: boolean;
+  fetchLimits?: {
+    vehicles?: number;
+    rsus?: number;
+    congestion?: number;
+    anomalies?: number;
+  };
 }
 
 export function useRealTimeTrafficData({
   initialRefreshInterval = 60000, // Default: 1 minute
-  enableAutoRefresh = true
+  enableAutoRefresh = true,
+  fetchLimits = {
+    vehicles: 5000,  // Increased from 1000
+    rsus: 1000,      // Increased from 100
+    congestion: 1000, // Increased from 500
+    anomalies: 500   // Increased from 200
+  }
 }: UseRealTimeTrafficDataProps = {}) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [rsus, setRSUs] = useState<RSU[]>([]);
@@ -52,6 +63,8 @@ export function useRealTimeTrafficData({
     currentRequests.current[dataType] = abortController;
     
     try {
+      console.log(`Fetching ${dataType} data with limit: ${options.limit || 'default'}`);
+      
       // Add signal to options
       const fetchOptions = {
         ...options,
@@ -190,28 +203,32 @@ export function useRealTimeTrafficData({
     setIsRefreshing(true);
     
     try {
-      // Fetch all data in parallel
+      // Fetch all data in parallel with increased limits
       const [vehiclesData, rsusData, congestionResults, anomaliesResults] = await Promise.allSettled([
-        fetchDataWithAbort(fetchVehicles, 'vehicles', { limit: 1000 }),
-        fetchDataWithAbort(fetchRSUs, 'rsus', { limit: 100 }),
-        fetchDataWithAbort(fetchCongestionData, 'congestion', { limit: 500 }),
-        fetchDataWithAbort(fetchAnomalies, 'anomalies', { limit: 200 })
+        fetchDataWithAbort(fetchVehicles, 'vehicles', { limit: fetchLimits.vehicles }),
+        fetchDataWithAbort(fetchRSUs, 'rsus', { limit: fetchLimits.rsus }),
+        fetchDataWithAbort(fetchCongestionData, 'congestion', { limit: fetchLimits.congestion }),
+        fetchDataWithAbort(fetchAnomalies, 'anomalies', { limit: fetchLimits.anomalies })
       ]);
       
       // Update state with results that succeeded
       if (vehiclesData.status === 'fulfilled' && vehiclesData.value) {
+        console.log(`Received ${vehiclesData.value.length} vehicles from API`);
         setVehicles(vehiclesData.value);
       }
       
       if (rsusData.status === 'fulfilled' && rsusData.value) {
+        console.log(`Received ${rsusData.value.length} RSUs from API`);
         setRSUs(rsusData.value);
       }
       
       if (congestionResults.status === 'fulfilled' && congestionResults.value) {
+        console.log(`Received ${congestionResults.value.length} congestion zones from API`);
         setCongestionData(congestionResults.value);
       }
       
       if (anomaliesResults.status === 'fulfilled' && anomaliesResults.value) {
+        console.log(`Received ${anomaliesResults.value.length} anomalies from API`);
         setAnomalies(anomaliesResults.value);
       }
       
@@ -220,6 +237,12 @@ export function useRealTimeTrafficData({
       
       // Update data source info
       setDataSource(getDataSourceInfo());
+      
+      // Show success message
+      toast({
+        title: "Traffic Data Updated",
+        description: `Loaded ${vehiclesData.status === 'fulfilled' ? vehiclesData.value?.length || 0 : 0} vehicles and ${rsusData.status === 'fulfilled' ? rsusData.value?.length || 0 : 0} RSUs`,
+      });
       
     } catch (error) {
       console.error("Error fetching traffic data:", error);
@@ -232,7 +255,7 @@ export function useRealTimeTrafficData({
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [isRefreshing]);
+  }, [isRefreshing, fetchLimits.vehicles, fetchLimits.rsus, fetchLimits.congestion, fetchLimits.anomalies]);
 
   // Initial data load
   useEffect(() => {
@@ -291,5 +314,11 @@ export function useRealTimeTrafficData({
     refreshData,
     changeRefreshInterval,
     toggleAutoRefresh,
+    counts: {
+      vehicles: vehicles.length,
+      rsus: rsus.length,
+      congestion: congestionData.length,
+      anomalies: anomalies.length
+    }
   };
 }

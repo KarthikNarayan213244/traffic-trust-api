@@ -25,10 +25,17 @@ export async function fetchOpenDataTraffic(): Promise<{
   try {
     const { baseUrl, apiKey } = API_PROVIDERS.opendata;
     
-    // Construct the API URL with parameters
+    // Construct the API URL with parameters for maximum data
     const url = new URL(baseUrl);
-    url.searchParams.append('key', apiKey);
+    url.searchParams.append('api-key', apiKey);
+    url.searchParams.append('format', 'json');
+    // Add bbox parameter in format required by API
     url.searchParams.append('bbox', `${HYDERABAD_BOUNDING_BOX.west},${HYDERABAD_BOUNDING_BOX.south},${HYDERABAD_BOUNDING_BOX.east},${HYDERABAD_BOUNDING_BOX.north}`);
+    // Request more data records
+    url.searchParams.append('limit', '1000');
+    url.searchParams.append('offset', '0');
+    
+    console.log('Fetching OpenData traffic data from:', url.toString());
     
     // Fetch data from OpenData API
     const response = await fetch(url.toString(), {
@@ -36,7 +43,7 @@ export async function fetchOpenDataTraffic(): Promise<{
         'Accept': 'application/json',
         'Authorization': apiKey ? `Bearer ${apiKey}` : ''
       }
-      // Removed the timeout property as it's not supported by the fetch API
+      // Timeout is handled separately, not in fetch API
     });
     
     if (!response.ok) {
@@ -44,9 +51,13 @@ export async function fetchOpenDataTraffic(): Promise<{
     }
     
     const data = await response.json();
+    console.log('OpenData API response received:', data.count || 'unknown count');
     
     // Transform data using our utility function
-    return transformOpenDataTraffic(data);
+    const transformedData = transformOpenDataTraffic(data);
+    console.log(`Transformed OpenData traffic: ${transformedData.vehicles.length} vehicles, ${transformedData.congestion.length} congestion zones, ${transformedData.anomalies.length} anomalies`);
+    
+    return transformedData;
   } catch (error) {
     console.error('Error fetching data from OpenData API:', error);
     return {
