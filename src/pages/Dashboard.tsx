@@ -255,7 +255,7 @@ const Dashboard: React.FC = () => {
             isLoading={isLoading}
             icon={Car}
             trend={{
-              value: "3.5M", // Fixed: Convert number to string by using quotes
+              value: "3.5M", // Must be a string, not number
               label: "registered vehicles"
             }}
           />
