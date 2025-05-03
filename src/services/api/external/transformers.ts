@@ -1,11 +1,13 @@
+
 import { v4 as uuidv4 } from 'uuid';
+import { Vehicle, CongestionZone, Anomaly } from '../types';
 
 /**
  * Transform functions for HERE Traffic API data
  */
-export function transformHereVehicleData(apiData: any): any[] {
+export function transformHereVehicleData(apiData: any): Vehicle[] {
   try {
-    const vehicles = [];
+    const vehicles: Vehicle[] = [];
     
     // Extract flow items that represent vehicle positions
     if (apiData?.RWS?.[0]?.RW) {
@@ -23,7 +25,7 @@ export function transformHereVehicleData(apiData: any): any[] {
                   // Extract only a subset of flow points to simulate vehicles
                   if (Math.random() > 0.7) { // Only use ~30% of flow points
                     const speedKmh = mainInfo.SU || 0; // Speed in km/h
-                    const vehicle = {
+                    const vehicle: Vehicle = {
                       vehicle_id: `H-${uuidv4().substring(0, 8)}`, // Generate a unique ID with HERE prefix
                       owner_name: "Traffic Flow Vehicle", // Simulated owner name
                       vehicle_type: determineVehicleType(), // Randomly determine vehicle type
