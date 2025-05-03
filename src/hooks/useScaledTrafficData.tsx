@@ -63,63 +63,85 @@ export function useScaledTrafficData({
            Math.abs(newBounds.west - prev.west) > threshold;
   }, []);
   
+  // Fetch data with throttling
+  const fetchDataThrottled = useRef<NodeJS.Timeout | null>(null);
+  
   // Fetch all data
   const fetchAllData = useCallback(async (force: boolean = false) => {
     if (isRefreshing && !force) return;
     
-    setIsRefreshing(true);
-    
-    try {
-      // Initialize or refresh the traffic scaler data
-      await refreshScaledTrafficData();
-      
-      // Get data for the current view
-      const vehiclesData = getScaledVehicles(visibleBounds, zoomLevel);
-      const rsusData = getScaledRSUs(visibleBounds);
-      const congestionResults = getScaledCongestionData();
-      
-      // Update state with results
-      setVehicles(vehiclesData);
-      setRSUs(rsusData);
-      setCongestionData(congestionResults);
-      
-      // Fetch anomalies separately (we're not scaling these)
-      try {
-        const anomaliesData = await fetchAnomalies({ limit: 200 });
-        setAnomalies(anomaliesData);
-      } catch (error) {
-        console.error("Error fetching anomalies:", error);
-      }
-      
-      // Update stats
-      const trafficStats = getTrafficStats();
-      setStats({
-        totalVehicles: trafficStats.totalVehicles,
-        visibleVehicles: vehiclesData.length,
-        totalRSUs: trafficStats.totalRSUs,
-        visibleRSUs: rsusData.length
-      });
-      
-      // Update last updated timestamp
-      setLastUpdated(new Date());
-      
-      // Store current bounds and zoom for future comparison
-      if (visibleBounds) {
-        prevBoundsRef.current = { ...visibleBounds };
-      }
-      prevZoomRef.current = zoomLevel;
-      
-    } catch (error) {
-      console.error("Error fetching scaled traffic data:", error);
-      toast({
-        title: "Data Fetch Error",
-        description: "Could not refresh traffic data. Will try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+    // Clear any pending fetch
+    if (fetchDataThrottled.current) {
+      clearTimeout(fetchDataThrottled.current);
+      fetchDataThrottled.current = null;
     }
+    
+    fetchDataThrottled.current = setTimeout(async () => {
+      setIsRefreshing(true);
+      
+      try {
+        // Get stats first to avoid unnecessary data fetching
+        const trafficStats = getTrafficStats();
+        
+        // If we have no vehicles yet, initialize or refresh the traffic scaler data
+        if (trafficStats.totalVehicles === 0) {
+          await refreshScaledTrafficData();
+        }
+        
+        // Limit vehicle count based on zoom level to improve performance
+        const maxVehicles = zoomLevel < 12 ? 200 : zoomLevel < 14 ? 500 : 1000;
+        
+        // Get data for the current view with limits
+        const vehiclesData = getScaledVehicles(visibleBounds, zoomLevel, maxVehicles);
+        const rsusData = getScaledRSUs(visibleBounds, 200); // Limit to 200 RSUs
+        const congestionResults = getScaledCongestionData(300); // Limit to 300 congestion zones
+        
+        // Update state with results
+        setVehicles(vehiclesData);
+        setRSUs(rsusData);
+        setCongestionData(congestionResults);
+        
+        // Fetch anomalies separately (we're not scaling these)
+        try {
+          // Limit anomalies to improve performance
+          const anomaliesData = await fetchAnomalies({ limit: 100 });
+          setAnomalies(anomaliesData);
+        } catch (error) {
+          console.error("Error fetching anomalies:", error);
+        }
+        
+        // Update stats
+        const updatedStats = getTrafficStats();
+        setStats({
+          totalVehicles: updatedStats.totalVehicles,
+          visibleVehicles: vehiclesData.length,
+          totalRSUs: updatedStats.totalRSUs,
+          visibleRSUs: rsusData.length
+        });
+        
+        // Update last updated timestamp
+        setLastUpdated(new Date());
+        
+        // Store current bounds and zoom for future comparison
+        if (visibleBounds) {
+          prevBoundsRef.current = { ...visibleBounds };
+        }
+        prevZoomRef.current = zoomLevel;
+        
+      } catch (error) {
+        console.error("Error fetching scaled traffic data:", error);
+        toast({
+          title: "Data Fetch Error",
+          description: "Could not refresh traffic data. Will try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+        fetchDataThrottled.current = null;
+      }
+    }, 500); // Add a 500ms delay to prevent rapid consecutive calls
+    
   }, [isRefreshing, visibleBounds, zoomLevel]);
   
   // Update data when bounds or zoom changes
@@ -136,9 +158,16 @@ export function useScaledTrafficData({
   // Initial data load
   useEffect(() => {
     fetchAllData();
+    
+    // Cleanup function
+    return () => {
+      if (fetchDataThrottled.current) {
+        clearTimeout(fetchDataThrottled.current);
+      }
+    };
   }, [fetchAllData]);
   
-  // Set up auto refresh
+  // Set up auto refresh with proper cleanup
   useEffect(() => {
     if (!autoRefresh) return;
     

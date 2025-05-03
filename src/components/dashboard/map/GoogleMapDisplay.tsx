@@ -1,7 +1,7 @@
+
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { GoogleMap, DirectionsService, DirectionsRenderer, Polyline } from "@react-google-maps/api";
+import { GoogleMap } from "@react-google-maps/api";
 import OptimizedVehicleLayer from "./OptimizedVehicleLayer";
-import VehicleMarkers from "./VehicleMarkers";
 import RsuMarkers from "./RsuMarkers";
 import CongestionHeatmap from "./CongestionHeatmap";
 import MapInfoOverlay from "./MapInfoOverlay";
@@ -40,14 +40,12 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(12);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
   const [isCalculatingDirections, setIsCalculatingDirections] = useState<boolean>(false);
   const [useOptimizedLayer, setUseOptimizedLayer] = useState<boolean>(true);
   
   const mapRef = useRef<google.maps.Map | null>(null);
   const { apiKey } = useMapApiKey();
-  const [lastRouteRequest, setLastRouteRequest] = useState<string>('');
 
   // Handle map load
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
@@ -80,89 +78,6 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     }
   }, [selectedAmbulance, onMapClick]);
 
-  // Reset directions when ambulance or destination change
-  useEffect(() => {
-    if (!window.google) {
-      console.log("Google Maps API not loaded yet in directions effect");
-      return;
-    }
-
-    if (selectedAmbulance && destination) {
-      const requestKey = `${selectedAmbulance.vehicle_id}-${destination.lat.toFixed(6)}-${destination.lng.toFixed(6)}`;
-      
-      // Only recalculate if this is a new request
-      if (requestKey !== lastRouteRequest) {
-        setLastRouteRequest(requestKey);
-        setDirections(null);
-        setDirectionsStatus(null);
-        setIsCalculatingDirections(true);
-      }
-    } else {
-      setLastRouteRequest('');
-      setDirections(null);
-      setDirectionsStatus(null);
-      setIsCalculatingDirections(false);
-    }
-  }, [selectedAmbulance, destination, optimizedRoute]);
-
-  // Prepare optimized waypoints for directions service
-  const optimizedWaypoints = useMemo(() => {
-    if (!optimizedRoute || optimizedRoute.length === 0 || !window.google) {
-      return [];
-    }
-    
-    try {
-      // Only use a reasonable number of waypoints (max 8) to avoid overloading the API
-      // and to ensure we get a realistic route that the API can optimize
-      const waypointCount = Math.min(optimizedRoute.length, 8);
-      const step = optimizedRoute.length / waypointCount;
-      
-      const waypoints = [];
-      for (let i = 0; i < waypointCount; i++) {
-        const index = Math.floor(i * step);
-        if (index < optimizedRoute.length) {
-          const point = optimizedRoute[index];
-          waypoints.push({
-            location: new google.maps.LatLng(point.lat, point.lng),
-            stopover: false
-          });
-        }
-      }
-      
-      return waypoints;
-    } catch (error) {
-      console.error("Error creating waypoints:", error);
-      return [];
-    }
-  }, [optimizedRoute]);
-
-  // Directions callback
-  const directionsCallback = useCallback(
-    (result: google.maps.DirectionsResult | null, status: google.maps.DirectionsStatus) => {
-      console.log("Directions API response:", status, result?.routes?.length || 0, "routes");
-      setIsCalculatingDirections(false);
-      setDirectionsStatus(status);
-      
-      if (result !== null && status === google.maps.DirectionsStatus.OK) {
-        setDirections(result);
-        
-        // Pan to fit the route
-        if (map && result.routes[0]?.bounds) {
-          map.fitBounds(result.routes[0].bounds);
-        }
-      } else {
-        console.error(`Directions request failed: ${status}`);
-      }
-    },
-    [map]
-  );
-
-  // Determine if we should use optimized rendering based on vehicle count
-  useEffect(() => {
-    // Use optimized layer if we have more than 1000 vehicles
-    setUseOptimizedLayer(vehicles.length > 1000);
-  }, [vehicles.length]);
-
   // Focus the map on the route when available
   useEffect(() => {
     if (!window.google || !map || !selectedAmbulance || !destination) {
@@ -181,8 +96,13 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     }
   }, [map, selectedAmbulance, destination]);
 
+  // Determine if we should use optimized rendering based on vehicle count
+  useEffect(() => {
+    // Always use optimized layer to prevent performance issues
+    setUseOptimizedLayer(true);
+  }, [vehicles.length]);
+
   if (!window.google) {
-    console.log("Google Maps API not loaded yet in GoogleMapDisplay render");
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -204,63 +124,20 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
-        {/* Vehicle markers - either optimized or individual */}
-        {useOptimizedLayer ? (
-          <OptimizedVehicleLayer 
-            vehicles={vehicles}
-            onAmbulanceSelect={onAmbulanceSelect}
-            selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
-            isSimulationRunning={isLiveMonitoring}
-            zoomLevel={zoomLevel}
-          />
-        ) : (
-          <VehicleMarkers 
-            vehicles={vehicles} 
-            onAmbulanceSelect={onAmbulanceSelect}
-            selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
-            isSimulationRunning={isLiveMonitoring}
-          />
-        )}
+        {/* Only use OptimizedVehicleLayer for better performance */}
+        <OptimizedVehicleLayer 
+          vehicles={vehicles}
+          onAmbulanceSelect={onAmbulanceSelect}
+          selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
+          isSimulationRunning={isLiveMonitoring}
+          zoomLevel={zoomLevel}
+        />
         
         {/* RSU markers */}
         <RsuMarkers rsus={rsus} />
         
         {/* Congestion heatmap */}
         <CongestionHeatmap congestionData={congestionData} />
-        
-        {/* Use Google Maps Directions service with optimized waypoints */}
-        {window.google && selectedAmbulance && destination && apiKey && isCalculatingDirections && (
-          <DirectionsService
-            options={{
-              origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
-              destination: destination,
-              travelMode: google.maps.TravelMode.DRIVING,
-              optimizeWaypoints: true,
-              waypoints: optimizedWaypoints,
-              provideRouteAlternatives: true,
-              avoidTolls: optimizedWaypoints.length > 0,
-              avoidFerries: true
-            }}
-            callback={directionsCallback}
-          />
-        )}
-        
-        {/* Render the directions once received */}
-        {directions && (
-          <DirectionsRenderer
-            options={{
-              directions: directions,
-              markerOptions: { 
-                visible: false  // Hide default markers
-              },
-              polylineOptions: {
-                strokeColor: '#0055FF',
-                strokeWeight: 6,
-                strokeOpacity: 0.8
-              }
-            }}
-          />
-        )}
       </GoogleMap>
 
       <MapInfoOverlay />

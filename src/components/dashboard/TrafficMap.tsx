@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
@@ -9,7 +9,6 @@ import MLControls from "./MLControls";
 import ApiKeyControl from "./ApiKeyControl";
 import { useMapApiKey, markGoogleMapsAsLoaded } from "@/hooks/useMapApiKey";
 import { useMLSimulation } from "@/hooks/useMLSimulation";
-import { useScaledTrafficData } from "@/hooks/useScaledTrafficData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 
@@ -43,24 +42,26 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [currentBounds, setCurrentBounds] = useState<any>(null);
   const [currentZoom, setCurrentZoom] = useState<number>(12);
   
-  // Using our scaled traffic data hook
-  const { 
-    data, 
-    isLoading: isDataLoading, 
-    refreshData,
-    lastUpdated 
-  } = useScaledTrafficData({
-    initialRefreshInterval: 60000,
-    visibleBounds: currentBounds,
-    zoomLevel: currentZoom
-  });
+  // Limit data size to prevent rendering issues
+  // Use useMemo to prevent unnecessary recalculations
+  const limitedVehicles = useMemo(() => {
+    // Limit to a manageable number (1000 max)
+    return initialVehicles.slice(0, 1000);
+  }, [initialVehicles]);
   
-  // Use provided data if available, otherwise use from hook
-  const vehicles = initialVehicles.length > 0 ? initialVehicles : data.vehicles;
-  const rsus = initialRsus.length > 0 ? initialRsus : data.rsus;
-  const congestionData = initialCongestionData.length > 0 ? initialCongestionData : data.congestion;
-  const anomalies = data.anomalies;
+  const limitedRsus = useMemo(() => {
+    // Limit RSUs to prevent rendering issues
+    return initialRsus.slice(0, 200);
+  }, [initialRsus]);
+  
+  const limitedCongestionData = useMemo(() => {
+    // Limit congestion data
+    return initialCongestionData.slice(0, 300);
+  }, [initialCongestionData]);
 
+  // Track last update time
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
 
   // Only initialize Google Maps when we have an API key
@@ -77,12 +78,17 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     }
   }, [isLoaded]);
   
-  // Set up periodic data refresh
+  // Set up periodic data refresh with a cleanup function
   useEffect(() => {
     if (!isLiveMonitoring) return;
     
+    // Update last updated timestamp
+    const refreshTimestamp = () => {
+      setLastUpdated(new Date());
+    };
+    
     const intervalId = setInterval(() => {
-      refreshData();
+      refreshTimestamp();
       
       // Show minimal notification
       toast({
@@ -92,8 +98,10 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       });
     }, 60000); // Every 60 seconds
     
-    return () => clearInterval(intervalId);
-  }, [isLiveMonitoring, refreshData]);
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isLiveMonitoring]);
   
   // Handle map bounds changed
   const handleMapBoundsChanged = (bounds: any, zoom: number) => {
@@ -107,7 +115,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   };
   
   // Combined loading state
-  const isLoading = initialLoading || isDataLoading;
+  const isLoading = initialLoading;
 
   // Show loading skeleton
   if (isLoading) {
@@ -179,15 +187,15 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
       {isLoaded && (
         <GoogleMapDisplay 
-          vehicles={vehicles} 
-          rsus={rsus} 
-          congestionData={congestionData} 
+          vehicles={limitedVehicles} 
+          rsus={limitedRsus} 
+          congestionData={limitedCongestionData} 
           isLiveMonitoring={isLiveMonitoring}
           selectedAmbulance={selectedAmbulance as Vehicle | null}
           onAmbulanceSelect={handleAmbulanceSelect}
           destination={destination}
           optimizedRoute={optimizedRoute}
-          onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
+          onMapClick={(latLng) => handleDestinationSelect(latLng, limitedCongestionData)}
           onBoundsChanged={handleMapBoundsChanged}
           vehicleCountSummary={vehicleCountSummary}
         />
@@ -197,7 +205,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         <span>
           {isLiveMonitoring ? (
             <>
-              <span className="text-green-500">●</span> LIVE: {vehicleCountSummary || `${vehicles.length.toLocaleString()} vehicles, ${rsus.length} RSUs`}, {anomalies.length} anomalies detected
+              <span className="text-green-500">●</span> LIVE: {vehicleCountSummary || `${limitedVehicles.length.toLocaleString()} vehicles, ${limitedRsus.length} RSUs`}
             </>
           ) : (
             <>
