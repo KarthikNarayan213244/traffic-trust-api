@@ -1,136 +1,126 @@
 
-import { Vehicle } from '@/services/api/types';
+import { Vehicle, RSU } from "@/services/api/types";
 
 /**
- * Create spatial index for vehicles to optimize filtering
+ * Create a spatial index for vehicles to optimize spatial queries
  */
-export function createVehicleIndex(vehicles: Vehicle[], gridSize: number = 0.1): Map<string, Vehicle[]> {
+export function createVehicleIndex(vehicles: Vehicle[]): Map<string, Vehicle[]> {
   const index = new Map<string, Vehicle[]>();
+  const cellSize = 0.01; // Approximately 1km cells at equator
   
   for (const vehicle of vehicles) {
-    const gridX = Math.floor(vehicle.lat / gridSize);
-    const gridY = Math.floor(vehicle.lng / gridSize);
-    const key = `${gridX}:${gridY}`;
+    // Create a grid cell identifier based on lat/lng
+    const cellX = Math.floor(vehicle.lng / cellSize);
+    const cellY = Math.floor(vehicle.lat / cellSize);
+    const cellId = `${cellX}:${cellY}`;
     
-    if (!index.has(key)) {
-      index.set(key, []);
+    // Add to existing cell or create new one
+    if (index.has(cellId)) {
+      index.get(cellId)!.push(vehicle);
+    } else {
+      index.set(cellId, [vehicle]);
     }
-    
-    index.get(key)!.push(vehicle);
   }
   
   return index;
 }
 
 /**
- * Filter vehicles by map bounds and zoom level
+ * Filter vehicles by map bounds with optimized spatial querying
  */
 export function filterVehiclesByBounds(
   vehicleIndex: Map<string, Vehicle[]>,
   allVehicles: Vehicle[],
-  bounds?: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  },
-  zoomLevel: number = 10,
-  gridSize: number = 0.1
+  bounds?: { north: number; south: number; east: number; west: number },
+  zoomLevel: number = 10
 ): Vehicle[] {
-  if (allVehicles.length === 0) {
-    return [];
+  // If no bounds provided, limit to a small sample for performance
+  if (!bounds) {
+    return allVehicles.slice(0, 1000);
   }
   
-  // If no bounds provided or zoom is very low, return a small sample for overview
-  if (!bounds || zoomLevel < 8) {
-    // Return samples from the index for a low-zoom overview
-    const samples: Vehicle[] = [];
-    let count = 0;
-    
-    // Get one vehicle from each grid cell
-    for (const vehicles of vehicleIndex.values()) {
-      if (vehicles.length > 0) {
-        samples.push(vehicles[0]);
-        count++;
-      }
+  const { north, south, east, west } = bounds;
+  const cellSize = 0.01; // Same cell size as in createVehicleIndex
+  
+  // Calculate cell range to query
+  const minCellX = Math.floor(west / cellSize);
+  const maxCellX = Math.ceil(east / cellSize);
+  const minCellY = Math.floor(south / cellSize);
+  const maxCellY = Math.ceil(north / cellSize);
+  
+  // Collect vehicles from relevant cells
+  let filteredVehicles: Vehicle[] = [];
+  
+  for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+    for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+      const cellId = `${cellX}:${cellY}`;
       
-      if (count >= 5000) break; // Limit to 5000 markers maximum
-    }
-    
-    return samples;
-  }
-  
-  // For medium zoom (8-12), return sample from each relevant grid cell
-  if (zoomLevel < 13) {
-    const relevantGridCells: string[] = [];
-    const samples: Vehicle[] = [];
-    
-    // Find grid cells that overlap with the viewport
-    const minGridX = Math.floor(bounds.south / gridSize);
-    const maxGridX = Math.ceil(bounds.north / gridSize);
-    const minGridY = Math.floor(bounds.west / gridSize);
-    const maxGridY = Math.ceil(bounds.east / gridSize);
-    
-    // Calculate how many vehicles to sample based on zoom level
-    const samplesPerCell = Math.max(1, Math.floor((zoomLevel - 8) * 5));
-    
-    for (let x = minGridX; x <= maxGridX; x++) {
-      for (let y = minGridY; y <= maxGridY; y++) {
-        const key = `${x}:${y}`;
-        if (vehicleIndex.has(key)) {
-          const cellVehicles = vehicleIndex.get(key)!;
-          
-          // Take samples from this cell
-          if (cellVehicles.length <= samplesPerCell) {
-            samples.push(...cellVehicles);
-          } else {
-            // Take random samples
-            const cellSamples = new Set<number>();
-            while (cellSamples.size < samplesPerCell) {
-              cellSamples.add(Math.floor(Math.random() * cellVehicles.length));
-            }
-            for (const index of cellSamples) {
-              samples.push(cellVehicles[index]);
-            }
-          }
-        }
+      if (vehicleIndex.has(cellId)) {
+        filteredVehicles.push(...vehicleIndex.get(cellId)!);
       }
     }
-    
-    // Limit total returned vehicles
-    const maxVehicles = Math.min(50000, Math.pow(10, zoomLevel - 6));
-    return samples.slice(0, maxVehicles);
   }
   
-  // For high zoom (13+), return individual vehicles in viewport
-  return allVehicles.filter(vehicle => {
-    return vehicle.lat <= bounds.north && 
-           vehicle.lat >= bounds.south && 
-           vehicle.lng <= bounds.east && 
-           vehicle.lng >= bounds.west;
-  }).slice(0, 100000); // Hard limit at 100k vehicles for performance
+  // Apply secondary filter to ensure bounds are respected
+  filteredVehicles = filteredVehicles.filter(vehicle => 
+    vehicle.lat >= south && 
+    vehicle.lat <= north && 
+    vehicle.lng >= west && 
+    vehicle.lng <= east
+  );
+  
+  // Apply density reduction based on zoom level
+  // At low zoom levels, we don't want to render thousands of vehicles
+  if (zoomLevel < 10) {
+    const samplingRate = Math.max(0.01, (zoomLevel - 5) / 5);
+    const maxVehicles = Math.floor(100 + (900 * samplingRate));
+    
+    // If we have too many vehicles, sample them
+    if (filteredVehicles.length > maxVehicles) {
+      // Priority sampling for emergency vehicles
+      const emergencyVehicles = filteredVehicles.filter(v => 
+        v.vehicle_type === 'Ambulance' || 
+        v.vehicle_type === 'Police' || 
+        v.vehicle_type === 'Fire'
+      );
+      
+      // Get remaining vehicles
+      const regularVehicles = filteredVehicles.filter(v => 
+        v.vehicle_type !== 'Ambulance' && 
+        v.vehicle_type !== 'Police' && 
+        v.vehicle_type !== 'Fire'
+      );
+      
+      // Sample regular vehicles
+      const sampledRegular = regularVehicles
+        .sort(() => 0.5 - Math.random())
+        .slice(0, maxVehicles - emergencyVehicles.length);
+      
+      // Combine emergency and sampled regular vehicles
+      filteredVehicles = [...emergencyVehicles, ...sampledRegular];
+    }
+  }
+  
+  return filteredVehicles;
 }
 
 /**
  * Filter RSUs by map bounds
  */
 export function filterRSUsByBounds(
-  rsus: any[],
-  bounds?: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  }
-): any[] {
+  rsus: RSU[],
+  bounds?: { north: number; south: number; east: number; west: number }
+): RSU[] {
   if (!bounds) {
-    return rsus;
+    return rsus.slice(0, 100); // Limit if no bounds provided
   }
   
-  return rsus.filter(rsu => {
-    return rsu.lat <= bounds.north && 
-           rsu.lat >= bounds.south && 
-           rsu.lng <= bounds.east && 
-           rsu.lng >= bounds.west;
-  });
+  const { north, south, east, west } = bounds;
+  
+  return rsus.filter(rsu => 
+    rsu.lat >= south && 
+    rsu.lat <= north && 
+    rsu.lng >= west && 
+    rsu.lng <= east
+  );
 }
