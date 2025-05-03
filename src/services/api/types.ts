@@ -1,3 +1,4 @@
+
 export interface Vehicle {
   vehicle_id: string;
   owner_name: string;
@@ -6,11 +7,15 @@ export interface Vehicle {
     lat: number;
     lng: number;
   };
+  lat?: number;
+  lng?: number;
   speed: number;
   heading: number;
   trust_score: number;
   trust_score_change: number;
   trust_score_confidence: number;
+  status?: string;
+  timestamp?: string;
 }
 
 export interface RSU {
@@ -19,6 +24,8 @@ export interface RSU {
     lat: number;
     lng: number;
   };
+  lat?: number;
+  lng?: number;
   status: 'Active' | 'Inactive';
   coverage_radius: number;
 }
@@ -42,6 +49,11 @@ export interface TrustLedgerEntry {
   new_score: number;
   change: number;
   reason: string;
+  tx_id?: string;
+  action?: string;
+  old_value?: number;
+  new_value?: number;
+  details?: string;
 }
 
 export interface CongestionZone {

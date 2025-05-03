@@ -24,9 +24,65 @@ export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
 // Mock data for vehicles (for offline development/testing)
 export function getMockVehicles(): Vehicle[] {
   return [
-    { vehicle_id: "TS07-1234-AB", owner_name: "Rahul Sharma", vehicle_type: "Sedan", trust_score: 95, lat: 17.4344, lng: 78.3866, speed: 45 },
-    { vehicle_id: "TS08-5678-CD", owner_name: "Priya Patel", vehicle_type: "SUV", trust_score: 88, lat: 17.4384, lng: 78.3869, speed: 60 },
-    { vehicle_id: "TS09-9012-EF", owner_name: "Vikram Singh", vehicle_type: "Hatchback", trust_score: 91, lat: 17.4395, lng: 78.3892, speed: 35 },
-    { vehicle_id: "TS10-3456-GH", owner_name: "Ananya Reddy", vehicle_type: "Sedan", trust_score: 99, lat: 17.4420, lng: 78.3880, speed: 40 }
+    { 
+      vehicle_id: "TS07-1234-AB", 
+      owner_name: "Rahul Sharma", 
+      vehicle_type: "Sedan", 
+      trust_score: 95, 
+      location: { lat: 17.4344, lng: 78.3866 },
+      lat: 17.4344, 
+      lng: 78.3866, 
+      speed: 45,
+      heading: 90,
+      trust_score_change: 0,
+      trust_score_confidence: 0.95,
+      status: "Active",
+      timestamp: new Date().toISOString()
+    },
+    { 
+      vehicle_id: "TS08-5678-CD", 
+      owner_name: "Priya Patel", 
+      vehicle_type: "SUV", 
+      trust_score: 88, 
+      location: { lat: 17.4384, lng: 78.3869 },
+      lat: 17.4384, 
+      lng: 78.3869, 
+      speed: 60,
+      heading: 180,
+      trust_score_change: -2,
+      trust_score_confidence: 0.88,
+      status: "Active",
+      timestamp: new Date().toISOString()
+    },
+    { 
+      vehicle_id: "TS09-9012-EF", 
+      owner_name: "Vikram Singh", 
+      vehicle_type: "Hatchback", 
+      trust_score: 91, 
+      location: { lat: 17.4395, lng: 78.3892 },
+      lat: 17.4395, 
+      lng: 78.3892, 
+      speed: 35,
+      heading: 270,
+      trust_score_change: 1,
+      trust_score_confidence: 0.91,
+      status: "Active",
+      timestamp: new Date().toISOString()
+    },
+    { 
+      vehicle_id: "TS10-3456-GH", 
+      owner_name: "Ananya Reddy", 
+      vehicle_type: "Sedan", 
+      trust_score: 99, 
+      location: { lat: 17.4420, lng: 78.3880 },
+      lat: 17.4420, 
+      lng: 78.3880, 
+      speed: 40,
+      heading: 0,
+      trust_score_change: 0,
+      trust_score_confidence: 0.99,
+      status: "Active",
+      timestamp: new Date().toISOString()
+    }
   ];
 }

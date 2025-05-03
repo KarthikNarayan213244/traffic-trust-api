@@ -23,8 +23,8 @@ export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
 
 // Mock data for anomalies
 export const getMockAnomalies = (): Anomaly[] => [
-  { id: 1, timestamp: "2025-04-28T10:05:00Z", type: "Speed Violation", severity: "High", vehicle_id: "TS08-5678-CD", message: "Speed limit violation detected" },
-  { id: 2, timestamp: "2025-04-28T09:15:00Z", type: "Signal Tampering", severity: "Critical", vehicle_id: "TS08-1234-GH", message: "Suspicious signal activity detected" },
-  { id: 3, timestamp: "2025-04-28T08:30:00Z", type: "Unauthorized Access", severity: "Medium", vehicle_id: "TS07-2345-AB", message: "Security breach attempt" },
-  { id: 4, timestamp: "2025-04-27T22:45:00Z", type: "GPS Spoofing", severity: "High", vehicle_id: "TS09-1010-XY", message: "Location spoofing attempt" }
+  { id: "1", timestamp: "2025-04-28T10:05:00Z", type: "Speed Violation", severity: "High", vehicle_id: "TS08-5678-CD", message: "Speed limit violation detected", status: "Detected", ml_confidence: 0.95 },
+  { id: "2", timestamp: "2025-04-28T09:15:00Z", type: "Signal Tampering", severity: "Critical", vehicle_id: "TS08-1234-GH", message: "Suspicious signal activity detected", status: "Detected", ml_confidence: 0.89 },
+  { id: "3", timestamp: "2025-04-28T08:30:00Z", type: "Unauthorized Access", severity: "Medium", vehicle_id: "TS07-2345-AB", message: "Security breach attempt", status: "Detected", ml_confidence: 0.78 },
+  { id: "4", timestamp: "2025-04-27T22:45:00Z", type: "GPS Spoofing", severity: "High", vehicle_id: "TS09-1010-XY", message: "Location spoofing attempt", status: "Detected", ml_confidence: 0.86 }
 ];
