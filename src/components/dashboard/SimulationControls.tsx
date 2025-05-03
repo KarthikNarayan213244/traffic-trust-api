@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, AlertCircle, RotateCcw, ChevronDown } from "lucide-react";
+import { Play, Pause, AlertCircle, RotateCcw, ChevronDown, Navigation } from "lucide-react";
 import { Vehicle } from "@/services/api";
 import {
   DropdownMenu,
@@ -37,9 +37,9 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({
         className={`transition-colors ${isSimulationRunning ? "bg-red-100 hover:bg-red-200" : "bg-green-100 hover:bg-green-200"}`}
       >
         {isSimulationRunning ? (
-          <><Pause className="mr-1" size={16} /> Pause Monitoring</>
+          <><Pause className="mr-1" size={16} /> Pause TomTom Data</>
         ) : (
-          <><Play className="mr-1" size={16} /> Real Time Monitoring</>
+          <><Play className="mr-1" size={16} /> Live TomTom Traffic</>
         )}
       </Button>
       
@@ -60,24 +60,25 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto">
-              Speed: {simulationSpeed.charAt(0).toUpperCase() + simulationSpeed.slice(1)}
+              <Navigation className="mr-2" size={16} />
+              Update: {simulationSpeed.charAt(0).toUpperCase() + simulationSpeed.slice(1)}
               <ChevronDown className="ml-1" size={16} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => changeSimulationSpeed('slow')}>
-              Slow
+              Slow (2 min)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => changeSimulationSpeed('normal')}>
-              Normal
+              Normal (1 min)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => changeSimulationSpeed('fast')}>
-              Fast
+              Fast (30 sec)
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <AlertCircle className="mr-1" size={14} />
-              Update frequency affects data refresh rate
+              TomTom API request frequency
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

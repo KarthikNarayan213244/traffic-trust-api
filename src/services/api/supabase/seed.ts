@@ -2,12 +2,12 @@
 import { supabase } from "./client";
 import { toast } from "@/hooks/use-toast";
 
-// Update utility function to seed only non-traffic data
+// Update utility function to seed only trust and anomaly data
 export async function seedDatabaseWithTestData(clearExisting = false) {
   try {
     console.log("Starting database seeding process for trust and anomaly data...");
     toast({
-      title: "Seeding database",
+      title: "Seeding trust database",
       description: "Please wait while we populate the database with trust and anomaly test data...",
     });
     
@@ -48,7 +48,7 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
       const errorText = await response.text();
       console.error(`Seeding failed with status: ${response.status}`, errorText);
       toast({
-        title: "Database Seeding Failed",
+        title: "Trust Database Seeding Failed",
         description: `Error: ${response.status}. Please check console for details.`,
         variant: "destructive",
       });

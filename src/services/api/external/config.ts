@@ -19,7 +19,7 @@ export const API_PROVIDERS = {
     rateLimit: 60, // requests per minute
     timeout: 10000, // 10 seconds
   },
-  // TomTom Traffic API
+  // TomTom Traffic API (primary)
   tomtom: {
     baseUrl: 'https://api.tomtom.com/traffic/services/4',
     flowEndpoint: '/flowSegmentData/absolute/10/json',
@@ -47,10 +47,10 @@ export const API_PROVIDERS = {
   }
 };
 
-// Current active provider, prioritizes real APIs over mock data
+// Current active provider, prioritize TomTom over other options
 export const getActiveProvider = (): TrafficApiProvider => {
-  if (API_PROVIDERS.here.enabled) return 'here';
   if (API_PROVIDERS.tomtom.enabled) return 'tomtom';
+  if (API_PROVIDERS.here.enabled) return 'here';
   if (API_PROVIDERS.opendata.enabled) return 'opendata';
   return 'mock';
 };
