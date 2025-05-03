@@ -325,7 +325,7 @@ export function transformTomTomAnomalyData(apiData: any): Anomaly[] {
         }
       }
       
-      // Create anomaly object - Fixed here to conform to the Anomaly type
+      // Create anomaly object - Fixed to include ml_confidence
       const anomaly: Anomaly = {
         id: incident.id || `tt-anomaly-${Date.now()}-${anomalies.length}`,
         vehicle_id: `TT-${Math.floor(10000 + Math.random() * 90000)}`, // Synthetic vehicle ID
@@ -334,8 +334,9 @@ export function transformTomTomAnomalyData(apiData: any): Anomaly[] {
         severity: severity,
         message: incident.description || 'Traffic incident detected',
         status: 'Detected',
-        lat: latitude,  // We add these directly 
-        lng: longitude  // instead of the location object
+        lat: latitude,
+        lng: longitude,
+        ml_confidence: 1.0  // Adding the required ml_confidence property with a default value of 1.0
       };
       
       anomalies.push(anomaly);
