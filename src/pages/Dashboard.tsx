@@ -13,25 +13,30 @@ import { Car, Radio, AlertTriangle, Shield, Database, BarChart3, ServerCrash, Re
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { seedDatabaseWithTestData } from "@/services/api/supabase";
-import { useRealTimeTrafficData } from "@/hooks/useRealTimeTrafficData";
-import { fetchTrustLedger } from "@/services/api";
-import { updateTrustScore, batchUpdateTrustScores } from "@/services/blockchain";
+import { useScaledTrafficData } from "@/hooks/useScaledTrafficData";
+import { refreshScaledTrafficData, getTrafficStats } from "@/services/trafficScaler";
 import { useTrustLedger } from "@/hooks/useTrustLedger";
+import { updateTrustScore, batchUpdateTrustScores } from "@/services/blockchain";
 
 const Dashboard: React.FC = () => {
-  // Using our real-time traffic data hook
+  // State for map bounds and zoom
+  const [mapBounds, setMapBounds] = useState<any>(null);
+  const [mapZoom, setMapZoom] = useState<number>(12);
+  
+  // Using our scaled traffic data hook
   const { 
     data: trafficData,
+    stats: trafficStats,
     isLoading,
     isRefreshing,
     lastUpdated,
     refreshData,
-    dataSource,
-    isRealTimeSource,
-    isRealtimeEnabled
-  } = useRealTimeTrafficData({
-    initialRefreshInterval: 30000, // 30 seconds
-    enableAutoRefresh: true
+    counts
+  } = useScaledTrafficData({
+    initialRefreshInterval: 60000, // 60 seconds
+    enableAutoRefresh: true,
+    visibleBounds: mapBounds,
+    zoomLevel: mapZoom
   });
   
   const { vehicles, rsus, congestion: congestionData, anomalies } = trafficData;
@@ -48,24 +53,61 @@ const Dashboard: React.FC = () => {
   
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
   const [isUpdatingTrust, setIsUpdatingTrust] = useState<boolean>(false);
+  
+  // Handle map bounds and zoom changes
+  const handleMapViewChanged = (bounds: any, zoom: number) => {
+    setMapBounds(bounds);
+    setMapZoom(zoom);
+  };
+  
+  // Initialize traffic scaler
+  useEffect(() => {
+    const initTrafficScaler = async () => {
+      setIsSeeding(true);
+      toast({
+        title: "Initializing Traffic Data",
+        description: "Scaling up traffic data for Hyderabad. This may take a moment...",
+      });
+      
+      try {
+        await refreshScaledTrafficData();
+        const stats = getTrafficStats();
+        
+        toast({
+          title: "Traffic Scaling Complete",
+          description: `Generated ${Math.round(stats.totalVehicles/1000000)}M vehicles across ${stats.segments} road segments`,
+        });
+      } catch (error) {
+        console.error("Error initializing traffic scaler:", error);
+        toast({
+          title: "Error",
+          description: "Failed to initialize traffic scaling. Using default data.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSeeding(false);
+      }
+    };
+    
+    initTrafficScaler();
+  }, []);
 
-  // Seed database
+  // Seed database - now only seeds trust data, not traffic
   const seedDatabase = async () => {
     setIsSeeding(true);
     toast({
-      title: "Seeding Traffic Database",
-      description: "Please wait while we populate the database with trust and traffic data...",
+      title: "Seeding Trust Database",
+      description: "Please wait while we populate the database with trust data...",
     });
     
     try {
       const result = await seedDatabaseWithTestData(true);
       toast({
         title: "Database Seeded Successfully",
-        description: `Added ${result.counts.trustEntries} trust entries, ${result.counts.anomalies} anomalies, and updated vehicles.`,
+        description: `Added ${result.counts.trustEntries} trust entries, ${result.counts.anomalies} anomalies.`,
       });
       
-      // Refresh all data
-      refreshData();
+      // Refresh trust data
       refreshTrustData();
       
     } catch (error: any) {
@@ -135,6 +177,16 @@ const Dashboard: React.FC = () => {
     return lastUpdated.toLocaleTimeString();
   };
 
+  // Format vehicle count for display
+  const getVehicleCountSummary = () => {
+    if (counts.totalVehicles === 0) return "";
+    
+    const totalMillions = (counts.totalVehicles / 1000000).toFixed(1);
+    const visibleThousands = Math.round(counts.vehicles / 1000);
+    
+    return `${totalMillions}M vehicles in Hyderabad, ${visibleThousands}K visible`;
+  };
+
   // Show critical anomalies count
   const criticalAnomalies = anomalies.filter(a => a.severity === "Critical").length;
 
@@ -146,16 +198,14 @@ const Dashboard: React.FC = () => {
             <h1 className="text-2xl font-bold">Hyderabad Traffic Trust Platform</h1>
             <div className="flex items-center gap-2 mt-1">
               <DataSourceBadge
-                provider={dataSource.provider}
-                isRealTime={dataSource.isRealTime}
-                apiCredits={dataSource.apiCredits}
+                provider="TomTom + Scaled Simulation"
+                isRealTime={true}
+                apiCredits={100}
               />
-              {isRealtimeEnabled && (
-                <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full">
-                  Real-time Updates Active
-                </span>
-              )}
-              <span className="text-xs text-muted-foreground">v2.2.0</span>
+              <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                {counts.totalVehicles ? `${(counts.totalVehicles / 1000000).toFixed(1)}M Vehicles` : "Scaling..."}
+              </span>
+              <span className="text-xs text-muted-foreground">v3.0.0</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -184,7 +234,7 @@ const Dashboard: React.FC = () => {
               className="flex items-center gap-2"
             >
               <Database className={`h-4 w-4 ${isSeeding ? 'animate-pulse' : ''}`} />
-              <span>{isSeeding ? 'Seeding...' : 'Seed Traffic Data'}</span>
+              <span>{isSeeding ? 'Seeding...' : 'Seed Trust Data'}</span>
             </Button>
             <Button
               variant="default"
@@ -202,18 +252,18 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard 
             title="Total Vehicles" 
-            value={vehicles.length}
+            value={counts.totalVehicles || 0}
             isLoading={isLoading}
             icon={Car}
             trend={{
-              value: vehicles.length > 100 ? "+12%" : "+0%",
-              label: vehicles.length > 100 ? "from last hour" : "No change"
+              value: "3.5M",
+              label: "registered vehicles"
             }}
           />
           <KpiCard 
             title="Active RSUs" 
             value={rsus.filter(rsu => rsu.status === 'Active').length}
-            total={rsus.length}
+            total={counts.totalRSUs || 0}
             isLoading={isLoading}
             icon={Radio}
             color="accent"
@@ -247,8 +297,7 @@ const Dashboard: React.FC = () => {
           <CardHeader>
             <CardTitle>Real-time Traffic Monitoring</CardTitle>
             <CardDescription>
-              View and track vehicles and roadside units across Hyderabad 
-              {isRealtimeEnabled && " with live updates"}
+              View and track {getVehicleCountSummary()} across Hyderabad with live updates
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -257,6 +306,8 @@ const Dashboard: React.FC = () => {
               rsus={rsus}
               isLoading={isLoading}
               congestionData={congestionData}
+              onBoundsChanged={handleMapViewChanged}
+              vehicleCountSummary={getVehicleCountSummary()}
             />
           </CardContent>
         </Card>

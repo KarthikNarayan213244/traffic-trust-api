@@ -1,6 +1,6 @@
-
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { GoogleMap, DirectionsService, DirectionsRenderer, Polyline } from "@react-google-maps/api";
+import OptimizedVehicleLayer from "./OptimizedVehicleLayer";
 import VehicleMarkers from "./VehicleMarkers";
 import RsuMarkers from "./RsuMarkers";
 import CongestionHeatmap from "./CongestionHeatmap";
@@ -21,6 +21,8 @@ interface GoogleMapDisplayProps {
   optimizedRoute: google.maps.LatLngLiteral[] | null;
   onAmbulanceSelect: (vehicle: Vehicle) => void;
   onMapClick: (latLng: google.maps.LatLngLiteral) => void;
+  onBoundsChanged?: (bounds: any, zoom: number) => void;
+  vehicleCountSummary?: string;
 }
 
 const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
@@ -32,12 +34,17 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   destination,
   optimizedRoute,
   onAmbulanceSelect,
-  onMapClick
+  onMapClick,
+  onBoundsChanged,
+  vehicleCountSummary
 }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(12);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
   const [isCalculatingDirections, setIsCalculatingDirections] = useState<boolean>(false);
+  const [useOptimizedLayer, setUseOptimizedLayer] = useState<boolean>(true);
+  
   const mapRef = useRef<google.maps.Map | null>(null);
   const { apiKey } = useMapApiKey();
   const [lastRouteRequest, setLastRouteRequest] = useState<string>('');
@@ -47,7 +54,20 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     console.log("Google Map loaded successfully");
     mapRef.current = mapInstance;
     setMap(mapInstance);
-  }, []);
+    setZoomLevel(mapInstance.getZoom());
+    
+    // Add map event listeners
+    mapInstance.addListener("bounds_changed", () => {
+      if (onBoundsChanged && mapInstance) {
+        const bounds = mapInstance.getBounds()?.toJSON();
+        const zoom = mapInstance.getZoom();
+        if (bounds) {
+          onBoundsChanged(bounds, zoom);
+          setZoomLevel(zoom);
+        }
+      }
+    });
+  }, [onBoundsChanged]);
 
   // Handle map click for destination selection
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
@@ -137,6 +157,12 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     [map]
   );
 
+  // Determine if we should use optimized rendering based on vehicle count
+  useEffect(() => {
+    // Use optimized layer if we have more than 1000 vehicles
+    setUseOptimizedLayer(vehicles.length > 1000);
+  }, [vehicles.length]);
+
   // Focus the map on the route when available
   useEffect(() => {
     if (!window.google || !map || !selectedAmbulance || !destination) {
@@ -178,12 +204,23 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
-        {/* Vehicle markers */}
-        <VehicleMarkers 
-          vehicles={vehicles} 
-          onAmbulanceSelect={onAmbulanceSelect}
-          selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
-        />
+        {/* Vehicle markers - either optimized or individual */}
+        {useOptimizedLayer ? (
+          <OptimizedVehicleLayer 
+            vehicles={vehicles}
+            onAmbulanceSelect={onAmbulanceSelect}
+            selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
+            isSimulationRunning={isLiveMonitoring}
+            zoomLevel={zoomLevel}
+          />
+        ) : (
+          <VehicleMarkers 
+            vehicles={vehicles} 
+            onAmbulanceSelect={onAmbulanceSelect}
+            selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
+            isSimulationRunning={isLiveMonitoring}
+          />
+        )}
         
         {/* RSU markers */}
         <RsuMarkers rsus={rsus} />
@@ -232,6 +269,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         rsusCount={rsus.length} 
         congestionZones={congestionData.length > 0 ? Math.ceil(congestionData.length / 3) : 0}
         anomaliesCount={vehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
+        vehicleCountSummary={vehicleCountSummary}
       />
       
       {selectedAmbulance && (
