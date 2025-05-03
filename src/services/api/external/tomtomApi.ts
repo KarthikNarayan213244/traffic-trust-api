@@ -29,18 +29,27 @@ export async function fetchTomTomTrafficFlow(): Promise<{
   try {
     const { baseUrl, flowEndpoint, apiKey, timeout } = API_PROVIDERS.tomtom;
     
-    // Construct query parameters
+    // TomTom API requires a point parameter rather than just a bounding box
+    // Let's use the center of our bounding box as the point
+    const centerLat = (HYDERABAD_BOUNDING_BOX.north + HYDERABAD_BOUNDING_BOX.south) / 2;
+    const centerLng = (HYDERABAD_BOUNDING_BOX.east + HYDERABAD_BOUNDING_BOX.west) / 2;
+    
+    // Construct query parameters - TomTom requires point and zoom level
     const params = new URLSearchParams({
       key: apiKey,
-      bbox: `${HYDERABAD_BOUNDING_BOX.west},${HYDERABAD_BOUNDING_BOX.south},${HYDERABAD_BOUNDING_BOX.east},${HYDERABAD_BOUNDING_BOX.north}`,
+      point: `${centerLat},${centerLng}`, // Center point of Hyderabad
+      zoom: '10', // City-level zoom
       unit: 'KMPH',
-      style: 'absolute'
+      style: 'absolute',
+      maxSpeedLimit: '150' // km/h
     });
 
     // Fetch with timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+    console.log(`Fetching TomTom flow data from: ${baseUrl}${flowEndpoint}?${params.toString()}`);
+    
     const response = await fetch(`${baseUrl}${flowEndpoint}?${params.toString()}`, {
       signal: controller.signal
     });
@@ -52,6 +61,7 @@ export async function fetchTomTomTrafficFlow(): Promise<{
     }
 
     const data = await response.json();
+    console.log("TomTom flow data received:", data);
     
     // Transform TomTom API data to our application's data model
     const vehicles = transformTomTomVehicleData(data);
@@ -95,15 +105,24 @@ export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
   try {
     const { baseUrl, incidentEndpoint, apiKey, timeout } = API_PROVIDERS.tomtom;
     
+    // For incidents we need to format the bbox as per TomTom requirements
+    // And add a proper position parameter
+    const centerLat = (HYDERABAD_BOUNDING_BOX.north + HYDERABAD_BOUNDING_BOX.south) / 2;
+    const centerLng = (HYDERABAD_BOUNDING_BOX.east + HYDERABAD_BOUNDING_BOX.west) / 2;
+
     // Construct query parameters
     const params = new URLSearchParams({
       key: apiKey,
-      bbox: `${HYDERABAD_BOUNDING_BOX.west},${HYDERABAD_BOUNDING_BOX.south},${HYDERABAD_BOUNDING_BOX.east},${HYDERABAD_BOUNDING_BOX.north}`,
-      fields: 'incidents',
+      position: `${centerLat},${centerLng}`, // Center of Hyderabad
+      radiusInMeters: '20000', // 20km radius
       language: 'en-GB',
+      categoryFilter: '0,1,2,3,4,5,6,7,8,9,10,11', // All categories
+      expandCluster: 'true',
       timeValidityFilter: 'present'
     });
 
+    console.log(`Fetching TomTom incidents from: ${baseUrl}${incidentEndpoint}?${params.toString()}`);
+    
     // Fetch with timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -119,6 +138,7 @@ export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
     }
 
     const data = await response.json();
+    console.log("TomTom incidents data received:", data);
     
     // Transform TomTom API incident data to our application's anomaly model
     return transformTomTomAnomalyData(data);

@@ -1,6 +1,6 @@
-
 import { v4 as uuidv4 } from 'uuid';
-import { Vehicle, CongestionZone, Anomaly } from '../types';
+import { Vehicle, CongestionZone, Anomaly, RSU } from '../types';
+import { HYDERABAD_BOUNDING_BOX } from './config';
 
 /**
  * Transform functions for HERE Traffic API data
@@ -158,35 +158,63 @@ export function transformHereAnomalyData(apiData: any): Anomaly[] {
  * Transform functions for TomTom Traffic API data
  */
 export function transformTomTomVehicleData(apiData: any): Vehicle[] {
+  if (!apiData || !apiData.flowSegmentData) {
+    console.warn('No flow segment data received from TomTom API');
+    return [];
+  }
+
   try {
+    // Generate synthetic vehicles based on flow segments
     const vehicles: Vehicle[] = [];
     
-    // Extract flow items that represent vehicle positions
-    if (apiData?.flowSegmentData?.coordinates?.coordinate) {
+    // Use flow segment coordinates to place vehicles
+    if (apiData.flowSegmentData.coordinates && apiData.flowSegmentData.coordinates.coordinate) {
       const coordinates = apiData.flowSegmentData.coordinates.coordinate;
+      const currentSpeed = apiData.flowSegmentData.currentSpeed || 30;
+      const freeFlowSpeed = apiData.flowSegmentData.freeFlowSpeed || 60;
       
-      for (const coord of coordinates) {
-        // Extract only a subset of flow points to simulate vehicles
-        if (Math.random() > 0.7) { // Only use ~30% of flow points
-          const speedKmh = apiData.flowSegmentData.currentSpeed || 0;
+      // Calculate trust score based on ratio of current to free flow speed (higher ratio = higher trust)
+      const speedRatio = Math.min(currentSpeed / freeFlowSpeed, 1);
+      const baseTrustScore = Math.round(60 + speedRatio * 40); // Score between 60-100
+      
+      // Generate vehicles along the flow segment 
+      for (let i = 0; i < Math.min(coordinates.length, 20); i++) {
+        if (i % 2 === 0) { // Only use some of the coordinates to avoid too many vehicles
+          const coord = coordinates[i];
+          
+          // Skip points outside our bounding box
+          if (coord.latitude < HYDERABAD_BOUNDING_BOX.south || 
+              coord.latitude > HYDERABAD_BOUNDING_BOX.north || 
+              coord.longitude < HYDERABAD_BOUNDING_BOX.west || 
+              coord.longitude > HYDERABAD_BOUNDING_BOX.east) {
+            continue;
+          }
+          
+          // Calculate heading from this point to the next
+          let heading = 0;
+          if (i < coordinates.length - 1) {
+            const nextCoord = coordinates[i + 1];
+            heading = Math.round(calculateHeading(coord.latitude, coord.longitude, 
+                                                 nextCoord.latitude, nextCoord.longitude));
+          }
+          
+          // Generate a vehicle
           const vehicle: Vehicle = {
-            vehicle_id: `T-${uuidv4().substring(0, 8)}`, // Generate a unique ID with TomTom prefix
-            owner_name: "Traffic Flow Vehicle", // Simulated owner name
-            vehicle_type: determineVehicleType(), // Randomly determine vehicle type
-            lat: coord.latitude, // Latitude
-            lng: coord.longitude, // Longitude
-            location: {
-              lat: coord.latitude,
-              lng: coord.longitude
-            },
-            speed: speedKmh,
-            heading: Math.floor(Math.random() * 360), // Random heading
-            trust_score: Math.floor(70 + Math.random() * 30), // Random trust score between 70-100
-            trust_score_change: 0,
-            trust_score_confidence: 0.9,
+            vehicle_id: `TT-${Math.floor(10000 + Math.random() * 90000)}`, // Synthetic ID
+            owner_name: "Traffic Flow Vehicle",
+            vehicle_type: getRandomVehicleType(),
+            trust_score: baseTrustScore + Math.floor(Math.random() * 10),
+            lat: coord.latitude,
+            lng: coord.longitude,
+            location: { lat: coord.latitude, lng: coord.longitude },
+            speed: currentSpeed + Math.floor(Math.random() * 10 - 5), // Add some variation
+            heading: heading,
             status: "Active",
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            trust_score_change: 0,
+            trust_score_confidence: 0.8 + Math.random() * 0.2
           };
+          
           vehicles.push(vehicle);
         }
       }
@@ -194,44 +222,60 @@ export function transformTomTomVehicleData(apiData: any): Vehicle[] {
     
     return vehicles;
   } catch (error) {
-    console.error("Error transforming TomTom vehicle data:", error);
+    console.error('Error transforming TomTom vehicle data:', error);
     return [];
   }
 }
 
 export function transformTomTomCongestionData(apiData: any): CongestionZone[] {
+  if (!apiData || !apiData.flowSegmentData) {
+    console.warn('No flow segment data received from TomTom API');
+    return [];
+  }
+
   try {
     const congestionZones: CongestionZone[] = [];
     
-    // Extract congestion information from flow data
-    if (apiData?.flowSegmentData) {
+    // Create congestion zones from the flow data
+    if (apiData.flowSegmentData) {
       const flowData = apiData.flowSegmentData;
       
-      // Calculate congestion level based on currentSpeed vs freeFlowSpeed
-      const freeFlowSpeed = flowData.freeFlowSpeed || 0;
-      const currentSpeed = flowData.currentSpeed || 0;
-      
-      if (freeFlowSpeed > 0 && currentSpeed < freeFlowSpeed) {
-        const congestionRatio = 1 - (currentSpeed / freeFlowSpeed);
-        const congestionLevel = Math.min(100, Math.round(congestionRatio * 100));
+      if (flowData.coordinates && flowData.coordinates.coordinate) {
+        // Use the start and end of segment plus some interesting points along the way
+        const coordinates = flowData.coordinates.coordinate;
+        const roadName = flowData.roadName || 'Road Segment';
         
-        // Only create congestion zones for segments with notable congestion
-        if (congestionLevel > 20) { // At least 20% congestion
-          // Use the coordinates to place the congestion zone
-          if (flowData.coordinates?.coordinate && flowData.coordinates.coordinate.length > 0) {
-            const midPoint = flowData.coordinates.coordinate[Math.floor(flowData.coordinates.coordinate.length / 2)];
+        // Get congestion level based on current/freeflow speed
+        const currentSpeed = flowData.currentSpeed || 0;
+        const freeFlowSpeed = flowData.freeFlowSpeed || 1;
+        const congestionRatio = 1 - (currentSpeed / freeFlowSpeed);
+        const congestionLevel = Math.min(100, Math.max(0, Math.round(congestionRatio * 100)));
+        
+        // Create congestion zones at some points along the segment
+        const pointsToUse = [0, Math.floor(coordinates.length / 2), coordinates.length - 1];
+        
+        for (const index of pointsToUse) {
+          if (index < coordinates.length) {
+            const coord = coordinates[index];
             
-            const congestionZone: CongestionZone = {
-              id: `T-${uuidv4().substring(0, 8)}`,
-              zone_name: flowData.roadName || `Road Segment ${midPoint.latitude.toFixed(4)},${midPoint.longitude.toFixed(4)}`,
-              lat: midPoint.latitude,
-              lng: midPoint.longitude,
+            // Skip points outside our bounding box
+            if (coord.latitude < HYDERABAD_BOUNDING_BOX.south || 
+                coord.latitude > HYDERABAD_BOUNDING_BOX.north || 
+                coord.longitude < HYDERABAD_BOUNDING_BOX.west || 
+                coord.longitude > HYDERABAD_BOUNDING_BOX.east) {
+              continue;
+            }
+            
+            const zone: CongestionZone = {
+              id: `tt-cong-${Date.now()}-${index}`,
+              zone_name: `${roadName} ${index}`,
+              lat: coord.latitude,
+              lng: coord.longitude,
               congestion_level: congestionLevel,
-              updated_at: new Date().toISOString(),
-              predicted_by_ml: false,
-              ml_confidence: 1
+              updated_at: new Date().toISOString()
             };
-            congestionZones.push(congestionZone);
+            
+            congestionZones.push(zone);
           }
         }
       }
@@ -239,68 +283,90 @@ export function transformTomTomCongestionData(apiData: any): CongestionZone[] {
     
     return congestionZones;
   } catch (error) {
-    console.error("Error transforming TomTom congestion data:", error);
+    console.error('Error transforming TomTom congestion data:', error);
     return [];
   }
 }
 
 export function transformTomTomAnomalyData(apiData: any): Anomaly[] {
+  if (!apiData || !apiData.incidents || !apiData.incidents.length) {
+    console.warn('No incident data received from TomTom API');
+    return [];
+  }
+
   try {
     const anomalies: Anomaly[] = [];
     
-    // Check if we have incidents data
-    if (apiData?.incidents) {
-      const incidents = apiData.incidents;
+    for (const incident of apiData.incidents) {
+      if (!incident.point) continue;
       
-      for (const incident of incidents) {
-        // Map TomTom incident type to our anomaly type
-        const anomalyType = mapTomTomIncidentTypeToAnomalyType(incident.type);
-        
-        // Map TomTom magnitudeOfDelay to our severity levels
-        const severity = mapTomTomMagnitudeToSeverity(incident.magnitudeOfDelay);
-        
-        // Get coordinates from the geometry
-        let lat = 0, lng = 0;
-        if (incident.geometry && incident.geometry.type === "Point" && incident.geometry.coordinates) {
-          lng = incident.geometry.coordinates[0];
-          lat = incident.geometry.coordinates[1];
-        }
-        
-        // Create anomaly object
-        if (lat !== 0 && lng !== 0) {
-          const anomaly: Anomaly = {
-            id: `T-${incident.id || uuidv4().substring(0, 8)}`,
-            timestamp: new Date(incident.startTime || Date.now()).toISOString(),
-            vehicle_id: `UNK-${uuidv4().substring(0, 8)}`, // Unknown vehicle ID for incidents
-            type: anomalyType,
-            severity: severity,
-            message: incident.description || "Traffic incident detected",
-            status: "Detected",
-            ml_confidence: 1.0
-          };
-          
-          anomalies.push(anomaly);
+      // Get coordinates
+      const latitude = incident.point.coordinates.latitude;
+      const longitude = incident.point.coordinates.longitude;
+      
+      // Skip if outside our bounding box
+      if (latitude < HYDERABAD_BOUNDING_BOX.south || 
+          latitude > HYDERABAD_BOUNDING_BOX.north || 
+          longitude < HYDERABAD_BOUNDING_BOX.west || 
+          longitude > HYDERABAD_BOUNDING_BOX.east) {
+        continue;
+      }
+      
+      // Map TomTom severity to our severity levels
+      let severity = 'Medium';
+      if (incident.criticality) {
+        switch (incident.criticality) {
+          case 0: severity = 'Low'; break;
+          case 1: severity = 'Medium'; break;
+          case 2: severity = 'High'; break;
+          case 3:
+          case 4: severity = 'Critical'; break;
+          default: severity = 'Medium';
         }
       }
+      
+      // Create anomaly object
+      const anomaly: Anomaly = {
+        id: incident.id || `tt-anomaly-${Date.now()}-${anomalies.length}`,
+        vehicle_id: `TT-${Math.floor(10000 + Math.random() * 90000)}`, // Synthetic vehicle ID
+        timestamp: new Date().toISOString(),
+        type: mapTomTomIncidentType(incident.type || 0),
+        severity: severity,
+        message: incident.description || 'Traffic incident detected',
+        status: 'Detected',
+        location: {
+          lat: latitude,
+          lng: longitude
+        }
+      };
+      
+      anomalies.push(anomaly);
     }
     
     return anomalies;
   } catch (error) {
-    console.error("Error transforming TomTom anomaly data:", error);
+    console.error('Error transforming TomTom anomaly data:', error);
     return [];
   }
 }
 
 /**
- * Transform functions for OpenData/Government API data
- * These are more generic as open data APIs can vary in structure
+ * Transforms OpenData API data into our Vehicle, CongestionZone and Anomaly models
  */
-export function transformOpenDataVehicleData(apiData: any): Vehicle[] {
+export function transformOpenDataTraffic(apiData: any): {
+  vehicles: Vehicle[];
+  congestion: CongestionZone[];
+  anomalies: Anomaly[];
+} {
   try {
     const vehicles: Vehicle[] = [];
+    const congestion: CongestionZone[] = [];
+    const anomalies: Anomaly[] = [];
     
     // Try common structures in open data APIs
     let vehicleData: any[] = [];
+    let congestionData: any[] = [];
+    let incidentData: any[] = [];
     
     // Check for different possible data structures
     if (apiData?.vehicles && Array.isArray(apiData.vehicles)) {
@@ -379,20 +445,7 @@ export function transformOpenDataVehicleData(apiData: any): Vehicle[] {
       }
     }
     
-    return vehicles;
-  } catch (error) {
-    console.error("Error transforming OpenData vehicle data:", error);
-    return [];
-  }
-}
-
-export function transformOpenDataCongestionData(apiData: any): CongestionZone[] {
-  try {
-    const congestionZones: CongestionZone[] = [];
-    
     // Try common structures for congestion data
-    let congestionData: any[] = [];
-    
     if (apiData?.congestion && Array.isArray(apiData.congestion)) {
       congestionData = apiData.congestion;
     } else if (apiData?.data?.congestion && Array.isArray(apiData.data.congestion)) {
@@ -454,24 +507,11 @@ export function transformOpenDataCongestionData(apiData: any): CongestionZone[] 
           predicted_by_ml: false,
           ml_confidence: 1
         };
-        congestionZones.push(congestionZone);
+        congestion.push(congestionZone);
       }
     }
     
-    return congestionZones;
-  } catch (error) {
-    console.error("Error transforming OpenData congestion data:", error);
-    return [];
-  }
-}
-
-export function transformOpenDataAnomalyData(apiData: any): Anomaly[] {
-  try {
-    const anomalies: Anomaly[] = [];
-    
     // Try common structures for incident data
-    let incidentData: any[] = [];
-    
     if (apiData?.incidents && Array.isArray(apiData.incidents)) {
       incidentData = apiData.incidents;
     } else if (apiData?.data?.incidents && Array.isArray(apiData.data.incidents)) {
@@ -543,10 +583,10 @@ export function transformOpenDataAnomalyData(apiData: any): Anomaly[] {
       }
     }
     
-    return anomalies;
+    return { vehicles, congestion, anomalies };
   } catch (error) {
-    console.error("Error transforming OpenData anomaly data:", error);
-    return [];
+    console.error("Error transforming OpenData traffic data:", error);
+    return { vehicles: [], congestion: [], anomalies: [] };
   }
 }
 
@@ -607,31 +647,19 @@ function mapHereCriticalityToSeverity(criticality: string): string {
 }
 
 // Map TomTom incident type to our anomaly type
-function mapTomTomIncidentTypeToAnomalyType(tomtomType: string): string {
-  switch (tomtomType) {
-    case "ACCIDENT":
-      return "Traffic Accident";
-    case "CONGESTION":
-      return "Congestion";
-    case "CONSTRUCTION":
-      return "Road Construction";
-    case "DISABLED_VEHICLE":
-      return "Vehicle Breakdown";
-    case "LANE_RESTRICTION":
-      return "Lane Restriction";
-    case "MASS_TRANSIT":
-      return "Public Transport Disruption";
-    case "PLANNED_EVENT":
-      return "Planned Event";
-    case "ROAD_CLOSURE":
-      return "Road Closure";
-    case "ROAD_HAZARD":
-      return "Road Hazard";
-    case "WEATHER":
-      return "Weather Hazard";
-    case "OTHER":
-    default:
-      return "Traffic Disruption";
+function mapTomTomIncidentType(tomtomType: number): string {
+  // TomTom incident types: https://developer.tomtom.com/traffic-api/documentation/traffic-incident/incident-details
+  switch(tomtomType) {
+    case 1: return 'Traffic Signal Violation';
+    case 2: return 'Accident';
+    case 3: return 'Road Closure';
+    case 6: return 'Speed Violation';
+    case 7: return 'Restricted Zone Entry';
+    case 8: return 'Traffic Congestion';
+    case 9: return 'Erratic Driving Pattern';
+    case 10: return 'Weather Incident';
+    case 11: return 'Hazard';
+    default: return 'Traffic Anomaly';
   }
 }
 
@@ -679,4 +707,26 @@ function mapOpenDataSeverityToAnomalyType(severity: string | number): string {
   if (lowerSeverity.includes("low") || lowerSeverity.includes("minor")) return "Low";
   
   return "Medium"; // Default
+}
+
+/**
+ * Helper function to calculate heading between two points
+ */
+function calculateHeading(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const y = Math.sin(lng2 - lng1) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - 
+            Math.sin(lat1) * Math.cos(lat2) * Math.cos(lng2 - lng1);
+  let bearing = Math.atan2(y, x) * 180 / Math.PI;
+  if (bearing < 0) {
+    bearing += 360;
+  }
+  return bearing;
+}
+
+/**
+ * Helper function to get a random vehicle type
+ */
+function getRandomVehicleType(): string {
+  const types = ['Car', 'Two-Wheeler', 'Taxi', 'Bus', 'Truck', 'Auto-Rickshaw'];
+  return types[Math.floor(Math.random() * types.length)];
 }
