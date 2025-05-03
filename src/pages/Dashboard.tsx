@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -255,7 +256,7 @@ const Dashboard: React.FC = () => {
             isLoading={isLoading}
             icon={Car}
             trend={{
-              value: "3.5M", // Must be a string, not number
+              value: "3.5M", // Ensuring this is a string for trend value
               label: "registered vehicles"
             }}
           />
@@ -286,7 +287,7 @@ const Dashboard: React.FC = () => {
             isLoading={isBlockchainLoading}
             icon={Shield}
             trend={{
-              value: "+15%",
+              value: "+15%", // This is already a string
               label: "increase in trust"
             }}
           />
