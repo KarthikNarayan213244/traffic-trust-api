@@ -8,24 +8,34 @@ import { isRealTimeDataAvailable } from "./external";
 
 export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
   try {
-    // First try to use real-time traffic API if configured
+    // Always try to use real-time traffic API first
     if (isRealTimeDataAvailable()) {
       try {
+        console.log("Attempting to fetch vehicles from real-time traffic API...");
         const realTimeData = await fetchRealTimeTrafficData();
+        
         if (realTimeData.vehicles && realTimeData.vehicles.length > 0) {
-          console.log(`Fetched ${realTimeData.vehicles.length} vehicles from real-time API`);
+          console.log(`Successfully fetched ${realTimeData.vehicles.length} vehicles from real-time API`);
           return realTimeData.vehicles;
+        } else {
+          console.log("Real-time API returned no vehicles, falling back to other sources");
         }
       } catch (realTimeError) {
         console.error("Error fetching vehicles from real-time API:", realTimeError);
         // Continue to try other data sources
       }
+    } else {
+      console.log("Real-time data sources not available, falling back to database");
     }
     
     // Then try to fetch from Supabase
     try {
+      console.log("Attempting to fetch vehicles from Supabase...");
       const data = await fetchFromSupabase<"vehicles">("vehicles", options);
-      return data;
+      if (data.length > 0) {
+        console.log(`Successfully fetched ${data.length} vehicles from Supabase`);
+        return data;
+      }
     } catch (error) {
       console.error("Error fetching vehicles from Supabase:", error);
       // Fallback to direct API or mock data
@@ -33,11 +43,19 @@ export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
 
     // Fallback to direct API
     try {
-      return await fetchData("vehicles", options);
+      console.log("Attempting to fetch vehicles from direct API...");
+      const apiData = await fetchData("vehicles", options);
+      if (apiData.length > 0) {
+        console.log(`Successfully fetched ${apiData.length} vehicles from direct API`);
+        return apiData;
+      }
     } catch (apiError) {
       console.error("Error fetching vehicles from API:", apiError);
-      return getMockVehicles();
+      // Final fallback to mock data
     }
+    
+    console.log("All data sources failed, using mock data");
+    return getMockVehicles();
   } catch (error) {
     console.error("All vehicle data sources failed:", error);
     return getMockVehicles();

@@ -8,24 +8,34 @@ import { isRealTimeDataAvailable } from "./external";
 
 export async function fetchRSUs(options = {}): Promise<RSU[]> {
   try {
-    // First try to use real-time traffic API if configured
+    // Always try to use real-time traffic API first
     if (isRealTimeDataAvailable()) {
       try {
+        console.log("Attempting to fetch RSUs from real-time traffic API...");
         const realTimeData = await fetchRealTimeTrafficData();
+        
         if (realTimeData.rsus && realTimeData.rsus.length > 0) {
-          console.log(`Fetched ${realTimeData.rsus.length} RSUs from real-time API`);
+          console.log(`Successfully fetched ${realTimeData.rsus.length} RSUs from real-time API`);
           return realTimeData.rsus;
+        } else {
+          console.log("Real-time API returned no RSUs, falling back to other sources");
         }
       } catch (realTimeError) {
         console.error("Error fetching RSUs from real-time API:", realTimeError);
         // Continue to try other data sources
       }
+    } else {
+      console.log("Real-time data sources not available, falling back to database");
     }
     
     // Then try to fetch from Supabase
     try {
+      console.log("Attempting to fetch RSUs from Supabase...");
       const data = await fetchFromSupabase<"rsus">("rsus", options);
-      return data;
+      if (data.length > 0) {
+        console.log(`Successfully fetched ${data.length} RSUs from Supabase`);
+        return data;
+      }
     } catch (error) {
       console.error("Error fetching RSUs from Supabase:", error);
       // Fallback to direct API or mock data
@@ -33,11 +43,19 @@ export async function fetchRSUs(options = {}): Promise<RSU[]> {
 
     // Fallback to direct API
     try {
-      return await fetchData("rsus", options);
+      console.log("Attempting to fetch RSUs from direct API...");
+      const apiData = await fetchData("rsus", options);
+      if (apiData.length > 0) {
+        console.log(`Successfully fetched ${apiData.length} RSUs from direct API`);
+        return apiData;
+      }
     } catch (apiError) {
       console.error("Error fetching RSUs from API:", apiError);
-      return getMockRSUs();
+      // Final fallback to mock data
     }
+    
+    console.log("All data sources failed, using mock data");
+    return getMockRSUs();
   } catch (error) {
     console.error("All RSU data sources failed:", error);
     return getMockRSUs();

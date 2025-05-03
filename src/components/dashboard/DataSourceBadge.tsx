@@ -28,7 +28,7 @@ const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="inline-flex items-center space-x-1">
-            <Badge variant={badgeVariant} className={badgeClass}>
+            <Badge variant={badgeVariant} className={`${badgeClass} ${isRealTime ? 'animate-pulse' : ''}`}>
               {isRealTime ? "LIVE API" : "SIMULATED"}
             </Badge>
             <HelpCircle className="h-4 w-4 text-muted-foreground" />
@@ -42,6 +42,11 @@ const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({
             {!isRealTime && (
               <p className="text-amber-500">
                 To enable real-time data, add an API key for a supported traffic provider in your environment variables.
+              </p>
+            )}
+            {isRealTime && (
+              <p className="text-green-500">
+                Using live traffic data from external API provider. No fallback to simulated data.
               </p>
             )}
           </div>

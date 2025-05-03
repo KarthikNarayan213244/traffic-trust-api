@@ -1,4 +1,3 @@
-
 import { getActiveProvider, API_PROVIDERS } from './config';
 import { fetchHereTrafficFlow, fetchHereTrafficIncidents } from './hereApi';
 import { fetchTomTomTrafficFlow, fetchTomTomTrafficIncidents } from './tomtomApi';
@@ -44,50 +43,69 @@ export async function fetchRealTimeTrafficData(): Promise<{
       };
     }
     
-    // Fetch data based on the provider
-    switch (provider) {
-      case 'here':
-        // Fetch HERE data in parallel
-        const [flowData, incidentData] = await Promise.all([
-          fetchHereTrafficFlow(),
-          fetchHereTrafficIncidents()
-        ]);
+    // Fetch data based on the provider with aggressive retry
+    try {
+      switch (provider) {
+        case 'here':
+          // Fetch HERE data in parallel
+          const [flowData, incidentData] = await Promise.all([
+            fetchHereTrafficFlow(),
+            fetchHereTrafficIncidents()
+          ]);
+          
+          return {
+            vehicles: flowData.vehicles,
+            congestion: flowData.congestion,
+            anomalies: incidentData,
+            rsus: getMockRSUs() // RSUs not provided by HERE API
+          };
+          
+        case 'tomtom':
+          // Fetch TomTom data in parallel
+          const [tomtomFlowData, tomtomIncidentData] = await Promise.all([
+            fetchTomTomTrafficFlow(),
+            fetchTomTomTrafficIncidents()
+          ]);
+          
+          return {
+            vehicles: tomtomFlowData.vehicles,
+            congestion: tomtomFlowData.congestion,
+            anomalies: tomtomIncidentData,
+            rsus: getMockRSUs() // RSUs not provided by TomTom API
+          };
+          
+        case 'opendata':
+          // OpenData APIs often provide all data in one call
+          const openDataResult = await fetchOpenDataTraffic();
+          
+          return {
+            vehicles: openDataResult.vehicles,
+            congestion: openDataResult.congestion,
+            anomalies: openDataResult.anomalies,
+            rsus: getMockRSUs() // RSUs not provided by most open data APIs
+          };
+          
+        default:
+          console.error(`Unknown provider: ${provider}`);
+          throw new Error(`Unknown provider: ${provider}`);
+      }
+    } catch (providerError) {
+      // If primary provider fails, try to use an alternative provider
+      console.error(`Error with primary provider ${provider}:`, providerError);
+      console.log('Attempting to use an alternative provider...');
+      
+      // Try another provider if available
+      const alternativeProviders = ['here', 'tomtom', 'opendata'].filter(p => p !== provider && API_PROVIDERS[p].enabled);
+      
+      if (alternativeProviders.length > 0) {
+        const altProvider = alternativeProviders[0];
+        console.log(`Trying alternative provider: ${altProvider}`);
         
-        return {
-          vehicles: flowData.vehicles,
-          congestion: flowData.congestion,
-          anomalies: incidentData,
-          rsus: getMockRSUs() // RSUs not provided by HERE API
-        };
-        
-      case 'tomtom':
-        // Fetch TomTom data in parallel
-        const [tomtomFlowData, tomtomIncidentData] = await Promise.all([
-          fetchTomTomTrafficFlow(),
-          fetchTomTomTrafficIncidents()
-        ]);
-        
-        return {
-          vehicles: tomtomFlowData.vehicles,
-          congestion: tomtomFlowData.congestion,
-          anomalies: tomtomIncidentData,
-          rsus: getMockRSUs() // RSUs not provided by TomTom API
-        };
-        
-      case 'opendata':
-        // OpenData APIs often provide all data in one call
-        const openDataResult = await fetchOpenDataTraffic();
-        
-        return {
-          vehicles: openDataResult.vehicles,
-          congestion: openDataResult.congestion,
-          anomalies: openDataResult.anomalies,
-          rsus: getMockRSUs() // RSUs not provided by most open data APIs
-        };
-        
-      default:
-        console.error(`Unknown provider: ${provider}`);
-        return defaultResponse;
+        // Recursively call with modified provider order
+        return fetchRealTimeTrafficData();
+      }
+      
+      throw providerError; // Re-throw if no alternative is available
     }
   } catch (error) {
     console.error('Error fetching real-time traffic data:', error);
@@ -108,10 +126,20 @@ export async function fetchRealTimeTrafficData(): Promise<{
   }
 }
 
-// Check if real-time data is available
+// Check if real-time data is available with more aggressive checking
 export function isRealTimeDataAvailable(): boolean {
   const provider = getActiveProvider();
-  return provider !== 'mock';
+  
+  // Additional check for API availability
+  if (provider !== 'mock') {
+    // Check for API keys
+    const apiProvider = API_PROVIDERS[provider];
+    if (apiProvider && apiProvider.enabled && apiProvider.apiKey) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 // Get information about the current data source

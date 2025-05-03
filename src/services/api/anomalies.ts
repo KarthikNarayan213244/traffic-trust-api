@@ -9,24 +9,34 @@ import { isRealTimeDataAvailable } from "./external";
 // Fetch anomalies with real-time API support
 export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
   try {
-    // First try to use real-time traffic API if configured
+    // Always try to use real-time traffic API first
     if (isRealTimeDataAvailable()) {
       try {
+        console.log("Attempting to fetch anomalies from real-time traffic API...");
         const realTimeData = await fetchRealTimeTrafficData();
+        
         if (realTimeData.anomalies && realTimeData.anomalies.length > 0) {
-          console.log(`Fetched ${realTimeData.anomalies.length} anomalies from real-time API`);
+          console.log(`Successfully fetched ${realTimeData.anomalies.length} anomalies from real-time API`);
           return realTimeData.anomalies;
+        } else {
+          console.log("Real-time API returned no anomalies, falling back to other sources");
         }
       } catch (realTimeError) {
         console.error("Error fetching anomalies from real-time API:", realTimeError);
         // Continue to try other data sources
       }
+    } else {
+      console.log("Real-time data sources not available, falling back to database");
     }
 
     // Then try to fetch from Supabase
     try {
+      console.log("Attempting to fetch anomalies from Supabase...");
       const data = await fetchFromSupabase<"anomalies">("anomalies", options);
-      return data;
+      if (data.length > 0) {
+        console.log(`Successfully fetched ${data.length} anomalies from Supabase`);
+        return data;
+      }
     } catch (error) {
       console.error("Error fetching anomalies from Supabase:", error);
       // Fallback to direct API or mock data
@@ -34,11 +44,19 @@ export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
 
     // Fallback to direct API
     try {
-      return await fetchData("anomalies", options);
+      console.log("Attempting to fetch anomalies from direct API...");
+      const apiData = await fetchData("anomalies", options);
+      if (apiData.length > 0) {
+        console.log(`Successfully fetched ${apiData.length} anomalies from direct API`);
+        return apiData;
+      }
     } catch (apiError) {
       console.error("Error fetching anomalies from API:", apiError);
       return getMockAnomalies();
     }
+    
+    console.log("All data sources failed, using mock data");
+    return getMockAnomalies();
   } catch (error) {
     console.error("All anomaly data sources failed:", error);
     return getMockAnomalies();

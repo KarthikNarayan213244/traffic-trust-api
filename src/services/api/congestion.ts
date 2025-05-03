@@ -9,24 +9,34 @@ import { isRealTimeDataAvailable } from "./external";
 // Renamed function to match import expectations across the app
 export async function fetchCongestionData(options = {}): Promise<CongestionZone[]> {
   try {
-    // First try to use real-time traffic API if configured
+    // Always try to use real-time traffic API first
     if (isRealTimeDataAvailable()) {
       try {
+        console.log("Attempting to fetch congestion data from real-time traffic API...");
         const realTimeData = await fetchRealTimeTrafficData();
+        
         if (realTimeData.congestion && realTimeData.congestion.length > 0) {
-          console.log(`Fetched ${realTimeData.congestion.length} congestion zones from real-time API`);
+          console.log(`Successfully fetched ${realTimeData.congestion.length} congestion zones from real-time API`);
           return realTimeData.congestion;
+        } else {
+          console.log("Real-time API returned no congestion data, falling back to other sources");
         }
       } catch (realTimeError) {
         console.error("Error fetching congestion from real-time API:", realTimeError);
         // Continue to try other data sources
       }
+    } else {
+      console.log("Real-time data sources not available, falling back to database");
     }
     
     // Then try to fetch from Supabase
     try {
+      console.log("Attempting to fetch congestion data from Supabase...");
       const data = await fetchFromSupabase<"congestion">("congestion", options);
-      return data;
+      if (data.length > 0) {
+        console.log(`Successfully fetched ${data.length} congestion zones from Supabase`);
+        return data;
+      }
     } catch (error) {
       console.error("Error fetching congestion zones from Supabase:", error);
       // Fallback to direct API or mock data
@@ -34,11 +44,19 @@ export async function fetchCongestionData(options = {}): Promise<CongestionZone[
 
     // Fallback to direct API
     try {
-      return await fetchData("congestion", options);
+      console.log("Attempting to fetch congestion data from direct API...");
+      const apiData = await fetchData("congestion", options);
+      if (apiData.length > 0) {
+        console.log(`Successfully fetched ${apiData.length} congestion zones from direct API`);
+        return apiData;
+      }
     } catch (apiError) {
       console.error("Error fetching congestion zones from API:", apiError);
-      return getMockCongestionZones();
+      // Final fallback to mock data
     }
+    
+    console.log("All data sources failed, using mock data");
+    return getMockCongestionZones();
   } catch (error) {
     console.error("All congestion data sources failed:", error);
     return getMockCongestionZones();
