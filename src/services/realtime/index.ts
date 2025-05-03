@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";

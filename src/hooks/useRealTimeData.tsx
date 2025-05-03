@@ -18,7 +18,7 @@ export const useRealTimeData = <T extends any>(
   // Initialize real-time service if not already done
   useEffect(() => {
     if (!isInitialized && supabase) {
-      realtimeService.initializeWebSockets(supabase);
+      realtimeService.initializeWebSockets();
       isInitialized = true;
     }
     

@@ -17,7 +17,7 @@ export const API_PROVIDERS = {
     apiKey: import.meta.env.VITE_HERE_API_KEY || '',
     enabled: Boolean(import.meta.env.VITE_HERE_API_KEY),
     rateLimit: 60, // requests per minute
-    timeout: 10000, // 10 seconds
+    timeout: 10000, // 10 seconds - used for custom timeout handling, not in fetch directly
   },
   // TomTom Traffic API (primary)
   tomtom: {
@@ -27,7 +27,7 @@ export const API_PROVIDERS = {
     apiKey: import.meta.env.VITE_TOMTOM_API_KEY || 'pEwSxAaTM0quOL1x2WuqFFYRj7lGIJeL', // Use provided key as default
     enabled: true, // Always enable TomTom as we have the key
     rateLimit: 40, // requests per minute
-    timeout: 12000, // 12 seconds
+    timeout: 12000, // 12 seconds - used for custom timeout handling, not in fetch directly
   },
   // Open Data Platforms (e.g. government transportation APIs)
   opendata: {
@@ -37,7 +37,7 @@ export const API_PROVIDERS = {
     apiKey: import.meta.env.VITE_OPENDATA_API_KEY || '',
     enabled: Boolean(import.meta.env.VITE_OPENDATA_API_KEY && import.meta.env.VITE_OPENDATA_TRAFFIC_API),
     rateLimit: 30, // requests per minute
-    timeout: 15000, // 15 seconds
+    timeout: 15000, // 15 seconds - used for custom timeout handling, not in fetch directly
   },
   // Mock data (fallback when no API keys are available)
   mock: {

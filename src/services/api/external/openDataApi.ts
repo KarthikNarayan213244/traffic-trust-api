@@ -35,8 +35,8 @@ export async function fetchOpenDataTraffic(): Promise<{
       headers: {
         'Accept': 'application/json',
         'Authorization': apiKey ? `Bearer ${apiKey}` : ''
-      },
-      timeout: API_PROVIDERS.opendata.timeout
+      }
+      // Removed the timeout property as it's not supported by the fetch API
     });
     
     if (!response.ok) {
