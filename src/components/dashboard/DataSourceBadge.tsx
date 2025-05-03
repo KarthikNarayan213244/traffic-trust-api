@@ -12,7 +12,7 @@ import {
 interface DataSourceBadgeProps {
   provider: string;
   isRealTime: boolean;
-  apiCredits?: string;
+  apiCredits?: number | string; // Updated to accept both number and string
 }
 
 const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({
@@ -38,7 +38,7 @@ const DataSourceBadge: React.FC<DataSourceBadgeProps> = ({
           <div className="space-y-2 text-xs">
             <p><strong>Data Source:</strong> {provider}</p>
             <p><strong>Type:</strong> {isRealTime ? "Real-time API data" : "Simulated data"}</p>
-            {apiCredits && <p className="text-muted-foreground">{apiCredits}</p>}
+            {apiCredits && <p className="text-muted-foreground">{apiCredits.toString()}</p>}
             {!isRealTime && (
               <p className="text-amber-500">
                 To enable real-time data, add an API key for a supported traffic provider in your environment variables.
