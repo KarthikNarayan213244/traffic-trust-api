@@ -325,7 +325,7 @@ export function transformTomTomAnomalyData(apiData: any): Anomaly[] {
         }
       }
       
-      // Create anomaly object
+      // Create anomaly object - Fixed here to conform to the Anomaly type
       const anomaly: Anomaly = {
         id: incident.id || `tt-anomaly-${Date.now()}-${anomalies.length}`,
         vehicle_id: `TT-${Math.floor(10000 + Math.random() * 90000)}`, // Synthetic vehicle ID
@@ -334,10 +334,8 @@ export function transformTomTomAnomalyData(apiData: any): Anomaly[] {
         severity: severity,
         message: incident.description || 'Traffic incident detected',
         status: 'Detected',
-        location: {
-          lat: latitude,
-          lng: longitude
-        }
+        lat: latitude,  // We add these directly 
+        lng: longitude  // instead of the location object
       };
       
       anomalies.push(anomaly);
@@ -351,22 +349,14 @@ export function transformTomTomAnomalyData(apiData: any): Anomaly[] {
 }
 
 /**
- * Transforms OpenData API data into our Vehicle, CongestionZone and Anomaly models
+ * Functions for OpenData APIs - added the missing functions
  */
-export function transformOpenDataTraffic(apiData: any): {
-  vehicles: Vehicle[];
-  congestion: CongestionZone[];
-  anomalies: Anomaly[];
-} {
+export function transformOpenDataVehicleData(apiData: any): Vehicle[] {
   try {
     const vehicles: Vehicle[] = [];
-    const congestion: CongestionZone[] = [];
-    const anomalies: Anomaly[] = [];
     
     // Try common structures in open data APIs
     let vehicleData: any[] = [];
-    let congestionData: any[] = [];
-    let incidentData: any[] = [];
     
     // Check for different possible data structures
     if (apiData?.vehicles && Array.isArray(apiData.vehicles)) {
@@ -445,7 +435,20 @@ export function transformOpenDataTraffic(apiData: any): {
       }
     }
     
+    return vehicles;
+  } catch (error) {
+    console.error("Error transforming OpenData vehicle data:", error);
+    return [];
+  }
+}
+
+export function transformOpenDataCongestionData(apiData: any): CongestionZone[] {
+  try {
+    const congestion: CongestionZone[] = [];
+    
     // Try common structures for congestion data
+    let congestionData: any[] = [];
+    
     if (apiData?.congestion && Array.isArray(apiData.congestion)) {
       congestionData = apiData.congestion;
     } else if (apiData?.data?.congestion && Array.isArray(apiData.data.congestion)) {
@@ -511,7 +514,20 @@ export function transformOpenDataTraffic(apiData: any): {
       }
     }
     
+    return congestion;
+  } catch (error) {
+    console.error("Error transforming OpenData congestion data:", error);
+    return [];
+  }
+}
+
+export function transformOpenDataAnomalyData(apiData: any): Anomaly[] {
+  try {
+    const anomalies: Anomaly[] = [];
+    
     // Try common structures for incident data
+    let incidentData: any[] = [];
+    
     if (apiData?.incidents && Array.isArray(apiData.incidents)) {
       incidentData = apiData.incidents;
     } else if (apiData?.data?.incidents && Array.isArray(apiData.data.incidents)) {
@@ -576,6 +592,8 @@ export function transformOpenDataTraffic(apiData: any): {
           severity: anomalySeverity,
           message: description || "Traffic incident detected",
           status: "Detected",
+          lat: lat,
+          lng: lng,
           ml_confidence: 1.0
         };
         
@@ -583,11 +601,26 @@ export function transformOpenDataTraffic(apiData: any): {
       }
     }
     
-    return { vehicles, congestion, anomalies };
+    return anomalies;
   } catch (error) {
-    console.error("Error transforming OpenData traffic data:", error);
-    return { vehicles: [], congestion: [], anomalies: [] };
+    console.error("Error transforming OpenData anomaly data:", error);
+    return [];
   }
+}
+
+/**
+ * Helper function for transformOpenDataTraffic in the openDataApi.ts file
+ */
+export function transformOpenDataTraffic(apiData: any): {
+  vehicles: Vehicle[];
+  congestion: CongestionZone[];
+  anomalies: Anomaly[];
+} {
+  const vehicles = transformOpenDataVehicleData(apiData);
+  const congestion = transformOpenDataCongestionData(apiData);
+  const anomalies = transformOpenDataAnomalyData(apiData);
+  
+  return { vehicles, congestion, anomalies };
 }
 
 /**

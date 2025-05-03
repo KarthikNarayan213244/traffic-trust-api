@@ -3,7 +3,8 @@ import { API_PROVIDERS, RateLimiter } from './config';
 import { 
   transformOpenDataVehicleData, 
   transformOpenDataCongestionData, 
-  transformOpenDataAnomalyData 
+  transformOpenDataAnomalyData,
+  transformOpenDataTraffic 
 } from './transformers';
 import { Vehicle, CongestionZone, Anomaly } from '../types';
 import { toast } from '@/hooks/use-toast';
@@ -57,22 +58,9 @@ export async function fetchOpenDataTraffic(): Promise<{
 
     const data = await response.json();
     
-    // Transform OpenData API data to our application's data models
-    const vehicles = transformOpenDataVehicleData(data);
-    const congestion = transformOpenDataCongestionData(data);
-    
-    // For some open data APIs, anomalies might come from the same endpoint
-    let anomalies: Anomaly[] = [];
-    
-    // Check if we need a separate call for incidents
-    if (data.incidents) {
-      anomalies = transformOpenDataAnomalyData(data);
-    } else {
-      // Separate API call for incidents if needed
-      anomalies = await fetchOpenDataIncidents();
-    }
+    // Use the combined transformer function
+    return transformOpenDataTraffic(data);
 
-    return { vehicles, congestion, anomalies };
   } catch (error) {
     console.error('Error fetching OpenData traffic data:', error);
     

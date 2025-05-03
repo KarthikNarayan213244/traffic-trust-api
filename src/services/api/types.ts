@@ -39,6 +39,13 @@ export interface Anomaly {
   message: string;
   status: 'Detected' | 'Resolved';
   ml_confidence: number;
+  // Adding lat and lng properties to directly store coordinates
+  lat?: number;
+  lng?: number;
+  location?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface TrustLedgerEntry {
