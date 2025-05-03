@@ -1,8 +1,6 @@
-
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { Anomaly } from "./types";
-import { ApiEndpoint } from "./config";
 import { fetchRealTimeTrafficData } from "./external";
 import { isRealTimeDataAvailable } from "./external";
 
@@ -28,7 +26,7 @@ export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
     } else {
       console.log("Real-time data sources not available, falling back to database");
     }
-
+    
     // Then try to fetch from Supabase
     try {
       console.log("Attempting to fetch anomalies from Supabase...");
@@ -39,7 +37,7 @@ export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
       }
     } catch (error) {
       console.error("Error fetching anomalies from Supabase:", error);
-      // Fallback to direct API or mock data
+      // Fallback to direct API
     }
 
     // Fallback to direct API
@@ -52,7 +50,7 @@ export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
       }
     } catch (apiError) {
       console.error("Error fetching anomalies from API:", apiError);
-      return getMockAnomalies();
+      // Final fallback to mock data
     }
     
     console.log("All data sources failed, using mock data");
@@ -63,7 +61,7 @@ export async function fetchAnomalies(options = {}): Promise<Anomaly[]> {
   }
 }
 
-// Mock data for anomalies
+// Mock data for anomalies - now used only as a last resort
 export function getMockAnomalies(): Anomaly[] {
   return [
     { 

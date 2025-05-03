@@ -2,13 +2,13 @@
 import { supabase } from "./client";
 import { toast } from "@/hooks/use-toast";
 
-// Add a utility function to seed the database
+// Update utility function to seed only non-traffic data
 export async function seedDatabaseWithTestData(clearExisting = false) {
   try {
-    console.log("Starting database seeding process...");
+    console.log("Starting database seeding process for trust and anomaly data...");
     toast({
       title: "Seeding database",
-      description: "Please wait while we populate the database with test data...",
+      description: "Please wait while we populate the database with trust and anomaly test data...",
     });
     
     // Get the full URL for the edge function
@@ -28,16 +28,19 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
       console.log("No authentication token available, proceeding without authentication");
     }
     
+    // Note: We're only seeding trust and anomaly data, not traffic data
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         clear: clearExisting,
-        vehicles: 1000,
-        rsus: 200,
-        anomalies: 1000,
-        trustEntries: 1000,
-        congestionEntries: 50
+        seedTraffic: false, // Don't seed traffic data
+        seedTrustOnly: true, // Only seed trust and anomaly data
+        vehicles: 0, // No traffic vehicles
+        rsus: 0, // No RSUs
+        anomalies: 1000, // Trust-related anomalies only
+        trustEntries: 1000, // Trust ledger entries
+        congestionEntries: 0 // No congestion data
       })
     });
     
@@ -50,11 +53,9 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
         variant: "destructive",
       });
       
-      // Fall back to mock data
-      console.log("Falling back to mock data generation");
       return {
         success: false,
-        message: "Seeding failed, using mock data",
+        message: "Seeding failed",
         counts: {
           vehicles: 0,
           rsus: 0,
@@ -68,8 +69,8 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
     const result = await response.json();
     console.log("Seeding completed successfully:", result);
     toast({
-      title: "Database Seeded Successfully",
-      description: `Added ${result.counts?.vehicles || 'many'} vehicles, ${result.counts?.rsus || 'many'} RSUs, and more data to the database.`,
+      title: "Trust Database Seeded Successfully",
+      description: `Added ${result.counts?.trustEntries || 'many'} trust entries and ${result.counts?.anomalies || 'many'} anomalies to the database.`,
     });
     return result;
   } catch (error: any) {

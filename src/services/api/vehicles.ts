@@ -1,8 +1,6 @@
-
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { Vehicle } from "./types";
-import { ApiEndpoint } from "./config";
 import { fetchRealTimeTrafficData } from "./external";
 import { isRealTimeDataAvailable } from "./external";
 
@@ -18,7 +16,7 @@ export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
           console.log(`Successfully fetched ${realTimeData.vehicles.length} vehicles from real-time API`);
           return realTimeData.vehicles;
         } else {
-          console.log("Real-time API returned no vehicles, falling back to other sources");
+          console.log("Real-time API returned no vehicle data, falling back to other sources");
         }
       } catch (realTimeError) {
         console.error("Error fetching vehicles from real-time API:", realTimeError);
@@ -38,7 +36,6 @@ export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
       }
     } catch (error) {
       console.error("Error fetching vehicles from Supabase:", error);
-      // Fallback to direct API or mock data
     }
 
     // Fallback to direct API
@@ -51,7 +48,6 @@ export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
       }
     } catch (apiError) {
       console.error("Error fetching vehicles from API:", apiError);
-      // Final fallback to mock data
     }
     
     console.log("All data sources failed, using mock data");
@@ -62,7 +58,7 @@ export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
   }
 }
 
-// Mock data for vehicles (for offline development/testing)
+// Mock data function - now used only as a last resort
 export function getMockVehicles(): Vehicle[] {
   return [
     { 

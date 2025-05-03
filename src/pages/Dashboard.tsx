@@ -41,15 +41,15 @@ const Dashboard: React.FC = () => {
   const seedDatabase = async () => {
     setIsSeeding(true);
     toast({
-      title: "Seeding Database",
-      description: "Please wait while we populate the database with sample data...",
+      title: "Seeding Trust Database",
+      description: "Please wait while we populate the database with trust and anomaly data...",
     });
     
     try {
       const result = await seedDatabaseWithTestData(true);
       toast({
-        title: "Database Seeded Successfully",
-        description: `Added ${result.counts.vehicles} vehicles, ${result.counts.rsus} RSUs, ${result.counts.anomalies} anomalies, ${result.counts.trustEntries} trust entries, and ${result.counts.congestionEntries} congestion entries.`,
+        title: "Trust Database Seeded Successfully",
+        description: `Added ${result.counts.trustEntries} trust entries and ${result.counts.anomalies} anomalies to the database.`,
       });
       
       refreshData();
@@ -110,7 +110,7 @@ const Dashboard: React.FC = () => {
               className="flex items-center gap-2"
             >
               <Database className={`h-4 w-4 ${isSeeding ? 'animate-pulse' : ''}`} />
-              <span>{isSeeding ? 'Seeding...' : 'Seed Database'}</span>
+              <span>{isSeeding ? 'Seeding...' : 'Seed Trust Data'}</span>
             </Button>
           </div>
         </div>

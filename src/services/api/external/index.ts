@@ -1,3 +1,4 @@
+
 import { getActiveProvider, API_PROVIDERS } from './config';
 import { fetchHereTrafficFlow, fetchHereTrafficIncidents } from './hereApi';
 import { fetchTomTomTrafficFlow, fetchTomTomTrafficIncidents } from './tomtomApi';
@@ -32,9 +33,9 @@ export async function fetchRealTimeTrafficData(): Promise<{
     const provider = getActiveProvider();
     console.log(`Fetching real-time traffic data from ${provider} provider`);
     
-    // Fall back to mock data if no real API is configured
+    // Only use mock data if explicitly requested or if no real API is configured
     if (provider === 'mock') {
-      console.log('No real API configured, using mock data');
+      console.log('No real API configured, using mock data as last resort');
       return {
         vehicles: getMockVehicles(),
         congestion: getMockCongestionZones(),
@@ -43,7 +44,7 @@ export async function fetchRealTimeTrafficData(): Promise<{
       };
     }
     
-    // Fetch data based on the provider with aggressive retry
+    // Fetch data from the primary provider
     try {
       switch (provider) {
         case 'here':
@@ -53,11 +54,13 @@ export async function fetchRealTimeTrafficData(): Promise<{
             fetchHereTrafficIncidents()
           ]);
           
+          console.log('Successfully fetched real-time traffic data from HERE API');
+          
           return {
             vehicles: flowData.vehicles,
             congestion: flowData.congestion,
             anomalies: incidentData,
-            rsus: getMockRSUs() // RSUs not provided by HERE API
+            rsus: getMockRSUs() // RSUs not provided by API, still using mock data for these
           };
           
         case 'tomtom':
@@ -67,26 +70,29 @@ export async function fetchRealTimeTrafficData(): Promise<{
             fetchTomTomTrafficIncidents()
           ]);
           
+          console.log('Successfully fetched real-time traffic data from TomTom API');
+          
           return {
             vehicles: tomtomFlowData.vehicles,
             congestion: tomtomFlowData.congestion,
             anomalies: tomtomIncidentData,
-            rsus: getMockRSUs() // RSUs not provided by TomTom API
+            rsus: getMockRSUs() // RSUs not provided by API, still using mock data for these
           };
           
         case 'opendata':
           // OpenData APIs often provide all data in one call
           const openDataResult = await fetchOpenDataTraffic();
           
+          console.log('Successfully fetched real-time traffic data from Open Data API');
+          
           return {
             vehicles: openDataResult.vehicles,
             congestion: openDataResult.congestion,
             anomalies: openDataResult.anomalies,
-            rsus: getMockRSUs() // RSUs not provided by most open data APIs
+            rsus: getMockRSUs() // RSUs not provided by API, still using mock data for these
           };
           
         default:
-          console.error(`Unknown provider: ${provider}`);
           throw new Error(`Unknown provider: ${provider}`);
       }
     } catch (providerError) {
@@ -112,11 +118,11 @@ export async function fetchRealTimeTrafficData(): Promise<{
     
     toast({
       title: "API Connection Error",
-      description: "Failed to connect to traffic data provider. Using local data instead.",
+      description: "Failed to connect to traffic data provider. Using fallback data temporarily.",
       variant: "destructive",
     });
     
-    // Return mock data as fallback
+    // Return mock data only as a last resort fallback
     return {
       vehicles: getMockVehicles(),
       congestion: getMockCongestionZones(),
@@ -130,7 +136,7 @@ export async function fetchRealTimeTrafficData(): Promise<{
 export function isRealTimeDataAvailable(): boolean {
   const provider = getActiveProvider();
   
-  // Additional check for API availability
+  // Don't consider 'mock' as real-time
   if (provider !== 'mock') {
     // Check for API keys
     const apiProvider = API_PROVIDERS[provider];

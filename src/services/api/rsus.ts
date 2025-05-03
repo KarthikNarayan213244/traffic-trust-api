@@ -1,8 +1,6 @@
-
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { RSU } from "./types";
-import { ApiEndpoint } from "./config";
 import { fetchRealTimeTrafficData } from "./external";
 import { isRealTimeDataAvailable } from "./external";
 
@@ -62,7 +60,7 @@ export async function fetchRSUs(options = {}): Promise<RSU[]> {
   }
 }
 
-// Mock data for RSUs
+// Mock data for RSUs - now used only as a last resort
 export function getMockRSUs(): RSU[] {
   return [
     { 

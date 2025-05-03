@@ -37,7 +37,7 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({
         className={`transition-colors ${isSimulationRunning ? "bg-red-100 hover:bg-red-200" : "bg-green-100 hover:bg-green-200"}`}
       >
         {isSimulationRunning ? (
-          <><Pause className="mr-1" size={16} /> Pause Simulation</>
+          <><Pause className="mr-1" size={16} /> Pause Monitoring</>
         ) : (
           <><Play className="mr-1" size={16} /> Real Time Monitoring</>
         )}
@@ -77,7 +77,7 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <AlertCircle className="mr-1" size={14} />
-              Simulation affects update frequency
+              Update frequency affects data refresh rate
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,8 +1,6 @@
-
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { CongestionZone } from "./types";
-import { ApiEndpoint } from "./config";
 import { fetchRealTimeTrafficData } from "./external";
 import { isRealTimeDataAvailable } from "./external";
 
@@ -39,7 +37,6 @@ export async function fetchCongestionData(options = {}): Promise<CongestionZone[
       }
     } catch (error) {
       console.error("Error fetching congestion zones from Supabase:", error);
-      // Fallback to direct API or mock data
     }
 
     // Fallback to direct API
@@ -52,7 +49,6 @@ export async function fetchCongestionData(options = {}): Promise<CongestionZone[
       }
     } catch (apiError) {
       console.error("Error fetching congestion zones from API:", apiError);
-      // Final fallback to mock data
     }
     
     console.log("All data sources failed, using mock data");
@@ -68,7 +64,7 @@ export async function fetchCongestionZones(options = {}): Promise<CongestionZone
   return fetchCongestionData(options);
 }
 
-// Mock data for congestion zones
+// Mock data for congestion zones - now used only as a last resort
 export function getMockCongestionZones(): CongestionZone[] {
   return [
     { id: "1", zone_name: "Hitech City Junction", lat: 17.4479, lng: 78.3762, congestion_level: 8, updated_at: new Date().toISOString() },
