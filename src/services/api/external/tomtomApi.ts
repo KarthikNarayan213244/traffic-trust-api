@@ -105,16 +105,15 @@ export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
   try {
     const { baseUrl, incidentEndpoint, apiKey, timeout } = API_PROVIDERS.tomtom;
     
-    // For incidents we need to format the bbox as per TomTom requirements
-    // And add a proper position parameter
+    // For incidents we need to format the parameters correctly
     const centerLat = (HYDERABAD_BOUNDING_BOX.north + HYDERABAD_BOUNDING_BOX.south) / 2;
     const centerLng = (HYDERABAD_BOUNDING_BOX.east + HYDERABAD_BOUNDING_BOX.west) / 2;
-
-    // Construct query parameters
+    
+    // Updated query parameters to match TomTom's requirements
     const params = new URLSearchParams({
       key: apiKey,
-      position: `${centerLat},${centerLng}`, // Center of Hyderabad
-      radiusInMeters: '20000', // 20km radius
+      position: `${centerLat},${centerLng}`,
+      radius: "20000", // 20km radius
       language: 'en-GB',
       categoryFilter: '0,1,2,3,4,5,6,7,8,9,10,11', // All categories
       expandCluster: 'true',
@@ -134,7 +133,9 @@ export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`TomTom API error: ${response.status} ${response.statusText}`);
+      console.error(`TomTom API error: ${response.status} ${response.statusText}`);
+      // Instead of throwing, we'll return empty array in case of API errors
+      return [];
     }
 
     const data = await response.json();
@@ -149,11 +150,12 @@ export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
     if (error instanceof Error && error.name === 'AbortError') {
       toast({
         title: "TomTom API Request Timeout",
-        description: "The request to the TomTom Traffic Incidents API timed out. Please try again later.",
+        description: "The request to the TomTom Traffic Incidents API timed out. Using fallback data.",
         variant: "destructive",
       });
     }
     
-    throw error;
+    // Return empty array instead of throwing to ensure application continues to work
+    return [];
   }
 }

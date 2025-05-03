@@ -37,11 +37,12 @@ export interface Anomaly {
   type: string;
   severity: string;
   message: string;
-  status: 'Detected' | 'Resolved';
+  status: 'Detected' | 'Resolved' | 'Under Investigation' | 'False Alarm';
   ml_confidence: number;
-  // Adding lat and lng properties to directly store coordinates
+  // Direct coordinates for mapping
   lat?: number;
   lng?: number;
+  // Legacy location format (kept for backward compatibility)
   location?: {
     lat: number;
     lng: number;

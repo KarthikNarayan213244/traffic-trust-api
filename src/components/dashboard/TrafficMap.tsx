@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
@@ -11,6 +11,7 @@ import { useMapApiKey, markGoogleMapsAsLoaded } from "@/hooks/useMapApiKey";
 import { useMLSimulation } from "@/hooks/useMLSimulation";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/hooks/use-toast";
 
 interface TrafficMapProps {
   vehicles?: any[];
@@ -34,7 +35,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     changeModelAccuracy
   } = useMLSimulation();
   
-  // Using our new real-time data hooks
+  // Using our real-time data hooks
   const { 
     data: vehicles, 
     isLoading: isVehiclesLoading, 
@@ -59,6 +60,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   } = useRealTimeData('anomaly', []);
 
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   // Only initialize Google Maps when we have an API key
   const { isLoaded, loadError } = useJsApiLoader({
@@ -68,9 +70,32 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   });
 
   // Mark the Google Maps API as loaded to prevent multiple initializations
-  if (isLoaded) {
-    markGoogleMapsAsLoaded();
-  }
+  useEffect(() => {
+    if (isLoaded) {
+      markGoogleMapsAsLoaded();
+    }
+  }, [isLoaded]);
+  
+  // Set up periodic data refresh
+  useEffect(() => {
+    if (!isLiveMonitoring) return;
+    
+    const intervalId = setInterval(() => {
+      refreshVehicles();
+      refreshRsus();
+      refreshCongestion();
+      setLastRefreshed(new Date());
+      
+      // Show minimal notification
+      toast({
+        title: "Data Refreshed",
+        description: `Updated ${vehicles.length} vehicles, ${rsus.length} RSUs, and ${congestionData.length} congestion zones`,
+        duration: 2000, // 2 seconds
+      });
+    }, 30000); // Every 30 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [isLiveMonitoring, refreshVehicles, refreshRsus, refreshCongestion, vehicles.length, rsus.length, congestionData.length]);
   
   // Combined loading state
   const isLoading = initialLoading || isVehiclesLoading || isRsusLoading || isCongestionLoading || isAnomaliesLoading;
@@ -128,7 +153,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       <div className="flex justify-between items-center">
         <MLControls
           isLiveMonitoring={isLiveMonitoring}
-          selectedAmbulance={selectedAmbulance}
+          selectedAmbulance={selectedAmbulance as Vehicle | null}
           modelAccuracy={modelAccuracy}
           toggleLiveMonitoring={toggleLiveMonitoring}
           resetRouting={resetRouting}
@@ -149,7 +174,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
           rsus={rsus} 
           congestionData={congestionData} 
           isLiveMonitoring={isLiveMonitoring}
-          selectedAmbulance={selectedAmbulance}
+          selectedAmbulance={selectedAmbulance as Vehicle | null}
           onAmbulanceSelect={handleAmbulanceSelect}
           destination={destination}
           optimizedRoute={optimizedRoute}
@@ -169,9 +194,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
             </>
           )}
         </span>
-        {modelsLoaded && isLiveMonitoring && (
-          <span>ML Model Update in: {mlUpdateCountdown}s</span>
-        )}
+        <span>Last refreshed: {lastRefreshed.toLocaleTimeString()}</span>
       </div>
     </div>
   );

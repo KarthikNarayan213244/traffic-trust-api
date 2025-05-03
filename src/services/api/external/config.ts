@@ -47,9 +47,8 @@ export const API_PROVIDERS = {
   }
 };
 
-// Current active provider, prioritize TomTom over other options
+// Always use TomTom as primary provider since we have a working API key
 export const getActiveProvider = (): TrafficApiProvider => {
-  // Always return TomTom as we now have the API key
   return 'tomtom';
 };
 

@@ -1,6 +1,7 @@
 
 import { toast } from "@/hooks/use-toast";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
 // Singleton for managing realtime connections
 class RealtimeService {
@@ -10,6 +11,7 @@ class RealtimeService {
   private anomalyChannel: RealtimeChannel | null = null;
   private rsuChannel: RealtimeChannel | null = null;
   private subscribers: Map<string, Set<(data: any) => void>> = new Map();
+  private isConnected: boolean = false;
 
   private constructor() {
     // Initialize subscribers map for different event types
@@ -26,8 +28,35 @@ class RealtimeService {
     return RealtimeService.instance;
   }
 
+  /**
+   * Check if the real-time connection is possible
+   */
+  public async checkConnection(): Promise<boolean> {
+    if (!supabase) return false;
+    
+    try {
+      // Test the connection
+      const { error } = await supabase.from('vehicles').select('count', { count: 'exact' }).limit(1);
+      
+      if (error) {
+        console.error("Supabase connection error:", error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error checking Supabase connection:", error);
+      return false;
+    }
+  }
+
   // Initialize WebSocket connection to real data sources
-  public initializeWebSockets(supabase: any): void {
+  public initializeWebSockets(): void {
+    if (!supabase) {
+      console.error("Supabase client not available");
+      return;
+    }
+    
     try {
       console.log("Initializing real-time WebSocket connections...");
       
@@ -48,6 +77,7 @@ class RealtimeService {
               title: "Real-time Vehicle Data Active",
               description: "Now receiving live vehicle updates from the network."
             });
+            this.isConnected = true;
           }
         });
       
@@ -114,6 +144,7 @@ class RealtimeService {
         description: "Failed to establish real-time data connections. Some features may be limited.",
         variant: "destructive"
       });
+      this.isConnected = false;
     }
   }
 
@@ -124,6 +155,11 @@ class RealtimeService {
     }
     
     this.subscribers.get(eventType)!.add(callback);
+    
+    // Initialize WebSockets if this is our first subscriber
+    if (!this.isConnected && supabase) {
+      this.initializeWebSockets();
+    }
     
     // Return unsubscribe function
     return () => {
@@ -142,6 +178,16 @@ class RealtimeService {
     });
   }
 
+  // Unsubscribe a specific event type
+  public unsubscribe(eventType: 'vehicle' | 'congestion' | 'anomaly' | 'rsu'): void {
+    this.subscribers.get(eventType)?.clear();
+  }
+
+  // Unsubscribe all event types
+  public unsubscribeAll(): void {
+    this.subscribers.forEach(subscriberSet => subscriberSet.clear());
+  }
+
   // Cleanup all WebSocket connections
   public cleanup(): void {
     console.log("Cleaning up WebSocket connections...");
@@ -151,7 +197,8 @@ class RealtimeService {
     if (this.anomalyChannel) this.anomalyChannel.unsubscribe();
     if (this.rsuChannel) this.rsuChannel.unsubscribe();
     
-    this.subscribers.forEach(subscriberSet => subscriberSet.clear());
+    this.unsubscribeAll();
+    this.isConnected = false;
     
     console.log("All WebSocket connections cleaned up");
   }

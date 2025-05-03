@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { seedDatabaseWithTestData } from "@/services/api/supabase";
 import { useRealTimeTrafficData } from "@/hooks/useRealTimeTrafficData";
+import { fetchTrustLedger } from "@/services/api";
 
 const Dashboard: React.FC = () => {
   // Using our real-time traffic data hook
@@ -23,9 +24,10 @@ const Dashboard: React.FC = () => {
     lastUpdated,
     refreshData,
     dataSource,
-    isRealTimeSource
+    isRealTimeSource,
+    isRealtimeEnabled
   } = useRealTimeTrafficData({
-    initialRefreshInterval: 60000, // 1 minute
+    initialRefreshInterval: 30000, // 30 seconds
     enableAutoRefresh: true
   });
   
@@ -34,25 +36,54 @@ const Dashboard: React.FC = () => {
   // For trust ledger data (not from real-time APIs)
   const [trustLedger, setTrustLedger] = useState<any[]>([]);
   const [isTrustLoading, setIsTrustLoading] = useState<boolean>(false);
-
   const [isSeeding, setIsSeeding] = useState<boolean>(false);
+
+  // Load trust ledger data
+  useEffect(() => {
+    const loadTrustData = async () => {
+      setIsTrustLoading(true);
+      try {
+        const result = await fetchTrustLedger({ limit: 100 });
+        setTrustLedger(result);
+      } catch (error) {
+        console.error("Error loading trust ledger:", error);
+      } finally {
+        setIsTrustLoading(false);
+      }
+    };
+    
+    loadTrustData();
+  }, []);
 
   // Seed database
   const seedDatabase = async () => {
     setIsSeeding(true);
     toast({
-      title: "Seeding Trust Database",
-      description: "Please wait while we populate the database with trust and anomaly data...",
+      title: "Seeding Traffic Database",
+      description: "Please wait while we populate the database with trust and traffic data...",
     });
     
     try {
       const result = await seedDatabaseWithTestData(true);
       toast({
-        title: "Trust Database Seeded Successfully",
-        description: `Added ${result.counts.trustEntries} trust entries and ${result.counts.anomalies} anomalies to the database.`,
+        title: "Database Seeded Successfully",
+        description: `Added ${result.counts.trustEntries} trust entries, ${result.counts.anomalies} anomalies, and updated vehicles.`,
       });
       
+      // Refresh all data
       refreshData();
+      
+      // Reload trust ledger data
+      setIsTrustLoading(true);
+      try {
+        const updatedTrust = await fetchTrustLedger({ limit: 100 });
+        setTrustLedger(updatedTrust);
+      } catch (trustError) {
+        console.error("Error refreshing trust data:", trustError);
+      } finally {
+        setIsTrustLoading(false);
+      }
+      
     } catch (error: any) {
       console.error("Error seeding database:", error);
       toast({
@@ -69,6 +100,9 @@ const Dashboard: React.FC = () => {
     return lastUpdated.toLocaleTimeString();
   };
 
+  // Show critical anomalies count
+  const criticalAnomalies = anomalies.filter(a => a.severity === "Critical").length;
+
   return (
     <MainLayout>
       <div className="flex flex-col space-y-6">
@@ -81,7 +115,12 @@ const Dashboard: React.FC = () => {
                 isRealTime={dataSource.isRealTime}
                 apiCredits={dataSource.apiCredits}
               />
-              <span className="text-xs text-muted-foreground">v2.0.0</span>
+              {isRealtimeEnabled && (
+                <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                  Real-time Updates Active
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">v2.1.0</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -110,7 +149,7 @@ const Dashboard: React.FC = () => {
               className="flex items-center gap-2"
             >
               <Database className={`h-4 w-4 ${isSeeding ? 'animate-pulse' : ''}`} />
-              <span>{isSeeding ? 'Seeding...' : 'Seed Trust Data'}</span>
+              <span>{isSeeding ? 'Seeding...' : 'Seed Traffic Data'}</span>
             </Button>
           </div>
         </div>
@@ -141,8 +180,8 @@ const Dashboard: React.FC = () => {
             icon={AlertTriangle}
             color="danger"
             trend={{
-              value: anomalies.filter(a => a.severity === "Critical").length > 0 ? 
-                `${anomalies.filter(a => a.severity === "Critical").length} critical` : 
+              value: criticalAnomalies > 0 ? 
+                `${criticalAnomalies} critical` : 
                 "0 critical",
               label: "issues detected"
             }}
@@ -162,7 +201,10 @@ const Dashboard: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>Real-time Traffic Monitoring</CardTitle>
-            <CardDescription>View and track vehicles and roadside units across Hyderabad in real-time</CardDescription>
+            <CardDescription>
+              View and track vehicles and roadside units across Hyderabad 
+              {isRealtimeEnabled && " with live updates"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <TrafficMap 
