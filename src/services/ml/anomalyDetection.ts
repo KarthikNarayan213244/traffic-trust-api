@@ -89,7 +89,7 @@ export const initAnomalyDetectionModel = async (): Promise<boolean> => {
     
     // Compile with advanced optimizer settings
     model.compile({
-      optimizer: tf.train.adam({ learningRate: 0.001 }),
+      optimizer: tf.train.adam(0.001), // Fixed: using numeric learning rate directly
       loss: 'meanSquaredError',
     });
     
