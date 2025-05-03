@@ -44,7 +44,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           <DataSourceBadge
             provider="TomTom + Scaled Simulation"
             isRealTime={true}
-            apiCredits={100}
+            apiCredits={100} // This is now properly typed as number | string
           />
           <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full">
             {counts.totalVehicles ? `${(counts.totalVehicles / 1000000).toFixed(1)}M Vehicles` : "Scaling..."}
