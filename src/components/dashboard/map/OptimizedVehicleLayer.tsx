@@ -1,9 +1,8 @@
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { Vehicle } from "@/services/api/types";
 import { getTrustScoreColor } from "./utils";
 import { defaultCenter } from "./constants";
-import { OverlayView } from "@react-google-maps/api";
 
 interface OptimizedVehicleLayerProps {
   vehicles: Vehicle[];
@@ -22,10 +21,12 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
   zoomLevel
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const clickableVehiclesRef = useRef<Map<string, Vehicle>>(new Map());
+  const clickableVehiclesRef = useRef<Map<string, {vehicle: Vehicle, x: number, y: number, size: number}>>(new Map());
+  const renderRequestRef = useRef<number | null>(null);
+  const projectionRef = useRef<any>(null);
   
   // Get appropriate marker size based on zoom
-  const getMarkerSize = (vehicleType: string | undefined, isSelected: boolean): number => {
+  const getMarkerSize = useMemo(() => (vehicleType: string | undefined, isSelected: boolean): number => {
     const baseSize = Math.max(1, Math.min(8, zoomLevel - 8));
     
     if (isSelected) return baseSize * 2;
@@ -37,10 +38,26 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
       case 'two-wheeler': return baseSize * 0.7;
       default: return baseSize;
     }
+  }, [zoomLevel]);
+  
+  // Create projection helper function
+  const createProjection = () => {
+    if (!window.google) return null;
+    
+    try {
+      const overlay = new google.maps.OverlayView();
+      overlay.draw = () => {}; // Required but does nothing
+      return overlay.getProjection();
+    } catch (err) {
+      console.error("Error creating projection:", err);
+      return null;
+    }
   };
   
   // Render vehicles on canvas for performance
-  useEffect(() => {
+  const renderVehicles = () => {
+    renderRequestRef.current = null;
+    
     const canvas = canvasRef.current;
     if (!canvas || !window.google) return;
     
@@ -53,25 +70,25 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
     // Clear clickable vehicles map
     clickableVehiclesRef.current.clear();
     
-    // Create a projection function to convert lat/lng to pixel coordinates
-    const overlay = new google.maps.OverlayView();
+    // Initialize projection if needed
+    if (!projectionRef.current) {
+      projectionRef.current = createProjection();
+    }
     
-    overlay.draw = () => {}; // Required but does nothing
-    
-    // Get the current map's projection
-    const projection = overlay.getProjection();
-    if (!projection) return;
+    // If projection not available, skip drawing
+    if (!projectionRef.current) {
+      console.log("Projection not available, skipping render");
+      return;
+    }
     
     // Draw vehicles
-    vehicles.forEach(vehicle => {
+    for (let i = 0; i < vehicles.length; i++) {
+      const vehicle = vehicles[i];
+      if (!vehicle) continue;
+      
       try {
         const isAmbulance = vehicle.vehicle_type?.toLowerCase() === 'ambulance';
         const isSelected = vehicle.vehicle_id === selectedAmbulanceId;
-        
-        // Store ambulances for click detection
-        if (isAmbulance) {
-          clickableVehiclesRef.current.set(vehicle.vehicle_id, vehicle);
-        }
         
         // Convert lat/lng to pixel coordinates
         const position = new google.maps.LatLng(
@@ -79,12 +96,22 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
           vehicle.lng || defaultCenter.lng
         );
         
-        const point = projection.fromLatLngToDivPixel(position);
-        if (!point) return;
+        const point = projectionRef.current.fromLatLngToDivPixel(position);
+        if (!point) continue;
         
         // Get marker size and color
         const size = getMarkerSize(vehicle.vehicle_type, isSelected);
         const color = getTrustScoreColor(vehicle.trust_score);
+        
+        // Store ambulances for click detection
+        if (isAmbulance) {
+          clickableVehiclesRef.current.set(vehicle.vehicle_id, {
+            vehicle, 
+            x: point.x,
+            y: point.y,
+            size: size * 3 // Clickable area is larger
+          });
+        }
         
         // Draw the marker
         ctx.beginPath();
@@ -118,13 +145,59 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
       } catch (error) {
         // Silently handle any rendering errors
       }
-    });
+      
+      // Break rendering into chunks if there are too many vehicles
+      if (i > 0 && i % 500 === 0 && i < vehicles.length - 1) {
+        // Schedule the next chunk of rendering
+        renderRequestRef.current = requestAnimationFrame(() => {
+          renderVehicles();
+        });
+        break;
+      }
+    }
+  };
+  
+  // Update canvas size on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        renderVehicles();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial sizing
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  // Render vehicles when data changes
+  useEffect(() => {
+    // Cancel any pending render
+    if (renderRequestRef.current) {
+      cancelAnimationFrame(renderRequestRef.current);
+    }
+    
+    // Schedule a new render
+    renderRequestRef.current = requestAnimationFrame(renderVehicles);
+    
+    // Cleanup
+    return () => {
+      if (renderRequestRef.current) {
+        cancelAnimationFrame(renderRequestRef.current);
+      }
+    };
   }, [vehicles, selectedAmbulanceId, zoomLevel]);
   
-  // Handle canvas clicks
+  // Handle canvas clicks with optimized detection
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas || !window.google || clickableVehiclesRef.current.size === 0) return;
+    if (!canvas || clickableVehiclesRef.current.size === 0) return;
     
     // Get click coordinates
     const rect = canvas.getBoundingClientRect();
@@ -132,33 +205,12 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
     const y = e.clientY - rect.top;
     
     // Check all ambulances for clicks
-    for (const vehicle of clickableVehiclesRef.current.values()) {
-      try {
-        // Convert vehicle position to pixels
-        const overlay = new google.maps.OverlayView();
-        overlay.draw = () => {};
-        
-        const projection = overlay.getProjection();
-        if (!projection) continue;
-        
-        const position = new google.maps.LatLng(
-          vehicle.lat || defaultCenter.lat,
-          vehicle.lng || defaultCenter.lng
-        );
-        
-        const point = projection.fromLatLngToDivPixel(position);
-        if (!point) continue;
-        
-        // Check if click is within marker area
-        const size = getMarkerSize('ambulance', false) * 3; // Make clickable area larger
-        const distance = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
-        
-        if (distance <= size) {
-          onAmbulanceSelect(vehicle);
-          break;
-        }
-      } catch (error) {
-        continue;
+    for (const [_, data] of clickableVehiclesRef.current.entries()) {
+      const distance = Math.sqrt(Math.pow(x - data.x, 2) + Math.pow(y - data.y, 2));
+      
+      if (distance <= data.size) {
+        onAmbulanceSelect(data.vehicle);
+        break;
       }
     }
   };
@@ -170,7 +222,7 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
       width={window.innerWidth}
       height={window.innerHeight}
       onClick={handleCanvasClick}
-      style={{ pointerEvents: 'auto' }}
+      style={{ pointerEvents: clickableVehiclesRef.current.size > 0 ? 'auto' : 'none' }}
     />
   );
 };

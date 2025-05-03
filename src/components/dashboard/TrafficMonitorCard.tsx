@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { memo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import TrafficMap from "@/components/dashboard/TrafficMap";
 
@@ -12,7 +12,8 @@ interface TrafficMonitorCardProps {
   vehicleCountSummary: string;
 }
 
-const TrafficMonitorCard: React.FC<TrafficMonitorCardProps> = ({
+// Memoize the component to prevent unnecessary re-renders
+const TrafficMonitorCard: React.FC<TrafficMonitorCardProps> = memo(({
   vehicles,
   rsus,
   congestionData,
@@ -40,6 +41,9 @@ const TrafficMonitorCard: React.FC<TrafficMonitorCardProps> = ({
       </CardContent>
     </Card>
   );
-};
+});
+
+// Display name for debugging
+TrafficMonitorCard.displayName = "TrafficMonitorCard";
 
 export default TrafficMonitorCard;

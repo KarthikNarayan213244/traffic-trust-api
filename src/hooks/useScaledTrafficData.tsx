@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Vehicle, RSU, CongestionZone, Anomaly } from "@/services/api/types";
 import { 
@@ -51,10 +50,14 @@ export function useScaledTrafficData({
   // Store previous bounds for comparison
   const prevBoundsRef = useRef<any>(null);
   const prevZoomRef = useRef<number>(zoomLevel);
+  const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Improved debouncing mechanism
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Check if bounds have changed significantly
   const haveBoundsChanged = useCallback((newBounds: any, threshold: number = 0.01) => {
-    if (!prevBoundsRef.current) return true;
+    if (!prevBoundsRef.current || !newBounds) return true;
     const prev = prevBoundsRef.current;
     
     return Math.abs(newBounds.north - prev.north) > threshold ||
@@ -63,86 +66,92 @@ export function useScaledTrafficData({
            Math.abs(newBounds.west - prev.west) > threshold;
   }, []);
   
-  // Fetch data with throttling
-  const fetchDataThrottled = useRef<NodeJS.Timeout | null>(null);
-  
-  // Fetch all data
-  const fetchAllData = useCallback(async (force: boolean = false) => {
-    if (isRefreshing && !force) return;
-    
-    // Clear any pending fetch
-    if (fetchDataThrottled.current) {
-      clearTimeout(fetchDataThrottled.current);
-      fetchDataThrottled.current = null;
+  // Throttle and debounce fetch operations
+  const debouncedFetchData = useCallback((force: boolean = false) => {
+    // Clear any pending debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
     
-    fetchDataThrottled.current = setTimeout(async () => {
-      setIsRefreshing(true);
-      
-      try {
-        // Get stats first to avoid unnecessary data fetching
-        const trafficStats = getTrafficStats();
-        
-        // If we have no vehicles yet, initialize or refresh the traffic scaler data
-        if (trafficStats.totalVehicles === 0) {
-          await refreshScaledTrafficData();
-        }
-        
-        // Limit vehicle count based on zoom level to improve performance
-        const maxVehicles = zoomLevel < 12 ? 200 : zoomLevel < 14 ? 500 : 1000;
-        
-        // Get data for the current view with limits
-        // Fix: Adjust parameter count to match function signatures
-        const vehiclesData = getScaledVehicles(visibleBounds, zoomLevel);
-        const rsusData = getScaledRSUs(visibleBounds);
-        const congestionResults = getScaledCongestionData();
-        
-        // Update state with results
-        setVehicles(vehiclesData);
-        setRSUs(rsusData);
-        setCongestionData(congestionResults);
-        
-        // Fetch anomalies separately (we're not scaling these)
-        try {
-          // Limit anomalies to improve performance
-          const anomaliesData = await fetchAnomalies({ limit: 100 });
-          setAnomalies(anomaliesData);
-        } catch (error) {
-          console.error("Error fetching anomalies:", error);
-        }
-        
-        // Update stats
-        const updatedStats = getTrafficStats();
-        setStats({
-          totalVehicles: updatedStats.totalVehicles,
-          visibleVehicles: vehiclesData.length,
-          totalRSUs: updatedStats.totalRSUs,
-          visibleRSUs: rsusData.length
-        });
-        
-        // Update last updated timestamp
-        setLastUpdated(new Date());
-        
-        // Store current bounds and zoom for future comparison
-        if (visibleBounds) {
-          prevBoundsRef.current = { ...visibleBounds };
-        }
-        prevZoomRef.current = zoomLevel;
-        
-      } catch (error) {
-        console.error("Error fetching scaled traffic data:", error);
-        toast({
-          title: "Data Fetch Error",
-          description: "Could not refresh traffic data. Will try again later.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-        fetchDataThrottled.current = null;
-      }
-    }, 500); // Add a 500ms delay to prevent rapid consecutive calls
+    // Set a new debounce timer
+    debounceTimerRef.current = setTimeout(() => {
+      fetchData(force);
+      debounceTimerRef.current = null;
+    }, 250); // 250ms debounce time
+  }, []);
+  
+  // Fetch data with improved error handling
+  const fetchData = useCallback(async (force: boolean = false) => {
+    if (isRefreshing && !force) return;
     
+    setIsRefreshing(true);
+    
+    try {
+      // Get stats first to avoid unnecessary data fetching
+      const trafficStats = getTrafficStats();
+      
+      // If we have no vehicles yet, initialize or refresh the traffic scaler data
+      if (trafficStats.totalVehicles === 0) {
+        await refreshScaledTrafficData();
+      }
+      
+      // Apply dynamic limits based on zoom level to improve performance
+      const maxVehicles = zoomLevel < 12 ? 200 : zoomLevel < 14 ? 500 : 1000;
+      
+      // Get data for the current view with limits
+      const vehiclesData = getScaledVehicles(visibleBounds, zoomLevel);
+      const rsusData = getScaledRSUs(visibleBounds);
+      const congestionResults = getScaledCongestionData();
+      
+      // Limit data size for better performance
+      const limitedVehicles = vehiclesData.slice(0, maxVehicles);
+      const limitedRSUs = rsusData.slice(0, 100);
+      const limitedCongestion = congestionResults.slice(0, 200);
+      
+      // Update state with results - batch updates for better performance
+      setVehicles(limitedVehicles);
+      setRSUs(limitedRSUs);
+      setCongestionData(limitedCongestion);
+      
+      // Fetch anomalies separately
+      try {
+        // Limit anomalies to improve performance
+        const anomaliesData = await fetchAnomalies({ limit: 50 });
+        setAnomalies(anomaliesData);
+      } catch (error) {
+        console.error("Error fetching anomalies:", error);
+        // Don't reset all anomalies on error - keep previous state
+      }
+      
+      // Update stats
+      const updatedStats = getTrafficStats();
+      setStats({
+        totalVehicles: updatedStats.totalVehicles,
+        visibleVehicles: limitedVehicles.length,
+        totalRSUs: updatedStats.totalRSUs,
+        visibleRSUs: limitedRSUs.length
+      });
+      
+      // Update last updated timestamp
+      setLastUpdated(new Date());
+      
+      // Store current bounds and zoom for future comparison
+      if (visibleBounds) {
+        prevBoundsRef.current = { ...visibleBounds };
+      }
+      prevZoomRef.current = zoomLevel;
+      
+    } catch (error) {
+      console.error("Error fetching scaled traffic data:", error);
+      toast({
+        title: "Data Fetch Error",
+        description: "Could not refresh traffic data. Will try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, [isRefreshing, visibleBounds, zoomLevel]);
   
   // Update data when bounds or zoom changes
@@ -151,49 +160,61 @@ export function useScaledTrafficData({
     const zoomChanged = Math.abs(prevZoomRef.current - zoomLevel) >= 1;
     
     if (boundsChanged || zoomChanged) {
-      console.log("Map view changed, updating vehicle data");
-      fetchAllData(true);
+      debouncedFetchData(false);
     }
-  }, [visibleBounds, zoomLevel, haveBoundsChanged, fetchAllData]);
+  }, [visibleBounds, zoomLevel, haveBoundsChanged, debouncedFetchData]);
   
   // Initial data load
   useEffect(() => {
-    fetchAllData();
+    debouncedFetchData(true);
     
     // Cleanup function
     return () => {
-      if (fetchDataThrottled.current) {
-        clearTimeout(fetchDataThrottled.current);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [fetchAllData]);
+  }, [debouncedFetchData]);
   
   // Set up auto refresh with proper cleanup
   useEffect(() => {
-    if (!autoRefresh) return;
+    // Clear any existing timer
+    if (autoRefreshTimerRef.current) {
+      clearInterval(autoRefreshTimerRef.current);
+      autoRefreshTimerRef.current = null;
+    }
     
-    const intervalId = setInterval(() => {
-      console.log(`Auto-refreshing traffic data (${refreshInterval / 1000}s interval)`);
-      fetchAllData();
-    }, refreshInterval);
+    // Only set up a new timer if auto refresh is enabled
+    if (autoRefresh) {
+      autoRefreshTimerRef.current = setInterval(() => {
+        console.log(`Auto-refreshing traffic data (${refreshInterval / 1000}s interval)`);
+        debouncedFetchData(false);
+      }, refreshInterval);
+    }
     
-    return () => clearInterval(intervalId);
-  }, [refreshInterval, autoRefresh, fetchAllData]);
+    // Cleanup function
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current);
+        autoRefreshTimerRef.current = null;
+      }
+    };
+  }, [refreshInterval, autoRefresh, debouncedFetchData]);
   
   // Change refresh interval
-  const changeRefreshInterval = (newInterval: number) => {
+  const changeRefreshInterval = useCallback((newInterval: number) => {
     setRefreshInterval(newInterval);
-  };
+  }, []);
   
   // Toggle auto refresh
-  const toggleAutoRefresh = () => {
+  const toggleAutoRefresh = useCallback(() => {
     setAutoRefresh(prev => !prev);
-  };
+  }, []);
   
   // Manual refresh
-  const refreshData = () => {
-    fetchAllData(true);
-  };
+  const refreshData = useCallback(() => {
+    debouncedFetchData(true);
+  }, [debouncedFetchData]);
   
   return {
     data: {

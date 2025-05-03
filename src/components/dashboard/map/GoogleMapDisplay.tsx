@@ -8,7 +8,7 @@ import MapInfoOverlay from "./MapInfoOverlay";
 import MapStatsOverlay from "./MapStatsOverlay";
 import EmergencyRoutePanel from "./EmergencyRoutePanel";
 import { defaultCenter, mapContainerStyle, mapOptions, mapTheme } from "./constants";
-import { Vehicle } from "@/services/api";
+import { Vehicle } from "@/services/api/types";
 import { useMapApiKey } from "@/hooks/useMapApiKey";
 
 interface GoogleMapDisplayProps {
@@ -42,32 +42,62 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(12);
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
   const [isCalculatingDirections, setIsCalculatingDirections] = useState<boolean>(false);
-  const [useOptimizedLayer, setUseOptimizedLayer] = useState<boolean>(true);
   
   const mapRef = useRef<google.maps.Map | null>(null);
+  const boundsChangedListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const { apiKey } = useMapApiKey();
+  
+  // Create memoized datasets to prevent unnecessary re-renders
+  const memoizedVehicles = useMemo(() => vehicles.slice(0, 1000), [vehicles]);
+  const memoizedRsus = useMemo(() => rsus.slice(0, 100), [rsus]); 
+  const memoizedCongestion = useMemo(() => congestionData.slice(0, 200), [congestionData]);
 
-  // Handle map load
+  // Handle map load with optimized event bindings
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     console.log("Google Map loaded successfully");
     mapRef.current = mapInstance;
     setMap(mapInstance);
     setZoomLevel(mapInstance.getZoom());
     
-    // Add map event listeners
-    mapInstance.addListener("bounds_changed", () => {
-      if (onBoundsChanged && mapInstance) {
-        const bounds = mapInstance.getBounds()?.toJSON();
-        const zoom = mapInstance.getZoom();
-        if (bounds) {
-          onBoundsChanged(bounds, zoom);
-          setZoomLevel(zoom);
-        }
+    // Clean up any existing listener
+    if (boundsChangedListenerRef.current) {
+      google.maps.event.removeListener(boundsChangedListenerRef.current);
+    }
+    
+    // Add map event listeners with throttling
+    let boundsUpdateTimeout: NodeJS.Timeout | null = null;
+    
+    boundsChangedListenerRef.current = mapInstance.addListener("bounds_changed", () => {
+      // Clear previous timeout to implement throttling
+      if (boundsUpdateTimeout) {
+        clearTimeout(boundsUpdateTimeout);
       }
+      
+      // Set new timeout to throttle updates
+      boundsUpdateTimeout = setTimeout(() => {
+        if (onBoundsChanged && mapInstance) {
+          const bounds = mapInstance.getBounds()?.toJSON();
+          const zoom = mapInstance.getZoom();
+          if (bounds) {
+            onBoundsChanged(bounds, zoom);
+            setZoomLevel(zoom);
+          }
+        }
+        boundsUpdateTimeout = null;
+      }, 250); // 250ms throttle
     });
   }, [onBoundsChanged]);
 
-  // Handle map click for destination selection
+  // Clean up event listeners when component unmounts
+  useEffect(() => {
+    return () => {
+      if (boundsChangedListenerRef.current && google && google.maps) {
+        google.maps.event.removeListener(boundsChangedListenerRef.current);
+      }
+    };
+  }, []);
+
+  // Optimize click handling with useCallback
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (e.latLng && selectedAmbulance) {
       const clickLocation = {
@@ -96,12 +126,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     }
   }, [map, selectedAmbulance, destination]);
 
-  // Determine if we should use optimized rendering based on vehicle count
-  useEffect(() => {
-    // Always use optimized layer to prevent performance issues
-    setUseOptimizedLayer(true);
-  }, [vehicles.length]);
-
+  // Create loading placeholder
   if (!window.google) {
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50">
@@ -124,28 +149,28 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
-        {/* Only use OptimizedVehicleLayer for better performance */}
+        {/* Optimized vehicle layer with memoized data */}
         <OptimizedVehicleLayer 
-          vehicles={vehicles}
+          vehicles={memoizedVehicles}
           onAmbulanceSelect={onAmbulanceSelect}
           selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
           isSimulationRunning={isLiveMonitoring}
           zoomLevel={zoomLevel}
         />
         
-        {/* RSU markers */}
-        <RsuMarkers rsus={rsus} />
+        {/* RSU markers with memoized data */}
+        <RsuMarkers rsus={memoizedRsus} />
         
-        {/* Congestion heatmap */}
-        <CongestionHeatmap congestionData={congestionData} />
+        {/* Congestion heatmap with memoized data */}
+        <CongestionHeatmap congestionData={memoizedCongestion} />
       </GoogleMap>
 
       <MapInfoOverlay />
       <MapStatsOverlay 
-        vehiclesCount={vehicles.length} 
-        rsusCount={rsus.length} 
-        congestionZones={congestionData.length > 0 ? Math.ceil(congestionData.length / 3) : 0}
-        anomaliesCount={vehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
+        vehiclesCount={memoizedVehicles.length} 
+        rsusCount={memoizedRsus.length} 
+        congestionZones={memoizedCongestion.length > 0 ? Math.ceil(memoizedCongestion.length / 3) : 0}
+        anomaliesCount={memoizedVehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
         vehicleCountSummary={vehicleCountSummary}
       />
       
