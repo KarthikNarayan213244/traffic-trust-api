@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTrafficFetch } from './useTrafficFetch';
 import { TrafficData, TrafficStats, TrafficCounts } from './types';
+import { toast } from '@/hooks/use-toast';
 
 interface UseScaledTrafficDataProps {
   initialRefreshInterval?: number;
@@ -35,13 +36,13 @@ export function useScaledTrafficData({
   } = useTrafficFetch({ visibleBounds, zoomLevel });
   
   // Extract values from traffic data for easier access
-  const { vehicles, rsus, congestionData, anomalies } = trafficData;
+  const { vehicles, rsus, congestionData: congestion, anomalies } = trafficData;
   
   // Create counts object for KPIs
   const counts: TrafficCounts = {
     vehicles: vehicles.length,
     rsus: rsus.length,
-    congestion: congestionData.length,
+    congestion: congestion.length,
     anomalies: anomalies.length,
     totalVehicles: stats.totalVehicles,
     totalRSUs: stats.totalRSUs
@@ -73,6 +74,10 @@ export function useScaledTrafficData({
 
   // Refresh data method - can be called manually
   const refreshData = useCallback(() => {
+    toast({
+      title: "Refreshing Traffic Data",
+      description: "Fetching the latest traffic information from TomTom API...",
+    });
     return fetchData(true);
   }, [fetchData]);
 
@@ -80,7 +85,7 @@ export function useScaledTrafficData({
     data: {
       vehicles,
       rsus,
-      congestion: congestionData,
+      congestion,
       anomalies
     } as TrafficData,
     stats,

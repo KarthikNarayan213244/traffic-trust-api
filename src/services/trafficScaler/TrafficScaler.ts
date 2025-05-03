@@ -5,7 +5,6 @@ import { toast } from '@/hooks/use-toast';
 import { fetchTrafficData, fetchIncidents, generateAllVehicles } from './core/fetchTrafficData';
 import { createVehicleIndex, filterVehiclesByBounds, filterRSUsByBounds } from './core/vehicleFiltering';
 import { distributeVehicles } from './generators';
-import { generateRSUs } from './generators';
 
 /**
  * Main TrafficScaler class with public API
@@ -24,8 +23,10 @@ export class TrafficScaler extends TrafficScalerCore {
     }
     
     try {
+      console.log("Fetching and scaling traffic data from TomTom API...");
+      
       // Step 1: Fetch and process traffic data
-      const { trafficData, congestionZones } = await fetchTrafficData();
+      const { trafficData, congestionZones, rsus } = await fetchTrafficData();
       
       // Step 2: Distribute vehicles across segments
       this.trafficData = distributeVehicles(trafficData);
@@ -35,25 +36,26 @@ export class TrafficScaler extends TrafficScalerCore {
       // Step 3: Generate vehicles for each segment
       const allVehicles = generateAllVehicles(this.trafficData);
       
-      // Step 4: Generate RSUs
-      const rsus = generateRSUs(this.trafficData);
+      // Step 4: Use RSUs from TomTom API or generated ones
+      const rsuData = rsus && rsus.length > 0 ? rsus : [];
       
       // Step 5: Create vehicle spatial index for efficient filtering
       this.vehicleIndex = createVehicleIndex(allVehicles);
       
       // Step 6: Update state
       this.vehicles = allVehicles;
-      this.rsus = rsus;
+      this.rsus = rsuData;
       this.congestionZones = congestionZones;
       this.lastFetched = now;
       
-      console.log(`Generated ${this.vehicles.length.toLocaleString()} vehicles and ${this.rsus.length} RSUs`);
+      console.log(`Generated ${this.vehicles.length.toLocaleString()} vehicles and using ${this.rsus.length} RSUs`);
       console.log(`Created ${this.vehicleIndex.size} vehicle grid cells for optimized rendering`);
       
       // Step 7: Try to fetch incidents as well
       const anomalies = await fetchIncidents();
       if (anomalies && anomalies.length > 0) {
         console.log(`Fetched ${anomalies.length} traffic incidents`);
+        this.anomalies = anomalies;
       }
       
       toast({
@@ -97,6 +99,7 @@ export class TrafficScaler extends TrafficScalerCore {
     east: number;
     west: number;
   }): RSU[] {
+    console.log(`Filtering RSUs for map bounds with ${this.rsus.length} total RSUs available`);
     return filterRSUsByBounds(this.rsus, bounds);
   }
 }

@@ -3,9 +3,10 @@ import React, { useEffect, useState } from "react";
 import { Marker, Circle } from "@react-google-maps/api";
 import { defaultCenter } from "./constants";
 import { toast } from "@/hooks/use-toast";
+import { RSU } from "@/services/api/types";
 
 interface RsuMarkersProps {
-  rsus: any[];
+  rsus: RSU[];
 }
 
 const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
@@ -15,7 +16,7 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
   useEffect(() => {
     if (rsus.length === 0) return;
     
-    // Find the most recently updated RSU based on last_seen
+    // Find the most recently updated RSU
     const sorted = [...rsus].sort((a, b) => {
       const dateA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
       const dateB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
@@ -45,9 +46,14 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
   return (
     <>
       {rsus.map((rsu) => {
+        if (!rsu || !rsu.lat || !rsu.lng) {
+          console.warn("RSU missing coordinates", rsu);
+          return null;
+        }
+
         const position = {
-          lat: rsu.lat || (defaultCenter.lat + (Math.random() * 0.12 - 0.06)),
-          lng: rsu.lng || (defaultCenter.lng + (Math.random() * 0.12 - 0.06)),
+          lat: rsu.lat,
+          lng: rsu.lng
         };
         
         // Determine RSU appearance based on status and coverage
@@ -67,6 +73,11 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
         const iconScale = isHighlighted ? 8 : 6;
         const circleOpacity = isHighlighted ? 0.3 : 0.15;
         
+        // Format location display
+        const locationDisplay = rsu.location ? 
+          (typeof rsu.location === 'string' ? rsu.location : `${rsu.location.lat.toFixed(4)}, ${rsu.location.lng.toFixed(4)}`) : 
+          `${rsu.lat.toFixed(4)}, ${rsu.lng.toFixed(4)}`;
+        
         return (
           <React.Fragment key={rsu.rsu_id}>
             <Marker
@@ -78,20 +89,20 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
                 fillOpacity: 0.9,
                 strokeWeight: isHighlighted ? 2 : 1,
                 strokeColor: "#FFFFFF",
-                rotation: rsu.heading || 0
+                rotation: 0
               }}
-              title={`${rsu.rsu_id} - ${rsu.location || 'Unknown Location'}`}
+              title={`${rsu.rsu_id} - ${locationDisplay}`}
               animation={isHighlighted ? google.maps.Animation.BOUNCE : null}
               onClick={() => {
                 if (isActive) {
                   toast({
                     title: `RSU ${rsu.rsu_id}`,
-                    description: `Location: ${rsu.location || 'Unknown'}, Status: Active, Coverage: ${coverage}m`,
+                    description: `Location: ${locationDisplay}, Status: Active, Coverage: ${coverage}m`,
                   });
                 } else {
                   toast({
                     title: `RSU ${rsu.rsu_id}`,
-                    description: `Location: ${rsu.location || 'Unknown'}, Status: Inactive, Coverage: ${coverage}m`,
+                    description: `Location: ${locationDisplay}, Status: Inactive, Coverage: ${coverage}m`,
                     variant: "destructive",
                   });
                 }
@@ -117,4 +128,4 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
   );
 };
 
-export default RsuMarkers;
+export default React.memo(RsuMarkers);

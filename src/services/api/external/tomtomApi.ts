@@ -20,7 +20,8 @@ export async function fetchTomTomTrafficFlow(): Promise<{
 }> {
   // Check if TomTom API is enabled
   if (!API_PROVIDERS.tomtom.enabled) {
-    throw new Error('TomTom Traffic API is not configured');
+    console.warn('TomTom Traffic API is not configured');
+    return { vehicles: [], congestion: [] };
   }
 
   // Apply rate limiting
@@ -67,6 +68,7 @@ export async function fetchTomTomTrafficFlow(): Promise<{
     const vehicles = transformTomTomVehicleData(data);
     const congestion = transformTomTomCongestionData(data);
 
+    console.log(`Transformed ${vehicles.length} vehicles and ${congestion.length} congestion zones`);
     return { vehicles, congestion };
   } catch (error) {
     console.error('Error fetching TomTom traffic flow data:', error);
@@ -75,18 +77,19 @@ export async function fetchTomTomTrafficFlow(): Promise<{
     if (error instanceof Error && error.name === 'AbortError') {
       toast({
         title: "TomTom API Request Timeout",
-        description: "The request to the TomTom Traffic API timed out. Please try again later.",
+        description: "The request to the TomTom Traffic API timed out. Using fallback data instead.",
         variant: "destructive",
       });
     } else {
       toast({
         title: "Traffic Data Error",
-        description: "Could not fetch traffic data from TomTom API. Using cached data instead.",
+        description: "Could not fetch traffic data from TomTom API. Using fallback data instead.",
         variant: "destructive",
       });
     }
     
-    throw error;
+    // Return empty arrays so the application can continue
+    return { vehicles: [], congestion: [] };
   }
 }
 
@@ -96,7 +99,8 @@ export async function fetchTomTomTrafficFlow(): Promise<{
 export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
   // Check if TomTom API is enabled
   if (!API_PROVIDERS.tomtom.enabled) {
-    throw new Error('TomTom Traffic API is not configured');
+    console.warn('TomTom Traffic API is not configured');
+    return [];
   }
 
   // Apply rate limiting
@@ -142,7 +146,9 @@ export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
     console.log("TomTom incidents data received:", data);
     
     // Transform TomTom API incident data to our application's anomaly model
-    return transformTomTomAnomalyData(data);
+    const anomalies = transformTomTomAnomalyData(data);
+    console.log(`Transformed ${anomalies.length} anomalies from TomTom data`);
+    return anomalies;
   } catch (error) {
     console.error('Error fetching TomTom traffic incidents:', error);
     
@@ -155,7 +161,7 @@ export async function fetchTomTomTrafficIncidents(): Promise<Anomaly[]> {
       });
     }
     
-    // Return empty array instead of throwing to ensure application continues to work
+    // Return empty array instead of throwing
     return [];
   }
 }
