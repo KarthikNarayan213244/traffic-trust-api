@@ -1,6 +1,6 @@
 
 import { TrafficScalerCore } from './core/TrafficScalerCore';
-import { Vehicle, RSU } from '@/services/api/types';
+import { Vehicle, RSU, Anomaly } from '@/services/api/types';
 import { toast } from '@/hooks/use-toast';
 import { fetchTrafficData, fetchIncidents, generateAllVehicles } from './core/fetchTrafficData';
 import { createVehicleIndex, filterVehiclesByBounds, filterRSUsByBounds } from './core/vehicleFiltering';
@@ -10,6 +10,11 @@ import { distributeVehicles } from './generators';
  * Main TrafficScaler class with public API
  */
 export class TrafficScaler extends TrafficScalerCore {
+  /**
+   * Store anomalies for the traffic data
+   */
+  protected anomalies: Anomaly[] = [];
+
   /**
    * Main method to fetch traffic data from TomTom and scale it
    */
@@ -101,5 +106,19 @@ export class TrafficScaler extends TrafficScalerCore {
   }): RSU[] {
     console.log(`Filtering RSUs for map bounds with ${this.rsus.length} total RSUs available`);
     return filterRSUsByBounds(this.rsus, bounds);
+  }
+  
+  /**
+   * Get anomalies data
+   */
+  getAnomalies(): Anomaly[] {
+    return this.anomalies;
+  }
+  
+  /**
+   * Get congestion data for visualization
+   */
+  getCongestionData() {
+    return this.congestionZones;
   }
 }

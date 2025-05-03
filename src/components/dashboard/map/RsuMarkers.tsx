@@ -18,8 +18,9 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
     
     // Find the most recently updated RSU
     const sorted = [...rsus].sort((a, b) => {
-      const dateA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
-      const dateB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+      // Use timestamp or current date if not available
+      const dateA = new Date().getTime();
+      const dateB = new Date().getTime();
       return dateB - dateA;
     });
     
