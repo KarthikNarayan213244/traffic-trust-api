@@ -63,13 +63,13 @@ export function generateVehiclesForSegment(segment: RoadSegment): Vehicle[] {
     const prefix = vehicleType.substring(0, 2).toUpperCase();
     const vehicleId = `HYD-${prefix}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 6)}`;
     
-    // Create the vehicle
+    // Create the vehicle - removing the invalid 'id' property and adding required location object
     vehicles.push({
-      id: uuidv4(),
       vehicle_id: vehicleId,
       vehicle_type: vehicleType,
       lat,
       lng,
+      location: { lat, lng }, // Add the location object as required by the type
       speed,
       heading,
       trust_score: trustScore,
@@ -114,15 +114,14 @@ export function generateRSUs(trafficData: TrafficData): RSU[] {
     // Create RSU ID
     const rsuId = `RSU-${i.toString().padStart(3, '0')}-${Math.random().toString(36).substring(2, 6)}`;
     
-    // Create the RSU
+    // Create the RSU - fixing the status to only use valid values and creating a proper location object
     rsus.push({
-      id: uuidv4(),
       rsu_id: rsuId,
       lat,
       lng,
+      location: { lat, lng }, // Add the location object with the correct structure
       coverage_radius: coverageRadius,
-      status: Math.random() > 0.1 ? 'Active' : 'Maintenance',
-      location: `Hyderabad-${Math.floor(Math.random() * 10)}-${Math.floor(Math.random() * 100)}`,
+      status: Math.random() > 0.1 ? 'Active' : 'Inactive', // Only use valid status values
       last_seen: new Date().toISOString()
     });
   }
