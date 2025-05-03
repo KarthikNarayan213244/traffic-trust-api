@@ -1,7 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { initAnomalyDetectionModel, processVehiclesForAnomalies } from "./anomalyDetection";
+import { initAnomalyDetectionModel, processVehiclesForAnomalies as processVehiclesForAnomaliesLocal } from "./anomalyDetection";
 import { initTrafficPredictionModel } from "./trafficPrediction";
 import { initTrustScoringModel } from "./trustScoring";
 import { initRouteOptimizationModel } from "./routeOptimization";
@@ -95,7 +95,13 @@ export async function processVehiclesForAnomalies(vehicles: any[]) {
     return response.anomalies;
   } catch (error) {
     console.error("Error detecting anomalies with ML:", error);
-    return [];
+    // Fallback to local processing if edge function fails
+    try {
+      return processVehiclesForAnomaliesLocal(vehicles);
+    } catch (localError) {
+      console.error("Local anomaly detection also failed:", localError);
+      return [];
+    }
   }
 }
 
