@@ -8,7 +8,7 @@ import {
 import { CONFIG } from '../config';
 import { fetchTrafficData } from './fetchTrafficData';
 import { createVehicleIndex, filterVehiclesByBounds } from './vehicleFiltering';
-import { generateRSUs, distributeVehicles } from '../generators';
+import { distributeVehicles } from '../generators';
 
 /**
  * Core class to handle traffic scaling functionality
