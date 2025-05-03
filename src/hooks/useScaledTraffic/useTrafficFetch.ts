@@ -1,46 +1,35 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Vehicle, RSU, CongestionZone, Anomaly } from "@/services/api/types";
+import { useState, useCallback, useRef } from "react";
 import { 
-  trafficScaler, 
   getScaledVehicles, 
   getScaledRSUs, 
   getScaledCongestionData,
-  refreshScaledTrafficData,
-  getTrafficStats
+  getTrafficStats,
+  refreshScaledTrafficData
 } from "@/services/trafficScaler";
 import { fetchAnomalies } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
+import { TrafficStats, TrafficData } from "./types";
+import { Vehicle, RSU, CongestionZone, Anomaly } from "@/services/api/types";
 
-interface UseScaledTrafficDataProps {
-  initialRefreshInterval?: number; // in milliseconds
-  enableAutoRefresh?: boolean;
+interface UseTrafficFetchProps {
   visibleBounds?: {
     north: number;
     south: number;
     east: number;
     west: number;
   };
-  zoomLevel?: number;
+  zoomLevel: number;
 }
 
-export function useScaledTrafficData({
-  initialRefreshInterval = 60000, // Default: 1 minute
-  enableAutoRefresh = true,
-  visibleBounds,
-  zoomLevel = 10
-}: UseScaledTrafficDataProps = {}) {
+export function useTrafficFetch({ visibleBounds, zoomLevel }: UseTrafficFetchProps) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [rsus, setRSUs] = useState<RSU[]>([]);
   const [congestionData, setCongestionData] = useState<CongestionZone[]>([]);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
-  
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [refreshInterval, setRefreshInterval] = useState<number>(initialRefreshInterval);
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(enableAutoRefresh);
-  
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<TrafficStats>({
     totalVehicles: 0,
     visibleVehicles: 0,
     totalRSUs: 0,
@@ -50,7 +39,6 @@ export function useScaledTrafficData({
   // Store previous bounds for comparison
   const prevBoundsRef = useRef<any>(null);
   const prevZoomRef = useRef<number>(zoomLevel);
-  const autoRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Improved debouncing mechanism
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -64,20 +52,6 @@ export function useScaledTrafficData({
            Math.abs(newBounds.south - prev.south) > threshold ||
            Math.abs(newBounds.east - prev.east) > threshold ||
            Math.abs(newBounds.west - prev.west) > threshold;
-  }, []);
-  
-  // Throttle and debounce fetch operations
-  const debouncedFetchData = useCallback((force: boolean = false) => {
-    // Clear any pending debounce timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    
-    // Set a new debounce timer
-    debounceTimerRef.current = setTimeout(() => {
-      fetchData(force);
-      debounceTimerRef.current = null;
-    }, 250); // 250ms debounce time
   }, []);
   
   // Fetch data with improved error handling
@@ -154,91 +128,36 @@ export function useScaledTrafficData({
     }
   }, [isRefreshing, visibleBounds, zoomLevel]);
   
-  // Update data when bounds or zoom changes
-  useEffect(() => {
-    const boundsChanged = visibleBounds && haveBoundsChanged(visibleBounds);
-    const zoomChanged = Math.abs(prevZoomRef.current - zoomLevel) >= 1;
-    
-    if (boundsChanged || zoomChanged) {
-      debouncedFetchData(false);
-    }
-  }, [visibleBounds, zoomLevel, haveBoundsChanged, debouncedFetchData]);
-  
-  // Initial data load
-  useEffect(() => {
-    debouncedFetchData(true);
-    
-    // Cleanup function
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [debouncedFetchData]);
-  
-  // Set up auto refresh with proper cleanup
-  useEffect(() => {
-    // Clear any existing timer
-    if (autoRefreshTimerRef.current) {
-      clearInterval(autoRefreshTimerRef.current);
-      autoRefreshTimerRef.current = null;
+  // Throttle and debounce fetch operations
+  const debouncedFetchData = useCallback((force: boolean = false) => {
+    // Clear any pending debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
     
-    // Only set up a new timer if auto refresh is enabled
-    if (autoRefresh) {
-      autoRefreshTimerRef.current = setInterval(() => {
-        console.log(`Auto-refreshing traffic data (${refreshInterval / 1000}s interval)`);
-        debouncedFetchData(false);
-      }, refreshInterval);
-    }
-    
-    // Cleanup function
-    return () => {
-      if (autoRefreshTimerRef.current) {
-        clearInterval(autoRefreshTimerRef.current);
-        autoRefreshTimerRef.current = null;
-      }
-    };
-  }, [refreshInterval, autoRefresh, debouncedFetchData]);
-  
-  // Change refresh interval
-  const changeRefreshInterval = useCallback((newInterval: number) => {
-    setRefreshInterval(newInterval);
-  }, []);
-  
-  // Toggle auto refresh
-  const toggleAutoRefresh = useCallback(() => {
-    setAutoRefresh(prev => !prev);
-  }, []);
-  
-  // Manual refresh
-  const refreshData = useCallback(() => {
-    debouncedFetchData(true);
-  }, [debouncedFetchData]);
-  
+    // Set a new debounce timer
+    debounceTimerRef.current = setTimeout(() => {
+      fetchData(force);
+      debounceTimerRef.current = null;
+    }, 250); // 250ms debounce time
+  }, [fetchData]);
+
   return {
-    data: {
+    trafficData: {
       vehicles,
       rsus,
-      congestion: congestionData,
-      anomalies,
+      congestionData,
+      anomalies
     },
     stats,
     isLoading,
     isRefreshing,
     lastUpdated,
-    refreshInterval,
-    autoRefresh,
-    refreshData,
-    changeRefreshInterval,
-    toggleAutoRefresh,
-    counts: {
-      vehicles: vehicles.length,
-      rsus: rsus.length,
-      congestion: congestionData.length,
-      anomalies: anomalies.length,
-      totalVehicles: stats.totalVehicles,
-      totalRSUs: stats.totalRSUs
-    }
+    debouncedFetchData,
+    fetchData,
+    haveBoundsChanged,
+    debounceTimerRef,
+    prevBoundsRef,
+    prevZoomRef
   };
 }

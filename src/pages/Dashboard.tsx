@@ -6,7 +6,7 @@ import { seedDatabaseWithTestData } from "@/services/api/supabase";
 import { refreshScaledTrafficData, getTrafficStats } from "@/services/trafficScaler";
 import { useTrustLedger } from "@/hooks/useTrustLedger";
 import { batchUpdateTrustScores } from "@/services/blockchain";
-import { useScaledTrafficData } from "@/hooks/useScaledTrafficData";
+import { useScaledTrafficData } from "@/hooks/useScaledTraffic";
 
 // Import new refactored components
 import DashboardHeader from "@/components/dashboard/DashboardHeader";

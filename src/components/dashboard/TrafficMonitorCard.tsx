@@ -1,5 +1,5 @@
 
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import TrafficMap from "@/components/dashboard/TrafficMap";
 
@@ -21,6 +21,11 @@ const TrafficMonitorCard: React.FC<TrafficMonitorCardProps> = memo(({
   onBoundsChanged,
   vehicleCountSummary
 }) => {
+  // Use memoized data for better performance
+  const memoizedVehicles = useMemo(() => vehicles, [vehicles]);
+  const memoizedRsus = useMemo(() => rsus, [rsus]);
+  const memoizedCongestionData = useMemo(() => congestionData, [congestionData]);
+
   return (
     <Card>
       <CardHeader>
@@ -31,10 +36,10 @@ const TrafficMonitorCard: React.FC<TrafficMonitorCardProps> = memo(({
       </CardHeader>
       <CardContent className="p-0">
         <TrafficMap 
-          vehicles={vehicles}
-          rsus={rsus}
+          vehicles={memoizedVehicles}
+          rsus={memoizedRsus}
           isLoading={isLoading}
-          congestionData={congestionData}
+          congestionData={memoizedCongestionData}
           onBoundsChanged={onBoundsChanged}
           vehicleCountSummary={vehicleCountSummary}
         />

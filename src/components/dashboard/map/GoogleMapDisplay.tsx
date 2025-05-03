@@ -48,6 +48,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const { apiKey } = useMapApiKey();
   
   // Create memoized datasets to prevent unnecessary re-renders
+  // This is critical for performance as these objects reference won't change unless the data changes
   const memoizedVehicles = useMemo(() => vehicles.slice(0, 1000), [vehicles]);
   const memoizedRsus = useMemo(() => rsus.slice(0, 100), [rsus]); 
   const memoizedCongestion = useMemo(() => congestionData.slice(0, 200), [congestionData]);
@@ -73,7 +74,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         clearTimeout(boundsUpdateTimeout);
       }
       
-      // Set new timeout to throttle updates
+      // Set new timeout to throttle updates (250ms is a good balance)
       boundsUpdateTimeout = setTimeout(() => {
         if (onBoundsChanged && mapInstance) {
           const bounds = mapInstance.getBounds()?.toJSON();
@@ -186,4 +187,4 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   );
 };
 
-export default GoogleMapDisplay;
+export default React.memo(GoogleMapDisplay);
