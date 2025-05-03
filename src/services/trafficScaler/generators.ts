@@ -121,8 +121,7 @@ export function generateRSUs(trafficData: TrafficData): RSU[] {
       lng,
       location: { lat, lng }, // Add the location object with the correct structure
       coverage_radius: coverageRadius,
-      status: Math.random() > 0.1 ? 'Active' : 'Inactive', // Only use valid status values
-      last_seen: new Date().toISOString()
+      status: Math.random() > 0.1 ? 'Active' : 'Inactive' // Only use valid status values
     });
   }
   
