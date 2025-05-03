@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, TrendingUp, TrendingDown } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import { useTrustScores } from '@/hooks/useTrustScores';
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from '@/hooks/use-toast';
 
 interface VehicleTrustCardProps {
   vehicles: any[];
@@ -29,8 +30,25 @@ const VehicleTrustCard: React.FC<VehicleTrustCardProps> = ({ vehicles, className
     }
   });
 
+  // Connect effect
+  useEffect(() => {
+    if (!isConnected) {
+      // Try to connect with slight delay to avoid constant retries
+      const timer = setTimeout(() => {
+        connect();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, connect]);
+
   // Calculate average trust score
   const averageTrustScore = React.useMemo(() => {
+    // Handle empty vehicles array
+    if (!vehicles || vehicles.length === 0) {
+      return 75; // Default score when no vehicles
+    }
+    
     if (Object.keys(trustScores).length === 0) {
       // Fallback to local trust scores if blockchain scores not available
       const localScores = vehicles.map(v => v.trust_score).filter(Boolean);
@@ -45,12 +63,16 @@ const VehicleTrustCard: React.FC<VehicleTrustCardProps> = ({ vehicles, className
   
   // Find vehicles with highest and lowest trust
   const [highestTrust, lowestTrust] = React.useMemo(() => {
-    if (vehicles.length === 0) return [{ score: 0, id: 'N/A' }, { score: 0, id: 'N/A' }];
+    if (!vehicles || vehicles.length === 0) {
+      return [{ score: 85, id: 'N/A' }, { score: 65, id: 'N/A' }];
+    }
     
     let highest = { score: -1, id: '' };
     let lowest = { score: 101, id: '' };
     
     vehicles.forEach(vehicle => {
+      if (!vehicle || !vehicle.vehicle_id) return; // Skip invalid entries
+      
       const id = vehicle.vehicle_id;
       const score = trustScores[id] !== undefined ? 
         trustScores[id] : (vehicle.trust_score || 75);
@@ -64,11 +86,29 @@ const VehicleTrustCard: React.FC<VehicleTrustCardProps> = ({ vehicles, className
       }
     });
     
+    // Provide defaults if we couldn't find values
+    if (highest.score === -1) highest = { score: 85, id: 'N/A' };
+    if (lowest.score === 101) lowest = { score: 65, id: 'N/A' };
+    
     return [highest, lowest];
   }, [vehicles, trustScores]);
 
   // Whether we should show blockchain connection status
   const showChainStatus = lastUpdate || isLoading || !isConnected;
+  
+  // Handle connect click with error handling
+  const handleConnectClick = useCallback(async () => {
+    try {
+      await connect();
+    } catch (error: any) {
+      console.error("Failed to connect to blockchain:", error);
+      toast({
+        title: "Connection Failed",
+        description: "Could not connect to blockchain. Please check your wallet connection.",
+        variant: "destructive",
+      });
+    }
+  }, [connect]);
 
   return (
     <Card className={className}>
@@ -153,7 +193,7 @@ const VehicleTrustCard: React.FC<VehicleTrustCardProps> = ({ vehicles, className
           
           {!isConnected && (
             <button
-              onClick={connect}
+              onClick={handleConnectClick}
               className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 mt-2 w-full"
             >
               Connect to Blockchain

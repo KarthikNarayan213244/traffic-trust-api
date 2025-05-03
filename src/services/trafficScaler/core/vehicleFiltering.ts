@@ -34,8 +34,9 @@ export function filterVehiclesByBounds(
   bounds?: { north: number; south: number; east: number; west: number },
   zoomLevel: number = 10
 ): Vehicle[] {
-  // If no bounds provided, limit to a small sample for performance
-  if (!bounds) {
+  // If no bounds provided or invalid vehicle index, limit to a small sample for performance
+  if (!bounds || !vehicleIndex || vehicleIndex.size === 0) {
+    console.log("No bounds or empty vehicle index, returning limited vehicles");
     return allVehicles.slice(0, 1000);
   }
   

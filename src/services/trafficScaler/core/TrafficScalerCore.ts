@@ -1,14 +1,6 @@
 
 import { Vehicle, RSU, CongestionZone } from '@/services/api/types';
-import { toast } from '@/hooks/use-toast';
-import { 
-  TrafficData, 
-  TrafficStats
-} from '../types';
-import { CONFIG } from '../config';
-import { fetchTrafficData } from './fetchTrafficData';
-import { createVehicleIndex, filterVehiclesByBounds } from './vehicleFiltering';
-import { distributeVehicles } from '../generators';
+import { TrafficData, TrafficStats } from '../types';
 
 /**
  * Core class to handle traffic scaling functionality
@@ -27,7 +19,7 @@ export class TrafficScalerCore {
   protected vehicleIndex: Map<string, Vehicle[]> = new Map();
   
   constructor() {
-    console.log(`Initializing TrafficScaler with target of ${CONFIG.VEHICLE_TARGET.toLocaleString()} vehicles`);
+    console.log(`Initializing TrafficScaler`);
   }
   
   /**
