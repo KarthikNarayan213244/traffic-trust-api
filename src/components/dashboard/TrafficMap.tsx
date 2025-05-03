@@ -129,6 +129,11 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     return loadingState;
   }
 
+  // Convert modelLoadingProgress to number to fix the type error
+  const modelProgressValue = typeof modelLoadingProgress === 'string' 
+    ? parseInt(modelLoadingProgress, 10) 
+    : modelLoadingProgress;
+
   return (
     <div className="space-y-2">
       <MapToolbar 
@@ -139,7 +144,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         resetRouting={resetRouting}
         changeModelAccuracy={changeModelAccuracy}
         isModelLoading={isModelLoading}
-        modelLoadingProgress={modelLoadingProgress}
+        modelLoadingProgress={modelProgressValue}
         apiKey={apiKey}
         onApiKeySet={handleApiKeySet}
       />

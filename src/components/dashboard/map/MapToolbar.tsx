@@ -7,7 +7,7 @@ import { Vehicle } from "@/services/api/types";
 interface MapToolbarProps {
   isLiveMonitoring: boolean;
   selectedAmbulance: Vehicle | null;
-  modelAccuracy: number;
+  modelAccuracy: number | 'standard' | 'high' | 'experimental';
   toggleLiveMonitoring: () => void;
   resetRouting: () => void;
   changeModelAccuracy: (accuracy: 'standard' | 'high' | 'experimental') => void;
@@ -29,12 +29,17 @@ const MapToolbar: React.FC<MapToolbarProps> = ({
   apiKey,
   onApiKeySet,
 }) => {
+  // Convert modelAccuracy to the expected string type if it's a number
+  const formattedModelAccuracy = typeof modelAccuracy === 'number' 
+    ? 'standard' as const 
+    : modelAccuracy;
+    
   return (
     <div className="flex justify-between items-center">
       <MLControls
         isLiveMonitoring={isLiveMonitoring}
         selectedAmbulance={selectedAmbulance}
-        modelAccuracy={modelAccuracy}
+        modelAccuracy={formattedModelAccuracy}
         toggleLiveMonitoring={toggleLiveMonitoring}
         resetRouting={resetRouting}
         changeModelAccuracy={changeModelAccuracy}
