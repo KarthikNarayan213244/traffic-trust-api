@@ -3,7 +3,8 @@ import { useState, useCallback, useEffect } from "react";
 import { API_KEY_STORAGE_KEY } from "@/components/dashboard/map/constants";
 import { toast } from "@/hooks/use-toast";
 
-// Use a constant to store the initial API key value to avoid multiple initializations
+// Global variable to track if we've already loaded the API
+let googleMapsApiLoaded = false;
 let initialApiKey: string | null = null;
 
 // Initialize the API key only once when the module is loaded
@@ -19,6 +20,12 @@ if (initialApiKey === null) {
 
 export const useMapApiKey = () => {
   const [apiKey, setApiKey] = useState<string>(initialApiKey || "");
+  
+  // Handle changes to the API key
+  useEffect(() => {
+    // Update module-level variable if the key changes
+    initialApiKey = apiKey;
+  }, [apiKey]);
 
   const handleApiKeySet = useCallback((newApiKey: string) => {
     // Avoid unnecessary re-initializations by checking if the key is actually changing
@@ -29,7 +36,8 @@ export const useMapApiKey = () => {
         setApiKey(newApiKey);
         
         // Only force reload if we had a previous key and it's changing
-        if (apiKey && newApiKey !== apiKey) {
+        // This is critical because the Google Maps loader can't be called with different options
+        if (googleMapsApiLoaded) {
           toast({
             title: "API Key Updated",
             description: "The Google Maps API key has been updated. Reloading the application.",
@@ -40,6 +48,7 @@ export const useMapApiKey = () => {
             console.log("API key changed, reloading page");
             window.location.reload();
           }, 2000);
+          return;
         }
       } catch (error) {
         console.error("Error saving Maps API key to localStorage:", error);
@@ -52,10 +61,10 @@ export const useMapApiKey = () => {
     }
   }, [apiKey]);
 
-  // Update module-level variable if the key changes
-  useEffect(() => {
-    initialApiKey = apiKey;
-  }, [apiKey]);
-
   return { apiKey, handleApiKeySet };
+};
+
+// Function to mark that Google Maps API has been loaded
+export const markGoogleMapsAsLoaded = () => {
+  googleMapsApiLoaded = true;
 };

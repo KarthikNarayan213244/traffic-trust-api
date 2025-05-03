@@ -7,15 +7,15 @@ export interface Vehicle {
     lat: number;
     lng: number;
   };
-  lat?: number;
-  lng?: number;
+  lat: number;
+  lng: number;
   speed: number;
   heading: number;
   trust_score: number;
   trust_score_change: number;
   trust_score_confidence: number;
-  status?: string;
-  timestamp?: string;
+  status: string;
+  timestamp: string;
 }
 
 export interface RSU {
@@ -24,8 +24,8 @@ export interface RSU {
     lat: number;
     lng: number;
   };
-  lat?: number;
-  lng?: number;
+  lat: number;
+  lng: number;
   status: 'Active' | 'Inactive';
   coverage_radius: number;
 }

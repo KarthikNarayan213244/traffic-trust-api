@@ -7,7 +7,7 @@ import { libraries } from "./map/constants";
 import { Vehicle } from "@/services/api/types";
 import MLControls from "./MLControls";
 import ApiKeyControl from "./ApiKeyControl";
-import { useMapApiKey } from "@/hooks/useMapApiKey";
+import { useMapApiKey, markGoogleMapsAsLoaded } from "@/hooks/useMapApiKey";
 import { useMLSimulation } from "@/hooks/useMLSimulation";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,6 +66,11 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     libraries,
     id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
+
+  // Mark the Google Maps API as loaded to prevent multiple initializations
+  if (isLoaded) {
+    markGoogleMapsAsLoaded();
+  }
   
   // Combined loading state
   const isLoading = initialLoading || isVehiclesLoading || isRsusLoading || isCongestionLoading || isAnomaliesLoading;
