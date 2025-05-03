@@ -1,21 +1,19 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
-import KpiCard from "@/components/dashboard/KpiCard";
-import TrafficMap from "@/components/dashboard/TrafficMap";
-import AnomalyChart from "@/components/dashboard/AnomalyChart";
-import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
-import SystemHealthMonitor from "@/components/dashboard/SystemHealthMonitor";
-import DataSourceBadge from "@/components/dashboard/DataSourceBadge";
-import VehicleTrustCard from "@/components/dashboard/VehicleTrustCard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Radio, AlertTriangle, Shield, Database, BarChart3, ServerCrash, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { seedDatabaseWithTestData } from "@/services/api/supabase";
-import { useScaledTrafficData } from "@/hooks/useScaledTrafficData";
 import { refreshScaledTrafficData, getTrafficStats } from "@/services/trafficScaler";
 import { useTrustLedger } from "@/hooks/useTrustLedger";
-import { updateTrustScore, batchUpdateTrustScores } from "@/services/blockchain";
+import { batchUpdateTrustScores } from "@/services/blockchain";
+import { useScaledTrafficData } from "@/hooks/useScaledTrafficData";
+
+// Import new refactored components
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardKpis from "@/components/dashboard/DashboardKpis";
+import TrafficMonitorCard from "@/components/dashboard/TrafficMonitorCard";
+import ChartsRow from "@/components/dashboard/ChartsRow";
+import MonitoringRow from "@/components/dashboard/MonitoringRow";
 
 const Dashboard: React.FC = () => {
   // State for map bounds and zoom
@@ -172,10 +170,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const getLastUpdatedText = () => {
-    return lastUpdated.toLocaleTimeString();
-  };
-
   // Format vehicle count for display
   const getVehicleCountSummary = () => {
     if (counts.totalVehicles === 0) return "";
@@ -186,178 +180,54 @@ const Dashboard: React.FC = () => {
     return `${totalMillions}M vehicles in Hyderabad, ${visibleThousands}K visible`;
   };
 
-  // Show critical anomalies count
-  const criticalAnomalies = anomalies.filter(a => a.severity === "Critical").length;
-
   return (
     <MainLayout>
       <div className="flex flex-col space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Hyderabad Traffic Trust Platform</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <DataSourceBadge
-                provider="TomTom + Scaled Simulation"
-                isRealTime={true}
-                apiCredits={100}
-              />
-              <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full">
-                {counts.totalVehicles ? `${(counts.totalVehicles / 1000000).toFixed(1)}M Vehicles` : "Scaling..."}
-              </span>
-              <span className="text-xs text-muted-foreground">v3.0.0</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-muted-foreground">
-              Last updated: {getLastUpdatedText()}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshData}
-              disabled={isLoading || isRefreshing}
-              className="flex items-center gap-2"
-            >
-              {isRefreshing ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <ServerCrash className="h-4 w-4" />
-              )}
-              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Now'}</span>
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={seedDatabase}
-              disabled={isSeeding}
-              className="flex items-center gap-2"
-            >
-              <Database className={`h-4 w-4 ${isSeeding ? 'animate-pulse' : ''}`} />
-              <span>{isSeeding ? 'Seeding...' : 'Seed Trust Data'}</span>
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={updateTrustScores}
-              disabled={isUpdatingTrust || vehicles.length === 0}
-              className="flex items-center gap-2"
-            >
-              <Shield className={`h-4 w-4 ${isUpdatingTrust ? 'animate-pulse' : ''}`} />
-              <span>{isUpdatingTrust ? 'Updating...' : 'Update Trust On-Chain'}</span>
-            </Button>
-          </div>
-        </div>
+        <DashboardHeader 
+          counts={counts}
+          lastUpdated={lastUpdated}
+          isLoading={isLoading}
+          isRefreshing={isRefreshing}
+          isSeeding={isSeeding}
+          isUpdatingTrust={isUpdatingTrust}
+          vehicles={vehicles}
+          refreshData={refreshData}
+          seedDatabase={seedDatabase}
+          updateTrustScores={updateTrustScores}
+        />
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard 
-            title="Total Vehicles" 
-            value={counts.totalVehicles || 0}
-            isLoading={isLoading}
-            icon={Car}
-            trend={{
-              value: "3.5M", // Ensuring this is a string for trend value
-              label: "registered vehicles"
-            }}
-          />
-          <KpiCard 
-            title="Active RSUs" 
-            value={rsus.filter(rsu => rsu.status === 'Active').length}
-            total={counts.totalRSUs || 0}
-            isLoading={isLoading}
-            icon={Radio}
-            color="accent"
-          />
-          <KpiCard 
-            title="Recent Anomalies" 
-            value={anomalies.length}
-            isLoading={isLoading}
-            icon={AlertTriangle}
-            color="danger"
-            trend={{
-              value: criticalAnomalies > 0 ? 
-                `${criticalAnomalies} critical` : 
-                "0 critical",
-              label: "issues detected"
-            }}
-          />
-          <KpiCard 
-            title="Trust Updates" 
-            value={trustBlockchainData.length || trustApiData.length}
-            isLoading={isBlockchainLoading}
-            icon={Shield}
-            trend={{
-              value: "+15%", // This is already a string
-              label: "increase in trust"
-            }}
-          />
-        </div>
+        <DashboardKpis 
+          counts={counts}
+          rsus={rsus}
+          anomalies={anomalies}
+          trustBlockchainData={trustBlockchainData}
+          trustApiData={trustApiData}
+          isLoading={isLoading}
+          isBlockchainLoading={isBlockchainLoading}
+        />
         
-        <Card>
-          <CardHeader>
-            <CardTitle>Real-time Traffic Monitoring</CardTitle>
-            <CardDescription>
-              View and track {getVehicleCountSummary()} across Hyderabad with live updates
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <TrafficMap 
-              vehicles={vehicles}
-              rsus={rsus}
-              isLoading={isLoading}
-              congestionData={congestionData}
-              onBoundsChanged={handleMapViewChanged}
-              vehicleCountSummary={getVehicleCountSummary()}
-            />
-          </CardContent>
-        </Card>
+        <TrafficMonitorCard 
+          vehicles={vehicles}
+          rsus={rsus}
+          congestionData={congestionData}
+          isLoading={isLoading}
+          onBoundsChanged={handleMapViewChanged}
+          vehicleCountSummary={getVehicleCountSummary()}
+        />
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="pb-0">
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                <span>Anomaly Distribution</span>
-              </CardTitle>
-              <CardDescription>Recent vehicle anomalies by severity</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AnomalyChart 
-                data={anomalies} 
-                isLoading={isLoading} 
-              />
-            </CardContent>
-          </Card>
-          
-          <VehicleTrustCard vehicles={vehicles} />
-        </div>
+        <ChartsRow 
+          anomalies={anomalies}
+          vehicles={vehicles}
+          isLoading={isLoading}
+        />
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SystemHealthMonitor />
-          
-          <Card>
-            <CardHeader className="pb-0">
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                <span>Blockchain Trust Ledger</span>
-              </CardTitle>
-              <CardDescription>
-                Real-time trust score changes secured by blockchain
-                {connectedWallet && (
-                  <span className="block text-xs mt-1">
-                    Connected wallet: {connectedWallet.slice(0, 6)}...{connectedWallet.slice(-4)}
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TrustLedgerTable 
-                data={trustBlockchainData.length > 0 ? trustBlockchainData : trustApiData} 
-                isLoading={isBlockchainLoading} 
-                etherscanUrl={etherscanUrl}
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <MonitoringRow 
+          trustBlockchainData={trustBlockchainData}
+          trustApiData={trustApiData}
+          isBlockchainLoading={isBlockchainLoading}
+          connectedWallet={connectedWallet}
+          etherscanUrl={etherscanUrl}
+        />
       </div>
     </MainLayout>
   );
