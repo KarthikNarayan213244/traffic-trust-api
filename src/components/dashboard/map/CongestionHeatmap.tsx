@@ -31,9 +31,12 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
       // Scale weight by congestion level (0.1 to 1)
       const weight = congestionLevel / 100;
       
+      // If this is ML predicted data, add slightly more weight to show its impact
+      const mlBoost = zone.predicted_by_ml ? 0.2 : 0;
+      
       return {
         location: new google.maps.LatLng(zone.lat, zone.lng),
-        weight: weight
+        weight: weight + mlBoost
       };
     });
     
@@ -96,6 +99,25 @@ const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData })
           enhancedPoints.push({
             location: new google.maps.LatLng(zone.lat + latOffset, zone.lng + lngOffset),
             weight: noiseCongestion / 100
+          });
+        }
+      });
+      
+      // For ML-predicted congestion zones, add extra points to emphasize
+      const mlPredictedZones = congestionData.filter(zone => zone.predicted_by_ml && zone.congestion_level > 70);
+      
+      mlPredictedZones.forEach(zone => {
+        // Add 3-5 points in a small cluster to emphasize ML predictions
+        const emphasisCount = 3 + Math.floor(Math.random() * 3);
+        
+        for (let i = 0; i < emphasisCount; i++) {
+          // Very small random offset to create a tight cluster
+          const latOffset = (Math.random() - 0.5) * 0.002;
+          const lngOffset = (Math.random() - 0.5) * 0.002;
+          
+          enhancedPoints.push({
+            location: new google.maps.LatLng(zone.lat + latOffset, zone.lng + lngOffset),
+            weight: (zone.congestion_level / 100) * 1.2 // 20% boost for ML predictions
           });
         }
       });

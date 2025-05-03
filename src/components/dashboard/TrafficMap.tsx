@@ -1,21 +1,16 @@
-import React, { useEffect, useState } from "react";
+
+import React, { useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
 import { libraries } from "./map/constants";
 import { Vehicle } from "@/services/api/types";
-import { fetchVehicles, fetchCongestionData, fetchRSUs, fetchAnomalies } from "@/services/api";
 import MLControls from "./MLControls";
 import ApiKeyControl from "./ApiKeyControl";
-import { useMapData } from "@/hooks/useMapData";
-import { useMLSimulation } from "@/hooks/useMLSimulation";
 import { useMapApiKey } from "@/hooks/useMapApiKey";
+import { useMLSimulation } from "@/hooks/useMLSimulation";
+import { useRealTimeData } from "@/hooks/useRealTimeData";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  updateCongestionData, 
-  processVehiclesForAnomalies, 
-  updateTrustScores 
-} from "@/services/ml";
 
 interface TrafficMapProps {
   vehicles?: any[];
@@ -32,20 +27,37 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 }) => {
   // Custom hooks to manage state
   const { apiKey, handleApiKeySet } = useMapApiKey();
-  const { vehicles, rsus, congestionData, anomalies, isLoading, setVehicles, setRsus, setCongestionData, setAnomalies } = useMapData(
-    initialVehicles, 
-    initialRsus, 
-    initialCongestionData, 
-    initialLoading
-  );
-  
   const { 
     isLiveMonitoring, selectedAmbulance, destination, modelAccuracy, optimizedRoute,
     isModelLoading, modelsLoaded, modelLoadingProgress,
     toggleLiveMonitoring, handleAmbulanceSelect, handleDestinationSelect, resetRouting,
-    changeModelAccuracy, getIntervals 
+    changeModelAccuracy
   } = useMLSimulation();
   
+  // Using our new real-time data hooks
+  const { 
+    data: vehicles, 
+    isLoading: isVehiclesLoading, 
+    refreshData: refreshVehicles 
+  } = useRealTimeData('vehicle', initialVehicles);
+  
+  const { 
+    data: rsus, 
+    isLoading: isRsusLoading, 
+    refreshData: refreshRsus 
+  } = useRealTimeData('rsu', initialRsus);
+  
+  const { 
+    data: congestionData, 
+    isLoading: isCongestionLoading, 
+    refreshData: refreshCongestion 
+  } = useRealTimeData('congestion', initialCongestionData);
+  
+  const { 
+    data: anomalies, 
+    isLoading: isAnomaliesLoading 
+  } = useRealTimeData('anomaly', []);
+
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
 
   // Only initialize Google Maps when we have an API key
@@ -54,129 +66,12 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     libraries,
     id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
-
-  // Set up interval for data updates and ML inference when monitoring is active
-  useEffect(() => {
-    if (!isLiveMonitoring || isModelLoading) return;
-
-    const intervals = getIntervals();
-    
-    // First update immediately on start
-    if (modelsLoaded) {
-      (async () => {
-        // Update congestion data with ML predictions
-        const updatedCongestion = await updateCongestionData(congestionData);
-        setCongestionData(updatedCongestion);
-        console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
-        
-        // Process vehicles for anomalies
-        const detectedAnomalies = await processVehiclesForAnomalies(vehicles);
-        if (detectedAnomalies.length > 0) {
-          setAnomalies(prev => [...detectedAnomalies, ...prev]);
-          console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
-        }
-        
-        // Update vehicle trust scores
-        const updatedVehicles = await updateTrustScores(vehicles, anomalies);
-        setVehicles(updatedVehicles);
-        console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
-      })();
-    }
-    
-    // Vehicle data update interval
-    const vehicleInterval = setInterval(() => {
-      fetchVehicles({ limit: 1000 }).then(data => {
-        if (Array.isArray(data)) {
-          setVehicles(data);
-          console.log(`Updated ${data.length} vehicles`);
-          
-          // If ML models are loaded, process vehicles for anomalies
-          if (modelsLoaded) {
-            processVehiclesForAnomalies(data).then(detectedAnomalies => {
-              if (detectedAnomalies.length > 0) {
-                setAnomalies(prev => [...detectedAnomalies, ...prev]);
-                console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
-              }
-            });
-          }
-        }
-      }).catch(error => {
-        console.error("Error updating vehicles:", error);
-      });
-    }, intervals.vehicles);
-
-    // Congestion data update with ML prediction interval
-    const congestionInterval = setInterval(() => {
-      fetchCongestionData({ limit: 500 }).then(async data => {
-        if (Array.isArray(data)) {
-          // If ML models are loaded, use them to update congestion predictions
-          if (modelsLoaded) {
-            const updatedCongestion = await updateCongestionData(data);
-            setCongestionData(updatedCongestion);
-            console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
-          } else {
-            setCongestionData(data);
-            console.log(`Updated ${data.length} congestion data points`);
-          }
-        }
-      }).catch(error => {
-        console.error("Error updating congestion data:", error);
-      });
-    }, intervals.congestion);
-    
-    // RSU data update interval
-    const rsuInterval = setInterval(() => {
-      fetchRSUs({ limit: 100 }).then(data => {
-        if (Array.isArray(data)) {
-          setRsus(data);
-          console.log(`Updated ${data.length} RSUs`);
-        }
-      }).catch(error => {
-        console.error("Error updating RSUs:", error);
-      });
-    }, intervals.rsus);
-    
-    // ML model update countdown
-    const countdownInterval = setInterval(() => {
-      setMlUpdateCountdown(prev => {
-        if (prev <= 0) {
-          return Math.floor(intervals.modelUpdate / 1000);
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    // ML model update interval (more intensive analysis)
-    const mlUpdateInterval = setInterval(() => {
-      if (modelsLoaded) {
-        console.log("Running comprehensive ML model updates...");
-        
-        // Update trust scores based on all data
-        updateTrustScores(vehicles, anomalies).then(updatedVehicles => {
-          setVehicles(updatedVehicles);
-          console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
-        });
-        
-        setMlUpdateCountdown(Math.floor(intervals.modelUpdate / 1000));
-      }
-    }, intervals.modelUpdate);
-
-    return () => {
-      clearInterval(vehicleInterval);
-      clearInterval(congestionInterval);
-      clearInterval(rsuInterval);
-      clearInterval(mlUpdateInterval);
-      clearInterval(countdownInterval);
-    };
-  }, [
-    isLiveMonitoring, modelsLoaded, isModelLoading, 
-    setVehicles, setRsus, setCongestionData, setAnomalies,
-    vehicles, congestionData, anomalies, 
-    getIntervals
-  ]);
+  
+  // Combined loading state
+  const isLoading = initialLoading || isVehiclesLoading || isRsusLoading || isCongestionLoading || isAnomaliesLoading;
 
   // Show loading skeleton
-  if (initialLoading && isLoading) {
+  if (isLoading) {
     return (
       <div className="space-y-2">
         <div className="flex justify-between items-center">
@@ -257,11 +152,22 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         />
       )}
       
-      {modelsLoaded && isLiveMonitoring && (
-        <div className="flex justify-end text-xs text-muted-foreground">
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>
+          {isLiveMonitoring ? (
+            <>
+              <span className="text-green-500">●</span> LIVE: {vehicles.length} vehicles, {rsus.length} RSUs, {anomalies.length} anomalies detected
+            </>
+          ) : (
+            <>
+              <span className="text-amber-500">●</span> PAUSED: Real-time updates disabled
+            </>
+          )}
+        </span>
+        {modelsLoaded && isLiveMonitoring && (
           <span>ML Model Update in: {mlUpdateCountdown}s</span>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
