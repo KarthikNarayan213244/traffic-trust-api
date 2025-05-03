@@ -7,13 +7,13 @@ import { ApiEndpoint } from "./config";
 export async function fetchTrustLedger(options = {}): Promise<TrustLedgerEntry[]> {
   try {
     // First try to fetch from Supabase
-    const data = await fetchFromSupabase<"trust">("trust", options);
+    const data = await fetchFromSupabase<"trustLedger">("trustLedger", options);
     return data;
   } catch (error) {
     console.error("Error fetching trust ledger from Supabase:", error);
     // Fallback to direct API or mock data
     try {
-      return await fetchData("trust", options);
+      return await fetchData("trustLedger", options);
     } catch (apiError) {
       console.error("Error fetching trust ledger from API:", apiError);
       return getMockTrustLedger();
