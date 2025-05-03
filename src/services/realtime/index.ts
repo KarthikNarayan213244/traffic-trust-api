@@ -1,3 +1,4 @@
+
 import { toast } from "@/hooks/use-toast";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +12,8 @@ class RealtimeService {
   private rsuChannel: RealtimeChannel | null = null;
   private subscribers: Map<string, Set<(data: any) => void>> = new Map();
   private isConnected: boolean = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectionAttempts: number = 0;
 
   private constructor() {
     // Initialize subscribers map for different event types
@@ -28,7 +31,7 @@ class RealtimeService {
   }
 
   /**
-   * Check if the real-time connection is possible
+   * Check if the real-time connection is possible and active
    */
   public async checkConnection(): Promise<boolean> {
     if (!supabase) return false;
@@ -39,14 +42,24 @@ class RealtimeService {
       
       if (error) {
         console.error("Supabase connection error:", error);
+        this.isConnected = false;
         return false;
       }
       
+      this.isConnected = true;
       return true;
     } catch (error) {
       console.error("Error checking Supabase connection:", error);
+      this.isConnected = false;
       return false;
     }
+  }
+
+  /**
+   * Returns current connection status
+   */
+  public isConnected(): boolean {
+    return this.isConnected;
   }
 
   // Initialize WebSocket connection to real data sources
@@ -58,6 +71,7 @@ class RealtimeService {
     
     try {
       console.log("Initializing real-time WebSocket connections...");
+      this.connectionAttempts++;
       
       // Initialize vehicle data channel
       this.vehicleChannel = supabase
@@ -72,11 +86,16 @@ class RealtimeService {
         .subscribe((status: string) => {
           console.log(`Vehicle channel status: ${status}`);
           if (status === 'SUBSCRIBED') {
-            toast({
-              title: "Real-time Vehicle Data Active",
-              description: "Now receiving live vehicle updates from the network."
-            });
+            if (!this.isConnected) {
+              toast({
+                title: "Real-time Vehicle Data Active",
+                description: "Now receiving live vehicle updates from the network."
+              });
+            }
             this.isConnected = true;
+            this.connectionAttempts = 0;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('vehicle');
           }
         });
       
@@ -92,6 +111,9 @@ class RealtimeService {
         )
         .subscribe((status: string) => {
           console.log(`Congestion channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('congestion');
+          }
         });
       
       // Initialize anomaly detection channel
@@ -112,7 +134,12 @@ class RealtimeService {
             }
           }
         )
-        .subscribe();
+        .subscribe((status: string) => {
+          console.log(`Anomaly channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('anomaly');
+          }
+        });
       
       // Initialize RSU status channel
       this.rsuChannel = supabase
@@ -133,18 +160,63 @@ class RealtimeService {
             }
           }
         )
-        .subscribe();
+        .subscribe((status: string) => {
+          console.log(`RSU channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('rsu');
+          }
+        });
         
       console.log("All real-time WebSocket connections initialized");
+      
+      // Check connection status after a short delay
+      setTimeout(() => this.checkConnection(), 5000);
+      
     } catch (error) {
       console.error("Error initializing WebSocket connections:", error);
       toast({
         title: "WebSocket Connection Error",
-        description: "Failed to establish real-time data connections. Some features may be limited.",
+        description: "Failed to establish real-time data connections. Retrying...",
         variant: "destructive"
       });
       this.isConnected = false;
+      this.scheduleReconnect();
     }
+  }
+  
+  // Handle connection errors
+  private handleConnectionError(channelType: string): void {
+    console.error(`${channelType} channel error, attempting to reconnect`);
+    this.isConnected = false;
+    this.scheduleReconnect();
+  }
+  
+  // Schedule a connection retry
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    
+    // Exponential backoff with maximum of 1 minute
+    const backoffMs = Math.min(30000, Math.pow(2, Math.min(this.connectionAttempts, 10)) * 1000);
+    
+    console.log(`Scheduling reconnect in ${backoffMs}ms (attempt ${this.connectionAttempts})`);
+    
+    this.reconnectTimer = setTimeout(() => {
+      console.log("Attempting to reconnect WebSockets...");
+      this.cleanup();
+      this.initializeWebSockets();
+    }, backoffMs);
+  }
+
+  // Resubscribe all channels
+  public resubscribeAll(): void {
+    console.log("Resubscribing all WebSocket channels");
+    
+    if (this.vehicleChannel) this.vehicleChannel.subscribe();
+    if (this.congestionChannel) this.congestionChannel.subscribe();
+    if (this.anomalyChannel) this.anomalyChannel.subscribe();
+    if (this.rsuChannel) this.rsuChannel.subscribe();
   }
 
   // Subscribe to real-time updates
@@ -196,8 +268,15 @@ class RealtimeService {
     if (this.anomalyChannel) this.anomalyChannel.unsubscribe();
     if (this.rsuChannel) this.rsuChannel.unsubscribe();
     
-    this.unsubscribeAll();
-    this.isConnected = false;
+    this.vehicleChannel = null;
+    this.congestionChannel = null;
+    this.anomalyChannel = null;
+    this.rsuChannel = null;
+    
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     
     console.log("All WebSocket connections cleaned up");
   }

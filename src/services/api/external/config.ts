@@ -1,3 +1,4 @@
+
 /**
  * External Traffic APIs Configuration
  * Supports multiple providers with fallback mechanisms
@@ -25,8 +26,8 @@ export const API_PROVIDERS = {
     incidentEndpoint: '/incidentDetails/s3/json',
     apiKey: import.meta.env.VITE_TOMTOM_API_KEY || 'pEwSxAaTM0quOL1x2WuqFFYRj7lGIJeL', // Use provided key as default
     enabled: true, // Always enable TomTom as we have the key
-    rateLimit: 40, // requests per minute
-    timeout: 12000, // 12 seconds - used for custom timeout handling, not in fetch directly
+    rateLimit: 100, // Increased from 40 to 100 requests per minute
+    timeout: 30000, // Increased from 12000 to 30000 ms for larger data fetching
   },
   // Open Data Platforms (e.g. government transportation APIs)
   opendata: {
@@ -35,8 +36,8 @@ export const API_PROVIDERS = {
     incidentEndpoint: '/incidents',
     apiKey: import.meta.env.VITE_OPENDATA_API_KEY || '579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b',
     enabled: true, // Enable opendata by default with the provided key
-    rateLimit: 30, // requests per minute
-    timeout: 15000, // 15 seconds - used for custom timeout handling, not in fetch directly
+    rateLimit: 60, // Increased from 30 to 60 requests per minute
+    timeout: 30000, // Increased from 15000 to 30000 ms for larger data fetching
   },
   // Mock data (fallback when no API keys are available)
   mock: {
@@ -55,12 +56,12 @@ export const getActiveProvider = (): TrafficApiProvider => {
   return 'tomtom';
 };
 
-// Coordinates for the Hyderabad region - expanded to cover more area
+// Coordinates for the Hyderabad region - significantly expanded to cover more area
 export const HYDERABAD_BOUNDING_BOX = {
-  north: 17.6200, // north latitude (expanded)
-  south: 17.2500, // south latitude (expanded)
-  east: 78.6500,  // east longitude (expanded)
-  west: 78.2500   // west longitude (expanded)
+  north: 17.8000, // north latitude (expanded from 17.6200)
+  south: 17.1000, // south latitude (expanded from 17.2500)
+  east: 78.9000,  // east longitude (expanded from 78.6500)
+  west: 78.0000   // west longitude (expanded from 78.2500)
 };
 
 // Rate limiter for API calls
