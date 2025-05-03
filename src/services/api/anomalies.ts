@@ -55,7 +55,7 @@ export function getMockAnomalies(): Anomaly[] {
       type: "Speed Violation", 
       severity: "High", 
       message: "Vehicle exceeded speed limit by 30km/h",
-      status: "Detected",
+      status: "Detected", // Changed from "Under Investigation" to "Detected"
       ml_confidence: 0.95
     },
     { 
@@ -65,7 +65,7 @@ export function getMockAnomalies(): Anomaly[] {
       type: "Signal Tampering", 
       severity: "Critical", 
       message: "Unusual signal pattern detected from vehicle transponder",
-      status: "Under Investigation",
+      status: "Detected", // Changed from "Under Investigation" to "Detected"
       ml_confidence: 0.88
     },
     { 
