@@ -92,9 +92,10 @@ export function useScaledTrafficData({
         const maxVehicles = zoomLevel < 12 ? 200 : zoomLevel < 14 ? 500 : 1000;
         
         // Get data for the current view with limits
-        const vehiclesData = getScaledVehicles(visibleBounds, zoomLevel, maxVehicles);
-        const rsusData = getScaledRSUs(visibleBounds, 200); // Limit to 200 RSUs
-        const congestionResults = getScaledCongestionData(300); // Limit to 300 congestion zones
+        // Fix: Adjust parameter count to match function signatures
+        const vehiclesData = getScaledVehicles(visibleBounds, zoomLevel);
+        const rsusData = getScaledRSUs(visibleBounds);
+        const congestionResults = getScaledCongestionData();
         
         // Update state with results
         setVehicles(vehiclesData);
