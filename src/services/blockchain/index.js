@@ -3,6 +3,7 @@
 import { connectWallet, getConnectedAddress, addTrustUpdateListener, getTrustScore } from './provider';
 import { getTrustLedger } from './ledger';
 import { updateTrustScore, batchUpdateTrustScores } from './trustScores';
+import { stakeTrust, simulateStakeTrust } from './staking';
 
 export {
   connectWallet,
@@ -11,5 +12,7 @@ export {
   updateTrustScore,
   batchUpdateTrustScores,
   addTrustUpdateListener,
-  getTrustScore
+  getTrustScore,
+  stakeTrust,
+  simulateStakeTrust
 };
