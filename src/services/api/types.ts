@@ -28,6 +28,7 @@ export interface RSU {
   status: 'Active' | 'Inactive';
   coverage_radius: number;
   heading?: number;
+  last_seen?: string; // Added this field to match what's being used in RsuMarkers.tsx
 }
 
 export interface Anomaly {
