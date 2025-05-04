@@ -20,6 +20,13 @@ interface TrafficMapProps {
   vehicleCountSummary?: string;
 }
 
+// Add a global map reference for optimized rendering
+declare global {
+  interface Window {
+    map: any;
+  }
+}
+
 const TrafficMap: React.FC<TrafficMapProps> = ({
   vehicles: initialVehicles = [],
   rsus: initialRsus = [],
@@ -44,29 +51,33 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   // Limit data size to prevent rendering issues
   // Use useMemo to prevent unnecessary recalculations
   const limitedVehicles = useMemo(() => {
-    // Start with a more reasonable limit that can be displayed
-    const baseLimit = 10000;
+    // Start with a reasonable limit that can be displayed
+    const baseLimit = Math.min(15000, initialVehicles.length);
     
-    // Adjust based on zoom level - show more when zoomed out
-    const zoomFactor = currentZoom < 10 ? 10 : 
-                       currentZoom < 12 ? 5 : 
-                       currentZoom < 14 ? 2 : 1;
+    // Adjust based on zoom level - show more when zoomed in
+    const zoomFactor = currentZoom < 10 ? 0.5 : 
+                       currentZoom < 12 ? 0.7 : 
+                       currentZoom < 14 ? 1 : 1.5;
     
-    const limit = baseLimit * zoomFactor;
+    const limit = Math.floor(baseLimit * zoomFactor);
+    
+    console.log(`Limiting vehicles to ${limit} from ${initialVehicles.length} (zoom ${currentZoom})`);
     
     // Apply the calculated limit
     return initialVehicles.slice(0, limit);
   }, [initialVehicles, currentZoom]);
   
   const limitedRsus = useMemo(() => {
-    // Show more RSUs when zoomed out
-    const rsuLimit = currentZoom < 12 ? 500 : 200;
+    // Show all RSUs - they're much fewer than vehicles
+    const rsuLimit = Math.min(500, initialRsus.length);
+    console.log(`Using ${rsuLimit} RSUs from ${initialRsus.length} available`);
     return initialRsus.slice(0, rsuLimit);
-  }, [initialRsus, currentZoom]);
+  }, [initialRsus]);
   
   const limitedCongestionData = useMemo(() => {
     // Limit congestion data
-    return initialCongestionData.slice(0, 300);
+    const limit = Math.min(300, initialCongestionData.length);
+    return initialCongestionData.slice(0, limit);
   }, [initialCongestionData]);
 
   // Track last update time
@@ -83,6 +94,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   useEffect(() => {
     if (isLoaded) {
       markGoogleMapsAsLoaded();
+      
+      // Log when map loads
+      console.log("Google Maps API loaded successfully");
     }
   }, [isLoaded]);
   
@@ -101,7 +115,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       // Show minimal notification
       toast({
         title: "Data Refreshed",
-        description: "Updated traffic data with live information",
+        description: `Updated with ${limitedVehicles.length.toLocaleString()} vehicles and ${limitedRsus.length} RSUs`,
         duration: 2000, // 2 seconds
       });
     }, 60000); // Every 60 seconds
@@ -109,7 +123,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [isLiveMonitoring]);
+  }, [isLiveMonitoring, limitedVehicles.length, limitedRsus.length]);
   
   // Handle map bounds changed
   const handleMapBoundsChanged = (bounds: any, zoom: number) => {
@@ -145,6 +159,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     ? parseInt(modelLoadingProgress, 10) 
     : modelLoadingProgress;
 
+  // Log initial render statistics
+  console.log(`TrafficMap rendering with ${limitedVehicles.length} vehicles, ${limitedRsus.length} RSUs`);
+    
   return (
     <div className="space-y-2">
       <MapToolbar 

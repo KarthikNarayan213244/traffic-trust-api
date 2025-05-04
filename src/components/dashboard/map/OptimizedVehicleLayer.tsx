@@ -32,6 +32,7 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
     try {
       const overlay = new google.maps.OverlayView();
       overlay.draw = () => {}; // Required but does nothing
+      overlay.setMap(window.map); // Set map reference
       return overlay.getProjection();
     } catch (err) {
       console.error("Error creating projection:", err);
@@ -58,12 +59,11 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
     // Initialize projection if needed
     if (!projectionRef.current) {
       projectionRef.current = createProjection();
-    }
-    
-    // If projection not available, skip drawing
-    if (!projectionRef.current) {
-      console.log("Projection not available, skipping render");
-      return;
+      if (!projectionRef.current) {
+        console.log("Trying to initialize projection");
+        setTimeout(renderVehicles, 500); // Retry after 500ms
+        return;
+      }
     }
     
     // Use WebGL if available for better performance with large datasets
@@ -75,9 +75,11 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
     }
     
     // Draw vehicles using Canvas 2D API
+    let drawnCount = 0;
+    
     for (let i = 0; i < vehicles.length; i++) {
       const vehicle = vehicles[i];
-      if (!vehicle) continue;
+      if (!vehicle || !vehicle.lat || !vehicle.lng) continue;
       
       try {
         const isAmbulance = vehicle.vehicle_type?.toLowerCase() === 'ambulance';
@@ -85,12 +87,19 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
         
         // Convert lat/lng to pixel coordinates
         const position = new google.maps.LatLng(
-          vehicle.lat || defaultCenter.lat,
-          vehicle.lng || defaultCenter.lng
+          vehicle.lat,
+          vehicle.lng
         );
         
         const point = projectionRef.current.fromLatLngToDivPixel(position);
         if (!point) continue;
+        
+        // Skip if outside canvas
+        if (point.x < -50 || point.y < -50 || 
+            point.x > canvas.width + 50 || 
+            point.y > canvas.height + 50) {
+          continue;
+        }
         
         // Get marker size and color
         const size = getVehicleSize(zoomLevel, vehicle.vehicle_type, isSelected);
@@ -110,12 +119,12 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
         ctx.beginPath();
         
         // Different shapes based on vehicle type
-        if (vehicle.vehicle_type === 'ambulance') {
+        if (vehicle.vehicle_type === 'Ambulance' || vehicle.vehicle_type === 'ambulance') {
           // Triangle for ambulance
           ctx.moveTo(point.x, point.y - size);
           ctx.lineTo(point.x - size, point.y + size);
           ctx.lineTo(point.x + size, point.y + size);
-        } else if (vehicle.vehicle_type === 'truck') {
+        } else if (vehicle.vehicle_type === 'Truck' || vehicle.vehicle_type === 'truck') {
           // Rectangle for truck
           ctx.rect(point.x - size, point.y - size, size * 2, size * 1.5);
         } else {
@@ -135,6 +144,8 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
           ctx.lineWidth = 0.5;
         }
         ctx.stroke();
+        
+        drawnCount++;
       } catch (error) {
         // Silently handle any rendering errors
       }
@@ -148,6 +159,8 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
         break;
       }
     }
+    
+    console.log(`Drew ${drawnCount} vehicles of ${vehicles.length} total`);
   };
   
   // WebGL rendering for better performance with large datasets
@@ -180,6 +193,13 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
           const point = projectionRef.current.fromLatLngToDivPixel(position);
           if (!point) return;
           
+          // Skip if outside canvas
+          if (point.x < -50 || point.y < -50 || 
+              point.x > canvas.width + 50 || 
+              point.y > canvas.height + 50) {
+            return;
+          }
+          
           // Assign to grid cell
           const gridX = Math.floor(point.x / gridSize);
           const gridY = Math.floor(point.y / gridSize);
@@ -201,24 +221,34 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
       });
       
       // Draw density cells
+      let cellCount = 0;
       Object.entries(gridCells).forEach(([key, data]) => {
         const [gridX, gridY] = key.split(',').map(Number);
         const x = gridX * gridSize;
         const y = gridY * gridSize;
-        const radius = Math.min(gridSize / 2, Math.max(3, Math.log(data.count) * 3));
+        const radius = Math.min(gridSize / 2, Math.max(5, Math.log(data.count) * 5));
         
         ctx.beginPath();
         ctx.arc(x + gridSize/2, y + gridSize/2, radius, 0, Math.PI * 2);
         ctx.fillStyle = getTrustScoreColor(data.avgTrust);
-        ctx.globalAlpha = Math.min(0.8, 0.3 + Math.min(0.5, data.count / 100));
+        ctx.globalAlpha = Math.min(0.9, 0.3 + Math.min(0.6, data.count / 100));
         ctx.fill();
+        
+        // Add stroke for better visibility
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        cellCount++;
       });
+      
+      console.log(`Drew ${cellCount} vehicle clusters`);
       
       ctx.globalAlpha = 1.0;
       
       // Also render any ambulances for selection
+      let ambulanceCount = 0;
       vehicles.forEach(vehicle => {
-        if (!vehicle.lat || !vehicle.lng || vehicle.vehicle_type !== 'ambulance') return;
+        if (!vehicle.lat || !vehicle.lng || vehicle.vehicle_type?.toLowerCase() !== 'ambulance') return;
         
         try {
           const isSelected = vehicle.vehicle_id === selectedAmbulanceId;
@@ -226,7 +256,14 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
           const point = projectionRef.current.fromLatLngToDivPixel(position);
           if (!point) return;
           
-          const size = getVehicleSize(zoomLevel, 'ambulance', isSelected);
+          // Skip if outside canvas
+          if (point.x < -50 || point.y < -50 || 
+              point.x > canvas.width + 50 || 
+              point.y > canvas.height + 50) {
+            return;
+          }
+          
+          const size = getVehicleSize(zoomLevel, 'ambulance', isSelected) * 1.5;
           
           // Store for click detection
           clickableVehiclesRef.current.set(vehicle.vehicle_id, {
@@ -248,11 +285,19 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
             ctx.strokeStyle = "#FFFF00";
             ctx.lineWidth = 2;
             ctx.stroke();
+          } else {
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 1;
+            ctx.stroke();
           }
+          
+          ambulanceCount++;
         } catch (e) {
           // Ignore errors
         }
       });
+      
+      console.log(`Drew ${ambulanceCount} ambulances separately`);
       
     } catch (error) {
       console.error("WebGL rendering failed, falling back to Canvas:", error);
@@ -271,6 +316,11 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
       }
     };
     
+    // Store map reference globally for projection
+    if (window.google && window.google.maps) {
+      window.map = window.google.maps.Map;
+    }
+    
     window.addEventListener('resize', handleResize);
     handleResize(); // Initial sizing
     
@@ -281,16 +331,20 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
   
   // Render vehicles when data changes
   useEffect(() => {
-    // Cancel any pending render
-    if (renderRequestRef.current) {
-      cancelAnimationFrame(renderRequestRef.current);
-    }
-    
-    // Schedule a new render
-    renderRequestRef.current = requestAnimationFrame(renderVehicles);
+    // Wait a bit for the map to fully initialize
+    const timer = setTimeout(() => {
+      // Cancel any pending render
+      if (renderRequestRef.current) {
+        cancelAnimationFrame(renderRequestRef.current);
+      }
+      
+      // Schedule a new render
+      renderRequestRef.current = requestAnimationFrame(renderVehicles);
+    }, 100);
     
     // Cleanup
     return () => {
+      clearTimeout(timer);
       if (renderRequestRef.current) {
         cancelAnimationFrame(renderRequestRef.current);
       }

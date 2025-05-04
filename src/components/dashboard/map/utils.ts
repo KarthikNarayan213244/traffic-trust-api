@@ -21,7 +21,7 @@ export const getTrustScoreColor = (score?: number): string => {
 // Map style utilities
 export const getVehicleSize = (zoomLevel: number, vehicleType?: string, isSelected: boolean = false): number => {
   // Base size scales with zoom level
-  const baseSize = Math.max(1, Math.min(6, zoomLevel - 10));
+  const baseSize = Math.max(1.5, Math.min(6, zoomLevel - 8));
   
   if (isSelected) return baseSize * 1.8;
   
@@ -41,4 +41,14 @@ export const getClusteringOptions = (zoomLevel: number) => {
     maxZoom: 16,
     minPoints: zoomLevel < 12 ? 5 : zoomLevel < 14 ? 3 : 2
   };
+};
+
+// Format timestamp to human-readable string (needed for compatibility)
+export const formatTimestamp = (timestamp: string): string => {
+  try {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch (e) {
+    return 'Invalid time';
+  }
 };

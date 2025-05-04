@@ -19,8 +19,8 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
     // Find the most recently updated RSU
     const sorted = [...rsus].sort((a, b) => {
       // Use timestamp or current date if not available
-      const dateA = new Date().getTime();
-      const dateB = new Date().getTime();
+      const dateA = a.timestamp ? new Date(a.timestamp).getTime() : new Date().getTime();
+      const dateB = b.timestamp ? new Date(b.timestamp).getTime() : new Date().getTime();
       return dateB - dateA;
     });
     
@@ -44,6 +44,8 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
     return null;
   }
 
+  console.log(`Rendering ${rsus.length} RSUs on map`);
+
   return (
     <>
       {rsus.map((rsu) => {
@@ -62,21 +64,21 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
         const isHighlighted = rsu.rsu_id === lastUpdatedRsu;
         
         // Base colors
-        const baseColor = isActive ? "#4ADE80" : "#94A3B8";
-        const baseStrokeColor = isActive ? "#22C55E" : "#64748B";
+        const baseColor = isActive ? "#22c55e" : "#94a3b8";
+        const baseStrokeColor = isActive ? "#16a34a" : "#64748b";
         
         // Highlight colors for recently updated RSUs
-        const fillColor = isHighlighted ? "#3B82F6" : baseColor;
-        const strokeColor = isHighlighted ? "#2563EB" : baseStrokeColor;
+        const fillColor = isHighlighted ? "#3b82f6" : baseColor;
+        const strokeColor = isHighlighted ? "#2563eb" : baseStrokeColor;
         
         const coverage = rsu.coverage_radius || 500;
         
         const iconScale = isHighlighted ? 8 : 6;
-        const circleOpacity = isHighlighted ? 0.3 : 0.15;
+        const circleOpacity = isHighlighted ? 0.25 : 0.1;
         
         // Format location display
         const locationDisplay = rsu.location ? 
-          (typeof rsu.location === 'string' ? rsu.location : `${rsu.location.lat.toFixed(4)}, ${rsu.location.lng.toFixed(4)}`) : 
+          (typeof rsu.location === 'string' ? rsu.location : `${rsu.lat.toFixed(4)}, ${rsu.lng.toFixed(4)}`) : 
           `${rsu.lat.toFixed(4)}, ${rsu.lng.toFixed(4)}`;
         
         return (
