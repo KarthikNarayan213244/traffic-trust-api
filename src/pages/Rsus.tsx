@@ -17,15 +17,7 @@ const Rsus: React.FC = () => {
       setIsLoading(true);
       setIsError(false);
       const data = await fetchRSUs();
-      
-      // Transform the data to ensure no objects are rendered directly
-      const processedData = Array.isArray(data) ? data.map(rsu => ({
-        ...rsu,
-        // Convert location object to string if it exists
-        location: typeof rsu.location === 'object' ? `${rsu.location.lat.toFixed(4)}, ${rsu.location.lng.toFixed(4)}` : rsu.location
-      })) : [];
-      
-      setRsus(processedData);
+      setRsus(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching RSUs:", error);
       setIsError(true);

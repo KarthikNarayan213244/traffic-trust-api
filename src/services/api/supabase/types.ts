@@ -1,90 +1,45 @@
 
-import { Anomaly, CongestionZone, RSU, TrustLedgerEntry, Vehicle } from "../types";
 import { ApiEndpoint } from "../config";
+import { Vehicle, Rsu, Anomaly, TrustLedgerEntry, CongestionZone } from "../types";
 
-export type SupabaseTable = 
-  | "vehicles" 
-  | "rsus" 
-  | "anomalies" 
-  | "trust_ledger"
-  | "zones_congestion";
-
-export type ValidTableName = SupabaseTable;
-
-export type TableDataTypes = {
-  vehicles: Vehicle;
-  rsus: RSU;
-  anomalies: Anomaly;
-  trust_ledger: TrustLedgerEntry;
-  zones_congestion: CongestionZone;
-};
-
-export type DataTypeMap<T extends SupabaseTable> = TableDataTypes[T];
-
-// Define the mapping between API endpoints and Supabase tables
-export const endpointToTableMap: Record<ApiEndpoint, SupabaseTable> = {
-  vehicles: "vehicles",
-  rsus: "rsus",
-  anomalies: "anomalies",
-  trustLedger: "trust_ledger",
-  congestion: "zones_congestion"
-};
-
-// Type mappings for API endpoints to their return types
+// Type mapping for each endpoint's return type
 export type EndpointTypeMap = {
   vehicles: Vehicle[];
-  rsus: RSU[];
+  rsus: Rsu[];
   anomalies: Anomaly[];
   trustLedger: TrustLedgerEntry[];
   congestion: CongestionZone[];
 };
 
-// Type guard functions to validate data types
+// Map API endpoints to their corresponding Supabase table names
+export const endpointToTableMap = {
+  vehicles: "vehicles",
+  rsus: "rsus",
+  anomalies: "anomalies",
+  trustLedger: "trust_ledger",
+  congestion: "zones_congestion"
+} as const;
+
+// Define a type for valid table names based on the values in our map
+export type ValidTableName = typeof endpointToTableMap[keyof typeof endpointToTableMap];
+
+// Type guards for each data type
 export function isVehicleData(item: any): item is Vehicle {
-  return (
-    item &&
-    typeof item.vehicle_id === 'string' &&
-    typeof item.owner_name === 'string' &&
-    typeof item.vehicle_type === 'string'
-  );
+  return item && 'vehicle_id' in item && 'owner_name' in item && 'vehicle_type' in item;
 }
 
-export function isRsuData(item: any): item is RSU {
-  return (
-    item &&
-    typeof item.rsu_id === 'string' &&
-    typeof item.status === 'string' &&
-    typeof item.coverage_radius === 'number'
-  );
+export function isRsuData(item: any): item is Rsu {
+  return item && 'rsu_id' in item && 'location' in item && 'coverage_radius' in item;
 }
 
 export function isAnomalyData(item: any): item is Anomaly {
-  return (
-    item &&
-    typeof item.id === 'string' &&
-    typeof item.timestamp === 'string' &&
-    typeof item.type === 'string' &&
-    typeof item.severity === 'string'
-  );
+  return item && 'type' in item && 'severity' in item && 'vehicle_id' in item;
 }
 
 export function isTrustLedgerData(item: any): item is TrustLedgerEntry {
-  return (
-    item &&
-    typeof item.id === 'string' &&
-    typeof item.timestamp === 'string' &&
-    typeof item.vehicle_id === 'string' &&
-    (typeof item.old_score === 'number' || typeof item.old_value === 'number')
-  );
+  return item && 'tx_id' in item && 'action' in item && 'old_value' in item && 'new_value' in item;
 }
 
 export function isCongestionData(item: any): item is CongestionZone {
-  return (
-    item &&
-    (typeof item.id === 'string' || typeof item.id === 'number') &&
-    typeof item.zone_name === 'string' &&
-    typeof item.lat === 'number' &&
-    typeof item.lng === 'number' &&
-    typeof item.congestion_level === 'number'
-  );
+  return item && 'zone_name' in item && 'congestion_level' in item;
 }

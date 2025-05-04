@@ -1,29 +1,46 @@
 
-import { Routes, Route } from 'react-router-dom';
-import Index from './pages/Index';
-import Vehicles from './pages/Vehicles';
-import TrustLedger from './pages/TrustLedger';
-import Rsus from './pages/Rsus';
-import Anomalies from './pages/Anomalies';
-import Settings from './pages/Settings';
-import NotFound from './pages/NotFound';
-import { Toaster } from '@/components/ui/toaster';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import Vehicles from "./pages/Vehicles";
+import Rsus from "./pages/Rsus";
+import Anomalies from "./pages/Anomalies";
+import TrustLedger from "./pages/TrustLedger";
+import Settings from "./pages/Settings";
+import NotFound from "./pages/NotFound";
 
-function App() {
-  return (
-    <>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/vehicles" element={<Vehicles />} />
-        <Route path="/trust-ledger" element={<TrustLedger />} />
-        <Route path="/rsus" element={<Rsus />} />
-        <Route path="/anomalies" element={<Anomalies />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+// Create a client for React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
       <Toaster />
-    </>
-  );
-}
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/vehicles" element={<Vehicles />} />
+          <Route path="/rsus" element={<Rsus />} />
+          <Route path="/anomalies" element={<Anomalies />} />
+          <Route path="/trust-ledger" element={<TrustLedger />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { seedDatabaseWithTestData } from "@/services/api";
 
@@ -19,8 +19,8 @@ export function DataSeeder() {
       
       if (result.success) {
         toast({
-          title: "Trust database seeded successfully",
-          description: `Added ${result.counts?.anomalies} anomalies and ${result.counts?.trustEntries} trust entries.`,
+          title: "Database seeded successfully",
+          description: `Added ${result.counts?.vehicles} vehicles, ${result.counts?.rsus} RSUs, ${result.counts?.anomalies} anomalies, ${result.counts?.trustEntries} trust entries, and ${result.counts?.congestionEntries} congestion entries.`,
         });
       } else {
         toast({
@@ -44,12 +44,9 @@ export function DataSeeder() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-4 w-4" />
-          Trust Database Seeder
-        </CardTitle>
+        <CardTitle>Database Seeder</CardTitle>
         <CardDescription>
-          Populate your trust database with realistic test data
+          Populate your database with realistic test data
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -59,15 +56,12 @@ export function DataSeeder() {
             checked={clearExisting} 
             onCheckedChange={(checked) => setClearExisting(!!checked)} 
           />
-          <Label htmlFor="clearExisting">Clear existing trust data before seeding</Label>
+          <Label htmlFor="clearExisting">Clear existing data before seeding</Label>
         </div>
         <p className="text-sm text-gray-500">
           {clearExisting 
-            ? "Warning: This will delete all existing trust and anomaly data before adding new records." 
-            : "New trust and anomaly data will be added without removing existing records."}
-        </p>
-        <p className="text-xs text-blue-600">
-          Note: Traffic data is now provided by TomTom API in real-time.
+            ? "Warning: This will delete all existing data in the database before adding new data." 
+            : "New data will be added without removing existing records."}
         </p>
       </CardContent>
       <CardFooter>
@@ -75,15 +69,14 @@ export function DataSeeder() {
           onClick={handleSeedData} 
           disabled={isSeeding}
           className="w-full"
-          variant="outline"
         >
           {isSeeding ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Seeding Trust Database...
+              Seeding Database...
             </>
           ) : (
-            "Seed Trust Database"
+            "Seed Database"
           )}
         </Button>
       </CardFooter>

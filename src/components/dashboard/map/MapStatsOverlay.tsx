@@ -1,47 +1,45 @@
 
 import React from "react";
-import { Car, Radio, AlertTriangle } from "lucide-react";
 
 interface MapStatsOverlayProps {
   vehiclesCount: number;
   rsusCount: number;
-  congestionZones: number;
-  anomaliesCount: number;
-  vehicleCountSummary?: string;
+  congestionZones?: number;
+  anomaliesCount?: number;
 }
 
-const MapStatsOverlay: React.FC<MapStatsOverlayProps> = ({
-  vehiclesCount,
-  rsusCount,
-  congestionZones,
-  anomaliesCount,
-  vehicleCountSummary
+const MapStatsOverlay: React.FC<MapStatsOverlayProps> = ({ 
+  vehiclesCount, 
+  rsusCount, 
+  congestionZones = 0,
+  anomaliesCount = 0
 }) => {
   return (
-    <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 bg-white/80 backdrop-blur-sm rounded-md px-3 py-2 shadow text-xs">
-      <div className="flex items-center gap-1">
-        <Car className="h-3 w-3" />
-        <span className="font-medium">
-          {vehicleCountSummary || 
-            (vehiclesCount > 1000 
-              ? `${(vehiclesCount / 1000).toFixed(1)}k Vehicles` 
-              : `${vehiclesCount} Vehicles`)}
-        </span>
-      </div>
-      <div className="flex items-center gap-1">
-        <Radio className="h-3 w-3" />
-        <span className="font-medium">{rsusCount} RSUs</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="h-3 w-3 rounded-full bg-red-400 opacity-70"></div>
-        <span className="font-medium">{congestionZones} Congested Areas</span>
-      </div>
-      {anomaliesCount > 0 && (
-        <div className="flex items-center gap-1 text-amber-600">
-          <AlertTriangle className="h-3 w-3" />
-          <span className="font-medium">{anomaliesCount} Anomalies</span>
+    <div className="absolute top-2 right-2 bg-white/90 dark:bg-gray-800/90 rounded-md p-3 text-xs shadow-md">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+          <p>{vehiclesCount} vehicles</p>
         </div>
-      )}
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+          <p>{rsusCount} RSUs</p>
+        </div>
+        
+        {congestionZones > 0 && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+            <p>{congestionZones} zones</p>
+          </div>
+        )}
+        
+        {anomaliesCount > 0 && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+            <p>{anomaliesCount} anomalies</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

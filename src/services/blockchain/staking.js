@@ -19,7 +19,7 @@ export const stakeTrust = async (vehicleId, amount) => {
     
     const contract = getContract();
     const amountInWei = ethers.utils.parseEther(amount.toString());
-    const tx = await contract.stakeTrust(vehicleId, { value: amountInWei });
+    const tx = await contract.stakeTrust(vehicleId, amountInWei);
     
     toast({
       title: "Transaction Submitted",

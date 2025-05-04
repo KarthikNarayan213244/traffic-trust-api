@@ -63,8 +63,7 @@ const EmergencyRoutePanel: React.FC<EmergencyRoutePanelProps> = ({
           <strong>Vehicle ID:</strong> {ambulance.vehicle_id}
         </div>
         <div>
-          <strong>Current Location:</strong> {ambulance.location ? 
-            `${ambulance.location.lat.toFixed(4)}, ${ambulance.location.lng.toFixed(4)}` : 'Unknown'}
+          <strong>Current Location:</strong> {ambulance.location || 'Unknown'}
         </div>
         <div>
           <strong>Status:</strong> {ambulance.status || 'Active'}

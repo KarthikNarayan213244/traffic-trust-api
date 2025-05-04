@@ -1,76 +1,53 @@
-export interface Vehicle {
+
+// Type definitions for the data models
+export type Vehicle = {
   vehicle_id: string;
   owner_name: string;
   vehicle_type: string;
-  location: {
-    lat: number;
-    lng: number;
-  };
+  trust_score: number;
   lat: number;
   lng: number;
   speed: number;
-  heading: number;
-  trust_score: number;
-  trust_score_change?: number;
-  trust_score_confidence?: number;
-  status: string;
-  timestamp: string;
-}
+  heading?: number;
+  timestamp?: string;
+  location?: string;
+  status?: string;
+};
 
-export interface RSU {
+export type Rsu = {
   rsu_id: string;
-  location: {
-    lat: number;
-    lng: number;
-  };
+  location: string;
+  status: string;
+  coverage_radius: number;
   lat: number;
   lng: number;
-  status: 'Active' | 'Inactive';
-  coverage_radius: number;
-  heading?: number;
-}
+};
 
-export interface Anomaly {
-  id: string;
+export type Anomaly = {
+  id: number | string;
   timestamp: string;
-  vehicle_id: string;
   type: string;
   severity: string;
+  vehicle_id: string;
   message: string;
-  status: 'Detected' | 'Resolved' | 'Under Investigation' | 'False Alarm';
-  ml_confidence: number;
-  // Direct coordinates for mapping
-  lat?: number;
-  lng?: number;
-  // Legacy location format (kept for backward compatibility)
-  location?: {
-    lat: number;
-    lng: number;
-  };
-}
+  status?: string;
+};
 
-export interface TrustLedgerEntry {
-  id: string;
+export type TrustLedgerEntry = {
+  tx_id: string;
   timestamp: string;
   vehicle_id: string;
-  old_score: number;
-  new_score: number;
-  change: number;
-  reason: string;
-  tx_id?: string;
-  action?: string;
-  old_value?: number;
-  new_value?: number;
+  action: string;
+  old_value: number;
+  new_value: number;
   details?: string;
-}
+};
 
-export interface CongestionZone {
-  id: string;
+export type CongestionZone = {
+  id: number;
   zone_name: string;
   lat: number;
   lng: number;
   congestion_level: number;
   updated_at: string;
-  predicted_by_ml?: boolean;
-  ml_confidence?: number;
-}
+};
