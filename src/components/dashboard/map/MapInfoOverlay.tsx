@@ -7,11 +7,11 @@ const MapInfoOverlay: React.FC = () => {
       <h4 className="font-semibold mb-1">Trust Score Legend</h4>
       <div className="grid grid-cols-1 gap-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="inline-block w-3 h-3 bg-blue-500 rounded-full"></span>
+          <span className="inline-block w-3 h-3 bg-green-500 rounded-full"></span>
           <span>High Trust (85+) - Most reliable vehicles</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-block w-3 h-3 bg-purple-500 rounded-full"></span>
+          <span className="inline-block w-3 h-3 bg-amber-400 rounded-full"></span>
           <span>Medium Trust (70-84) - Regular vehicles</span>
         </div>
         <div className="flex items-center gap-2">

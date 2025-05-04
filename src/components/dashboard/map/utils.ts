@@ -4,24 +4,24 @@ export const getTrustScoreColor = (score?: number): string => {
   // Default score if none provided
   const trustScore = score !== undefined ? score : 75;
   
-  // High trust (85-100): Ocean Blue
+  // High trust (85-100): Green
   if (trustScore >= 85) {
-    return '#0EA5E9'; // Ocean Blue for high trust
+    return '#22c55e'; // Green for high trust
   } 
-  // Medium trust (70-84): Vivid Purple
+  // Medium trust (70-84): Yellow/Amber
   else if (trustScore >= 70) {
-    return '#8B5CF6'; // Vivid Purple for medium trust
+    return '#fbbf24'; // Yellow/Amber for medium trust
   } 
   // Low trust (0-69): Red
   else {
-    return '#ea384c'; // Red for low trust
+    return '#ef4444'; // Red for low trust
   }
 };
 
 // Map style utilities
 export const getVehicleSize = (zoomLevel: number, vehicleType?: string, isSelected: boolean = false): number => {
   // Base size scales with zoom level
-  const baseSize = Math.max(1.5, Math.min(6, zoomLevel - 8));
+  const baseSize = Math.max(2, Math.min(7, zoomLevel - 7));
   
   if (isSelected) return baseSize * 1.8;
   

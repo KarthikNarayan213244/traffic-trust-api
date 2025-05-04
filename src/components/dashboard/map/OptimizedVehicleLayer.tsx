@@ -94,7 +94,7 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
         const point = projectionRef.current.fromLatLngToDivPixel(position);
         if (!point) continue;
         
-        // Skip if outside canvas
+        // Skip if outside canvas with some margin
         if (point.x < -50 || point.y < -50 || 
             point.x > canvas.width + 50 || 
             point.y > canvas.height + 50) {
@@ -128,8 +128,10 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
           // Rectangle for truck
           ctx.rect(point.x - size, point.y - size, size * 2, size * 1.5);
         } else {
-          // Circle for other vehicles
-          ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+          // Triangle for other vehicles (match image provided)
+          ctx.moveTo(point.x, point.y - size);
+          ctx.lineTo(point.x - size, point.y + size);
+          ctx.lineTo(point.x + size, point.y + size);
         }
         
         // Fill and stroke
@@ -226,10 +228,15 @@ const OptimizedVehicleLayer: React.FC<OptimizedVehicleLayerProps> = ({
         const [gridX, gridY] = key.split(',').map(Number);
         const x = gridX * gridSize;
         const y = gridY * gridSize;
-        const radius = Math.min(gridSize / 2, Math.max(5, Math.log(data.count) * 5));
+        
+        // Draw triangles for cell clusters (match image provided)
+        const size = Math.min(gridSize / 2, Math.max(8, Math.log(data.count) * 5));
         
         ctx.beginPath();
-        ctx.arc(x + gridSize/2, y + gridSize/2, radius, 0, Math.PI * 2);
+        ctx.moveTo(x + gridSize/2, y + gridSize/2 - size);
+        ctx.lineTo(x + gridSize/2 - size, y + gridSize/2 + size);
+        ctx.lineTo(x + gridSize/2 + size, y + gridSize/2 + size);
+        
         ctx.fillStyle = getTrustScoreColor(data.avgTrust);
         ctx.globalAlpha = Math.min(0.9, 0.3 + Math.min(0.6, data.count / 100));
         ctx.fill();

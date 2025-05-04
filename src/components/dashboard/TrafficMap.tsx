@@ -48,33 +48,19 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [currentBounds, setCurrentBounds] = useState<any>(null);
   const [currentZoom, setCurrentZoom] = useState<number>(12);
   
-  // Limit data size to prevent rendering issues
-  // Use useMemo to prevent unnecessary recalculations
-  const limitedVehicles = useMemo(() => {
-    // Start with a reasonable limit that can be displayed
-    const baseLimit = Math.min(15000, initialVehicles.length);
-    
-    // Adjust based on zoom level - show more when zoomed in
-    const zoomFactor = currentZoom < 10 ? 0.5 : 
-                       currentZoom < 12 ? 0.7 : 
-                       currentZoom < 14 ? 1 : 1.5;
-    
-    const limit = Math.floor(baseLimit * zoomFactor);
-    
-    console.log(`Limiting vehicles to ${limit} from ${initialVehicles.length} (zoom ${currentZoom})`);
-    
-    // Apply the calculated limit
-    return initialVehicles.slice(0, limit);
-  }, [initialVehicles, currentZoom]);
+  // Use all available vehicles and RSUs without limiting
+  const vehicles = useMemo(() => {
+    console.log(`Using all ${initialVehicles.length} vehicles for display`);
+    return initialVehicles;
+  }, [initialVehicles]);
   
-  const limitedRsus = useMemo(() => {
-    // Show all RSUs - they're much fewer than vehicles
-    const rsuLimit = Math.min(500, initialRsus.length);
-    console.log(`Using ${rsuLimit} RSUs from ${initialRsus.length} available`);
-    return initialRsus.slice(0, rsuLimit);
+  const rsus = useMemo(() => {
+    // Don't limit RSUs - show all of them
+    console.log(`Displaying all ${initialRsus.length} RSUs`);
+    return initialRsus;
   }, [initialRsus]);
   
-  const limitedCongestionData = useMemo(() => {
+  const congestionData = useMemo(() => {
     // Limit congestion data
     const limit = Math.min(300, initialCongestionData.length);
     return initialCongestionData.slice(0, limit);
@@ -115,7 +101,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       // Show minimal notification
       toast({
         title: "Data Refreshed",
-        description: `Updated with ${limitedVehicles.length.toLocaleString()} vehicles and ${limitedRsus.length} RSUs`,
+        description: `Updated with ${vehicles.length.toLocaleString()} vehicles and ${rsus.length} RSUs`,
         duration: 2000, // 2 seconds
       });
     }, 60000); // Every 60 seconds
@@ -123,7 +109,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [isLiveMonitoring, limitedVehicles.length, limitedRsus.length]);
+  }, [isLiveMonitoring, vehicles.length, rsus.length]);
   
   // Handle map bounds changed
   const handleMapBoundsChanged = (bounds: any, zoom: number) => {
@@ -160,7 +146,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     : modelLoadingProgress;
 
   // Log initial render statistics
-  console.log(`TrafficMap rendering with ${limitedVehicles.length} vehicles, ${limitedRsus.length} RSUs`);
+  console.log(`TrafficMap rendering with ${vehicles.length} vehicles, ${rsus.length} RSUs`);
     
   return (
     <div className="space-y-2">
@@ -180,15 +166,15 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
       {isLoaded && (
         <GoogleMapDisplay 
-          vehicles={limitedVehicles} 
-          rsus={limitedRsus} 
-          congestionData={limitedCongestionData} 
+          vehicles={vehicles} 
+          rsus={rsus} 
+          congestionData={congestionData} 
           isLiveMonitoring={isLiveMonitoring}
           selectedAmbulance={selectedAmbulance as Vehicle | null}
           onAmbulanceSelect={handleAmbulanceSelect}
           destination={destination}
           optimizedRoute={optimizedRoute}
-          onMapClick={(latLng) => handleDestinationSelect(latLng, limitedCongestionData)}
+          onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
           onBoundsChanged={handleMapBoundsChanged}
           vehicleCountSummary={vehicleCountSummary}
         />

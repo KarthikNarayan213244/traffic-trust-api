@@ -47,22 +47,10 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const boundsChangedListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const { apiKey } = useMapApiKey();
   
-  // Create memoized datasets to prevent unnecessary re-renders
-  const memoizedVehicles = useMemo(() => {
-    // Allow more vehicles at lower zoom levels
-    const maxCount = zoomLevel < 10 ? 10000 : 
-                    zoomLevel < 12 ? 5000 : 
-                    zoomLevel < 14 ? 2000 : 1000;
-    return vehicles.slice(0, maxCount);
-  }, [vehicles, zoomLevel]);
-  
-  const memoizedRsus = useMemo(() => {
-    // Show more RSUs when zoomed out
-    const maxRsus = zoomLevel < 12 ? 500 : 100;
-    return rsus.slice(0, maxRsus);
-  }, [rsus, zoomLevel]); 
-  
-  const memoizedCongestion = useMemo(() => congestionData.slice(0, 300), [congestionData]);
+  // Use all vehicles and RSUs without limits
+  const memoizedVehicles = useMemo(() => vehicles, [vehicles]);
+  const memoizedRsus = useMemo(() => rsus, [rsus]);
+  const memoizedCongestion = useMemo(() => congestionData, [congestionData]);
 
   // Handle map load with optimized event bindings
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
@@ -147,6 +135,9 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
       </div>
     );
   }
+
+  // Log the number of RSUs and vehicles being passed to their respective components
+  console.log(`GoogleMapDisplay passing ${memoizedVehicles.length} vehicles and ${memoizedRsus.length} RSUs`);
 
   return (
     <div className="h-[400px] relative">

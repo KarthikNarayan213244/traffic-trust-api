@@ -47,6 +47,7 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
 
   console.log(`Rendering ${rsus.length} RSUs on map`);
 
+  // Ensure we're rendering all RSUs by removing any filtering
   return (
     <>
       {rsus.map((rsu) => {
@@ -64,7 +65,7 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
         const isActive = rsu.status === "Active";
         const isHighlighted = rsu.rsu_id === lastUpdatedRsu;
         
-        // Base colors
+        // Base colors - making them more visible
         const baseColor = isActive ? "#22c55e" : "#94a3b8";
         const baseStrokeColor = isActive ? "#16a34a" : "#64748b";
         
@@ -72,8 +73,10 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
         const fillColor = isHighlighted ? "#3b82f6" : baseColor;
         const strokeColor = isHighlighted ? "#2563eb" : baseStrokeColor;
         
+        // Use provided coverage radius or default to 500m
         const coverage = rsu.coverage_radius || 500;
         
+        // Slightly larger icons for better visibility
         const iconScale = isHighlighted ? 8 : 6;
         const circleOpacity = isHighlighted ? 0.25 : 0.1;
         
