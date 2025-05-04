@@ -1,6 +1,6 @@
-
 import { toast } from "@/hooks/use-toast";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
 // Singleton for managing realtime connections
 class RealtimeService {
@@ -10,6 +10,9 @@ class RealtimeService {
   private anomalyChannel: RealtimeChannel | null = null;
   private rsuChannel: RealtimeChannel | null = null;
   private subscribers: Map<string, Set<(data: any) => void>> = new Map();
+  private _isConnected: boolean = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectionAttempts: number = 0;
 
   private constructor() {
     // Initialize subscribers map for different event types
@@ -26,10 +29,48 @@ class RealtimeService {
     return RealtimeService.instance;
   }
 
+  /**
+   * Check if the real-time connection is possible and active
+   */
+  public async checkConnection(): Promise<boolean> {
+    if (!supabase) return false;
+    
+    try {
+      // Test the connection
+      const { error } = await supabase.from('vehicles').select('count', { count: 'exact' }).limit(1);
+      
+      if (error) {
+        console.error("Supabase connection error:", error);
+        this._isConnected = false;
+        return false;
+      }
+      
+      this._isConnected = true;
+      return true;
+    } catch (error) {
+      console.error("Error checking Supabase connection:", error);
+      this._isConnected = false;
+      return false;
+    }
+  }
+
+  /**
+   * Returns current connection status
+   */
+  public isConnected(): boolean {
+    return this._isConnected;
+  }
+
   // Initialize WebSocket connection to real data sources
-  public initializeWebSockets(supabase: any): void {
+  public initializeWebSockets(): void {
+    if (!supabase) {
+      console.error("Supabase client not available");
+      return;
+    }
+    
     try {
       console.log("Initializing real-time WebSocket connections...");
+      this.connectionAttempts++;
       
       // Initialize vehicle data channel
       this.vehicleChannel = supabase
@@ -44,10 +85,16 @@ class RealtimeService {
         .subscribe((status: string) => {
           console.log(`Vehicle channel status: ${status}`);
           if (status === 'SUBSCRIBED') {
-            toast({
-              title: "Real-time Vehicle Data Active",
-              description: "Now receiving live vehicle updates from the network."
-            });
+            if (!this._isConnected) {
+              toast({
+                title: "Real-time Vehicle Data Active",
+                description: "Now receiving live vehicle updates from the network."
+              });
+            }
+            this._isConnected = true;
+            this.connectionAttempts = 0;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('vehicle');
           }
         });
       
@@ -63,6 +110,9 @@ class RealtimeService {
         )
         .subscribe((status: string) => {
           console.log(`Congestion channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('congestion');
+          }
         });
       
       // Initialize anomaly detection channel
@@ -83,7 +133,12 @@ class RealtimeService {
             }
           }
         )
-        .subscribe();
+        .subscribe((status: string) => {
+          console.log(`Anomaly channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('anomaly');
+          }
+        });
       
       // Initialize RSU status channel
       this.rsuChannel = supabase
@@ -104,17 +159,63 @@ class RealtimeService {
             }
           }
         )
-        .subscribe();
+        .subscribe((status: string) => {
+          console.log(`RSU channel status: ${status}`);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            this.handleConnectionError('rsu');
+          }
+        });
         
       console.log("All real-time WebSocket connections initialized");
+      
+      // Check connection status after a short delay
+      setTimeout(() => this.checkConnection(), 5000);
+      
     } catch (error) {
       console.error("Error initializing WebSocket connections:", error);
       toast({
         title: "WebSocket Connection Error",
-        description: "Failed to establish real-time data connections. Some features may be limited.",
+        description: "Failed to establish real-time data connections. Retrying...",
         variant: "destructive"
       });
+      this._isConnected = false;
+      this.scheduleReconnect();
     }
+  }
+  
+  // Handle connection errors
+  private handleConnectionError(channelType: string): void {
+    console.error(`${channelType} channel error, attempting to reconnect`);
+    this._isConnected = false;
+    this.scheduleReconnect();
+  }
+  
+  // Schedule a connection retry
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    
+    // Exponential backoff with maximum of 1 minute
+    const backoffMs = Math.min(30000, Math.pow(2, Math.min(this.connectionAttempts, 10)) * 1000);
+    
+    console.log(`Scheduling reconnect in ${backoffMs}ms (attempt ${this.connectionAttempts})`);
+    
+    this.reconnectTimer = setTimeout(() => {
+      console.log("Attempting to reconnect WebSockets...");
+      this.cleanup();
+      this.initializeWebSockets();
+    }, backoffMs);
+  }
+
+  // Resubscribe all channels
+  public resubscribeAll(): void {
+    console.log("Resubscribing all WebSocket channels");
+    
+    if (this.vehicleChannel) this.vehicleChannel.subscribe();
+    if (this.congestionChannel) this.congestionChannel.subscribe();
+    if (this.anomalyChannel) this.anomalyChannel.subscribe();
+    if (this.rsuChannel) this.rsuChannel.subscribe();
   }
 
   // Subscribe to real-time updates
@@ -124,6 +225,11 @@ class RealtimeService {
     }
     
     this.subscribers.get(eventType)!.add(callback);
+    
+    // Initialize WebSockets if this is our first subscriber
+    if (!this._isConnected && supabase) {
+      this.initializeWebSockets();
+    }
     
     // Return unsubscribe function
     return () => {
@@ -142,6 +248,16 @@ class RealtimeService {
     });
   }
 
+  // Unsubscribe a specific event type
+  public unsubscribe(eventType: 'vehicle' | 'congestion' | 'anomaly' | 'rsu'): void {
+    this.subscribers.get(eventType)?.clear();
+  }
+
+  // Unsubscribe all event types
+  public unsubscribeAll(): void {
+    this.subscribers.forEach(subscriberSet => subscriberSet.clear());
+  }
+
   // Cleanup all WebSocket connections
   public cleanup(): void {
     console.log("Cleaning up WebSocket connections...");
@@ -151,7 +267,15 @@ class RealtimeService {
     if (this.anomalyChannel) this.anomalyChannel.unsubscribe();
     if (this.rsuChannel) this.rsuChannel.unsubscribe();
     
-    this.subscribers.forEach(subscriberSet => subscriberSet.clear());
+    this.vehicleChannel = null;
+    this.congestionChannel = null;
+    this.anomalyChannel = null;
+    this.rsuChannel = null;
+    
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     
     console.log("All WebSocket connections cleaned up");
   }

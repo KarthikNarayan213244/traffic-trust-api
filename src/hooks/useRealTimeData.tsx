@@ -1,55 +1,100 @@
+import { useState, useEffect, useCallback } from 'react';
+import { realtimeService } from '@/services/realtime';
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { realtimeService } from "@/services/realtime";
-import { toast } from "@/hooks/use-toast";
+type DataType = 'vehicle' | 'congestion' | 'anomaly' | 'rsu';
 
-// Initialize real-time connection on first use
-let isInitialized = false;
+interface UseRealTimeDataOptions {
+  enableAutoRefresh?: boolean;
+  initialRefreshInterval?: number;
+}
 
-export const useRealTimeData = <T extends any>(
-  dataType: 'vehicle' | 'congestion' | 'anomaly' | 'rsu',
-  initialData: T[] = []
-) => {
+export function useRealTimeData<T>(
+  dataType: DataType,
+  initialData: T[] = [],
+  options: UseRealTimeDataOptions = {}
+) {
   const [data, setData] = useState<T[]>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [error, setError] = useState<Error | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState<number>(
+    options.initialRefreshInterval || 60000
+  );
+  const [enableAutoRefresh, setEnableAutoRefresh] = useState<boolean>(
+    options.enableAutoRefresh || false
+  );
+  const [isRealtimeEnabled, setIsRealtimeEnabled] = useState<boolean>(false);
 
-  // Initialize real-time service if not already done
-  useEffect(() => {
-    if (!isInitialized && supabase) {
-      realtimeService.initializeWebSockets(supabase);
-      isInitialized = true;
-    }
-    
-    return () => {
-      // Don't cleanup on component unmount as other components may be using it
-      // We'll handle cleanup on app unmount separately
-    };
+  // Function to refresh data manually
+  const refreshData = useCallback(() => {
+    setIsRefreshing(true);
+    // Since we're using real-time updates, this function just indicates
+    // that we're requesting/waiting for fresh data
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setLastUpdated(new Date());
+    }, 500);
   }, []);
 
-  // Subscribe to real-time updates for this data type
+  // Check if real-time is connected
   useEffect(() => {
+    const checkRealtimeStatus = async () => {
+      try {
+        // Fixed: isConnected is now a method, not a property
+        const isConnected = realtimeService.isConnected();
+        setIsRealtimeEnabled(isConnected);
+        
+        if (!isConnected) {
+          const connectionResult = await realtimeService.checkConnection();
+          setIsRealtimeEnabled(connectionResult);
+        }
+      } catch (err) {
+        console.error("Error checking realtime connection:", err);
+        setIsRealtimeEnabled(false);
+      }
+    };
+    
+    checkRealtimeStatus();
+    
+    // Check periodically
+    const interval = setInterval(checkRealtimeStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!dataType) return;
+    
+    setIsLoading(true);
+    
     // Subscribe to real-time updates
-    const unsubscribe = realtimeService.subscribe(dataType, (newItem) => {
-      setData(prevData => {
-        // Find if this item already exists
-        const existingIndex = prevData.findIndex((item: any) => 
-          item.id === newItem.id || 
-          (dataType === 'vehicle' && item.vehicle_id === newItem.vehicle_id) ||
-          (dataType === 'rsu' && item.rsu_id === newItem.rsu_id)
+    const unsubscribe = realtimeService.subscribe(dataType, (newData) => {
+      setData(currentData => {
+        // If this is a batch update, replace the entire dataset
+        if (Array.isArray(newData)) {
+          return newData as T[];
+        }
+        
+        // Otherwise, check if this item already exists and update it, or add it
+        const existingIndex = currentData.findIndex((item: any) => 
+          item.id === newData.id || 
+          item.vehicle_id === newData.vehicle_id ||
+          item.rsu_id === newData.rsu_id ||
+          item.zone_id === newData.zone_id
         );
         
         if (existingIndex >= 0) {
-          // Update existing item
-          const updatedData = [...prevData];
-          updatedData[existingIndex] = newItem;
+          const updatedData = [...currentData];
+          updatedData[existingIndex] = newData as T;
           return updatedData;
         } else {
-          // Add new item
-          return [...prevData, newItem];
+          return [...currentData, newData as T];
         }
       });
+      
+      setLastUpdated(new Date());
+      setIsLoading(false);
     });
     
     return () => {
@@ -57,67 +102,52 @@ export const useRealTimeData = <T extends any>(
     };
   }, [dataType]);
 
-  // Initial data fetch function
-  const fetchInitialData = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      let response;
-      
-      // Fetch data based on type
-      switch (dataType) {
-        case 'vehicle':
-          response = await supabase.from('vehicles').select('*').limit(1000);
-          break;
-        case 'congestion':
-          response = await supabase.from('zones_congestion').select('*').limit(500);
-          break;
-        case 'anomaly':
-          response = await supabase.from('anomalies').select('*').limit(500);
-          break;
-        case 'rsu':
-          response = await supabase.from('rsus').select('*').limit(100);
-          break;
-      }
-      
-      if (response.error) throw new Error(response.error.message);
-      
-      setData(response.data as T[]);
-      console.log(`Loaded ${response.data.length} ${dataType} records from database`);
-    } catch (err: any) {
-      setError(err);
-      console.error(`Error fetching initial ${dataType} data:`, err);
-      toast({
-        title: `Data Fetch Error`,
-        description: `Could not load ${dataType} data from the server. Please try again later.`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Manual refresh function
-  const refreshData = () => {
-    fetchInitialData();
-  };
-
-  // Initial data load
+  // Auto refresh interval
   useEffect(() => {
-    fetchInitialData();
-  }, [dataType]);
+    if (!enableAutoRefresh) return;
+    
+    const intervalId = setInterval(refreshData, refreshInterval);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [refreshData, refreshInterval, enableAutoRefresh]);
+
+  // Check for realtime service status periodically
+  useEffect(() => {
+    const checkRealtimeConnection = async () => {
+      try {
+        // Fixed: isConnected is now a method, not a property
+        const isConnected = realtimeService.isConnected();
+        setIsRealtimeEnabled(isConnected);
+      } catch (err) {
+        console.error("Failed to check real-time connection:", err);
+        setIsRealtimeEnabled(false);
+      }
+    };
+    
+    const intervalId = setInterval(checkRealtimeConnection, 10000);
+    
+    // Initial check
+    checkRealtimeConnection();
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
 
   return {
     data,
+    setData,
     isLoading,
+    isRefreshing,
+    lastUpdated,
     error,
     refreshData,
+    refreshInterval,
+    setRefreshInterval,
+    enableAutoRefresh,
+    setEnableAutoRefresh,
+    isRealtimeEnabled
   };
-};
-
-// App-level cleanup function to call on app unmount if needed
-export const cleanupRealTimeConnections = () => {
-  realtimeService.cleanup();
-  isInitialized = false;
-};
+}

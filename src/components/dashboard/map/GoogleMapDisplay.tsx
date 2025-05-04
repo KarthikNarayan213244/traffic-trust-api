@@ -1,14 +1,14 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { GoogleMap, DirectionsService, DirectionsRenderer, Polyline } from "@react-google-maps/api";
-import VehicleMarkers from "./VehicleMarkers";
+import { GoogleMap } from "@react-google-maps/api";
+import OptimizedVehicleLayer from "./OptimizedVehicleLayer";
 import RsuMarkers from "./RsuMarkers";
 import CongestionHeatmap from "./CongestionHeatmap";
 import MapInfoOverlay from "./MapInfoOverlay";
 import MapStatsOverlay from "./MapStatsOverlay";
 import EmergencyRoutePanel from "./EmergencyRoutePanel";
 import { defaultCenter, mapContainerStyle, mapOptions, mapTheme } from "./constants";
-import { Vehicle } from "@/services/api";
+import { Vehicle } from "@/services/api/types";
 import { useMapApiKey } from "@/hooks/useMapApiKey";
 
 interface GoogleMapDisplayProps {
@@ -21,6 +21,8 @@ interface GoogleMapDisplayProps {
   optimizedRoute: google.maps.LatLngLiteral[] | null;
   onAmbulanceSelect: (vehicle: Vehicle) => void;
   onMapClick: (latLng: google.maps.LatLngLiteral) => void;
+  onBoundsChanged?: (bounds: any, zoom: number) => void;
+  vehicleCountSummary?: string;
 }
 
 const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
@@ -32,24 +34,71 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   destination,
   optimizedRoute,
   onAmbulanceSelect,
-  onMapClick
+  onMapClick,
+  onBoundsChanged,
+  vehicleCountSummary
 }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(12);
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
   const [isCalculatingDirections, setIsCalculatingDirections] = useState<boolean>(false);
+  
   const mapRef = useRef<google.maps.Map | null>(null);
+  const boundsChangedListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const { apiKey } = useMapApiKey();
-  const [lastRouteRequest, setLastRouteRequest] = useState<string>('');
+  
+  // Create memoized datasets to prevent unnecessary re-renders
+  // This is critical for performance as these objects reference won't change unless the data changes
+  const memoizedVehicles = useMemo(() => vehicles.slice(0, 1000), [vehicles]);
+  const memoizedRsus = useMemo(() => rsus.slice(0, 100), [rsus]); 
+  const memoizedCongestion = useMemo(() => congestionData.slice(0, 200), [congestionData]);
 
-  // Handle map load
+  // Handle map load with optimized event bindings
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     console.log("Google Map loaded successfully");
     mapRef.current = mapInstance;
     setMap(mapInstance);
+    setZoomLevel(mapInstance.getZoom());
+    
+    // Clean up any existing listener
+    if (boundsChangedListenerRef.current) {
+      google.maps.event.removeListener(boundsChangedListenerRef.current);
+    }
+    
+    // Add map event listeners with throttling
+    let boundsUpdateTimeout: NodeJS.Timeout | null = null;
+    
+    boundsChangedListenerRef.current = mapInstance.addListener("bounds_changed", () => {
+      // Clear previous timeout to implement throttling
+      if (boundsUpdateTimeout) {
+        clearTimeout(boundsUpdateTimeout);
+      }
+      
+      // Set new timeout to throttle updates (250ms is a good balance)
+      boundsUpdateTimeout = setTimeout(() => {
+        if (onBoundsChanged && mapInstance) {
+          const bounds = mapInstance.getBounds()?.toJSON();
+          const zoom = mapInstance.getZoom();
+          if (bounds) {
+            onBoundsChanged(bounds, zoom);
+            setZoomLevel(zoom);
+          }
+        }
+        boundsUpdateTimeout = null;
+      }, 250); // 250ms throttle
+    });
+  }, [onBoundsChanged]);
+
+  // Clean up event listeners when component unmounts
+  useEffect(() => {
+    return () => {
+      if (boundsChangedListenerRef.current && google && google.maps) {
+        google.maps.event.removeListener(boundsChangedListenerRef.current);
+      }
+    };
   }, []);
 
-  // Handle map click for destination selection
+  // Optimize click handling with useCallback
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (e.latLng && selectedAmbulance) {
       const clickLocation = {
@@ -59,83 +108,6 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
       onMapClick(clickLocation);
     }
   }, [selectedAmbulance, onMapClick]);
-
-  // Reset directions when ambulance or destination change
-  useEffect(() => {
-    if (!window.google) {
-      console.log("Google Maps API not loaded yet in directions effect");
-      return;
-    }
-
-    if (selectedAmbulance && destination) {
-      const requestKey = `${selectedAmbulance.vehicle_id}-${destination.lat.toFixed(6)}-${destination.lng.toFixed(6)}`;
-      
-      // Only recalculate if this is a new request
-      if (requestKey !== lastRouteRequest) {
-        setLastRouteRequest(requestKey);
-        setDirections(null);
-        setDirectionsStatus(null);
-        setIsCalculatingDirections(true);
-      }
-    } else {
-      setLastRouteRequest('');
-      setDirections(null);
-      setDirectionsStatus(null);
-      setIsCalculatingDirections(false);
-    }
-  }, [selectedAmbulance, destination, optimizedRoute]);
-
-  // Prepare optimized waypoints for directions service
-  const optimizedWaypoints = useMemo(() => {
-    if (!optimizedRoute || optimizedRoute.length === 0 || !window.google) {
-      return [];
-    }
-    
-    try {
-      // Only use a reasonable number of waypoints (max 8) to avoid overloading the API
-      // and to ensure we get a realistic route that the API can optimize
-      const waypointCount = Math.min(optimizedRoute.length, 8);
-      const step = optimizedRoute.length / waypointCount;
-      
-      const waypoints = [];
-      for (let i = 0; i < waypointCount; i++) {
-        const index = Math.floor(i * step);
-        if (index < optimizedRoute.length) {
-          const point = optimizedRoute[index];
-          waypoints.push({
-            location: new google.maps.LatLng(point.lat, point.lng),
-            stopover: false
-          });
-        }
-      }
-      
-      return waypoints;
-    } catch (error) {
-      console.error("Error creating waypoints:", error);
-      return [];
-    }
-  }, [optimizedRoute]);
-
-  // Directions callback
-  const directionsCallback = useCallback(
-    (result: google.maps.DirectionsResult | null, status: google.maps.DirectionsStatus) => {
-      console.log("Directions API response:", status, result?.routes?.length || 0, "routes");
-      setIsCalculatingDirections(false);
-      setDirectionsStatus(status);
-      
-      if (result !== null && status === google.maps.DirectionsStatus.OK) {
-        setDirections(result);
-        
-        // Pan to fit the route
-        if (map && result.routes[0]?.bounds) {
-          map.fitBounds(result.routes[0].bounds);
-        }
-      } else {
-        console.error(`Directions request failed: ${status}`);
-      }
-    },
-    [map]
-  );
 
   // Focus the map on the route when available
   useEffect(() => {
@@ -155,8 +127,8 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     }
   }, [map, selectedAmbulance, destination]);
 
+  // Create loading placeholder
   if (!window.google) {
-    console.log("Google Maps API not loaded yet in GoogleMapDisplay render");
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -178,60 +150,29 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
-        {/* Vehicle markers */}
-        <VehicleMarkers 
-          vehicles={vehicles} 
+        {/* Optimized vehicle layer with memoized data */}
+        <OptimizedVehicleLayer 
+          vehicles={memoizedVehicles}
           onAmbulanceSelect={onAmbulanceSelect}
           selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
+          isSimulationRunning={isLiveMonitoring}
+          zoomLevel={zoomLevel}
         />
         
-        {/* RSU markers */}
-        <RsuMarkers rsus={rsus} />
+        {/* RSU markers with memoized data */}
+        <RsuMarkers rsus={memoizedRsus} />
         
-        {/* Congestion heatmap */}
-        <CongestionHeatmap congestionData={congestionData} />
-        
-        {/* Use Google Maps Directions service with optimized waypoints */}
-        {window.google && selectedAmbulance && destination && apiKey && isCalculatingDirections && (
-          <DirectionsService
-            options={{
-              origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },
-              destination: destination,
-              travelMode: google.maps.TravelMode.DRIVING,
-              optimizeWaypoints: true,
-              waypoints: optimizedWaypoints,
-              provideRouteAlternatives: true,
-              avoidTolls: optimizedWaypoints.length > 0,
-              avoidFerries: true
-            }}
-            callback={directionsCallback}
-          />
-        )}
-        
-        {/* Render the directions once received */}
-        {directions && (
-          <DirectionsRenderer
-            options={{
-              directions: directions,
-              markerOptions: { 
-                visible: false  // Hide default markers
-              },
-              polylineOptions: {
-                strokeColor: '#0055FF',
-                strokeWeight: 6,
-                strokeOpacity: 0.8
-              }
-            }}
-          />
-        )}
+        {/* Congestion heatmap with memoized data */}
+        <CongestionHeatmap congestionData={memoizedCongestion} />
       </GoogleMap>
 
       <MapInfoOverlay />
       <MapStatsOverlay 
-        vehiclesCount={vehicles.length} 
-        rsusCount={rsus.length} 
-        congestionZones={congestionData.length > 0 ? Math.ceil(congestionData.length / 3) : 0}
-        anomaliesCount={vehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
+        vehiclesCount={memoizedVehicles.length} 
+        rsusCount={memoizedRsus.length} 
+        congestionZones={memoizedCongestion.length > 0 ? Math.ceil(memoizedCongestion.length / 3) : 0}
+        anomaliesCount={memoizedVehicles.filter(v => v.status === 'Warning' || v.status === 'Alert').length}
+        vehicleCountSummary={vehicleCountSummary}
       />
       
       {selectedAmbulance && (
@@ -246,4 +187,4 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   );
 };
 
-export default GoogleMapDisplay;
+export default React.memo(GoogleMapDisplay);

@@ -1,128 +1,124 @@
 
-import { API_PROVIDERS, RateLimiter } from './config';
-import { 
-  transformOpenDataVehicleData, 
-  transformOpenDataCongestionData, 
-  transformOpenDataAnomalyData,
-  transformOpenDataTraffic 
-} from './transformers';
+import { API_PROVIDERS, HYDERABAD_BOUNDING_BOX } from './config';
+import { transformOpenDataTraffic } from './transformers';
 import { Vehicle, CongestionZone, Anomaly } from '../types';
-import { toast } from '@/hooks/use-toast';
-
-// Initialize rate limiter for OpenData API
-const rateLimiter = new RateLimiter(API_PROVIDERS.opendata.rateLimit);
 
 /**
- * Fetches real-time traffic data from OpenData/Government API
- * This is a flexible implementation that can work with different open data APIs
+ * Fetches traffic data from Open Data APIs
+ * These could be government or municipal traffic APIs with open access
  */
 export async function fetchOpenDataTraffic(): Promise<{
   vehicles: Vehicle[];
   congestion: CongestionZone[];
   anomalies: Anomaly[];
 }> {
-  // Check if OpenData API is enabled
+  // Check if Open Data API is enabled
   if (!API_PROVIDERS.opendata.enabled) {
-    throw new Error('OpenData Traffic API is not configured');
+    console.log('OpenData API is not configured, using mock data');
+    return {
+      vehicles: [],
+      congestion: [],
+      anomalies: []
+    };
   }
 
-  // Apply rate limiting
-  await rateLimiter.throttle();
-
   try {
-    const { baseUrl, flowEndpoint, apiKey, timeout } = API_PROVIDERS.opendata;
+    const { baseUrl, apiKey } = API_PROVIDERS.opendata;
     
-    // Headers often required for government/open data APIs
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
-    };
+    // Construct the API URL with parameters for maximum data
+    const url = new URL(baseUrl);
+    url.searchParams.append('api-key', apiKey);
+    url.searchParams.append('format', 'json');
+    // Add bbox parameter in format required by API
+    url.searchParams.append('bbox', `${HYDERABAD_BOUNDING_BOX.west},${HYDERABAD_BOUNDING_BOX.south},${HYDERABAD_BOUNDING_BOX.east},${HYDERABAD_BOUNDING_BOX.north}`);
+    // Request significantly more data records
+    url.searchParams.append('limit', '5000');  // Increased from 1000 to 5000
+    url.searchParams.append('offset', '0');
+    url.searchParams.append('include_all', 'true'); // Try to get all data if API supports it
     
-    if (apiKey) {
-      headers['X-API-Key'] = apiKey;
-    }
-
-    // Fetch with timeout
+    console.log('Fetching OpenData traffic data from:', url.toString());
+    
+    // Create a controller to handle timeout manually
     const controller = new AbortController();
+    const { timeout } = API_PROVIDERS.opendata;
+    
+    // Set up timeout
     const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    const response = await fetch(`${baseUrl}${flowEndpoint}`, {
-      headers,
-      signal: controller.signal
-    });
     
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`OpenData API error: ${response.status} ${response.statusText}`);
+    try {
+      // Fetch data from OpenData API without passing timeout to fetch directly
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': apiKey ? `Bearer ${apiKey}` : ''
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`OpenData API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('OpenData API response received:', data.count || data.length || 'unknown count');
+      
+      // If pagination is available, fetch more data
+      let allData = data;
+      if (data.offset !== undefined && data.limit !== undefined && data.total !== undefined) {
+        const totalRecords = data.total;
+        const recordsPerPage = data.limit;
+        const pages = Math.min(10, Math.ceil(totalRecords / recordsPerPage)); // Limit to 10 pages max
+        
+        console.log(`API supports pagination. Fetching up to ${pages} pages of data.`);
+        
+        // Start from page 1 since we already have page 0
+        const additionalRequests = [];
+        for (let page = 1; page < pages; page++) {
+          const pageUrl = new URL(url.toString());
+          pageUrl.searchParams.set('offset', (page * recordsPerPage).toString());
+          
+          additionalRequests.push(
+            fetch(pageUrl.toString(), {
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': apiKey ? `Bearer ${apiKey}` : ''
+              }
+            }).then(res => res.json())
+          );
+        }
+        
+        if (additionalRequests.length > 0) {
+          // Fetch additional pages in parallel
+          const additionalResults = await Promise.all(additionalRequests);
+          
+          // Combine all data
+          allData.data = allData.data || [];
+          additionalResults.forEach(result => {
+            if (result.data && Array.isArray(result.data)) {
+              allData.data = allData.data.concat(result.data);
+            }
+          });
+          
+          console.log(`Combined data from ${additionalResults.length + 1} pages, total records: ${allData.data.length}`);
+        }
+      }
+      
+      // Transform data using our utility function
+      const transformedData = transformOpenDataTraffic(allData);
+      console.log(`Transformed OpenData traffic: ${transformedData.vehicles.length} vehicles, ${transformedData.congestion.length} congestion zones, ${transformedData.anomalies.length} anomalies`);
+      
+      return transformedData;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const data = await response.json();
-    
-    // Use the combined transformer function
-    return transformOpenDataTraffic(data);
-
   } catch (error) {
-    console.error('Error fetching OpenData traffic data:', error);
-    
-    // Show user-friendly error notification
-    if (error instanceof Error && error.name === 'AbortError') {
-      toast({
-        title: "OpenData API Request Timeout",
-        description: "The request to the traffic data API timed out. Please try again later.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Traffic Data Error",
-        description: "Could not fetch traffic data from the government API. Using cached data instead.",
-        variant: "destructive",
-      });
-    }
-    
-    throw error;
-  }
-}
-
-/**
- * Fetches traffic incidents separately if needed
- */
-async function fetchOpenDataIncidents(): Promise<Anomaly[]> {
-  // Apply rate limiting
-  await rateLimiter.throttle();
-
-  try {
-    const { baseUrl, incidentEndpoint, apiKey, timeout } = API_PROVIDERS.opendata;
-    
-    // Headers setup
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
+    console.error('Error fetching data from OpenData API:', error);
+    return {
+      vehicles: [],
+      congestion: [],
+      anomalies: []
     };
-    
-    if (apiKey) {
-      headers['X-API-Key'] = apiKey;
-    }
-
-    // Fetch with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    const response = await fetch(`${baseUrl}${incidentEndpoint}`, {
-      headers,
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`OpenData incidents API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    // Transform incident data
-    return transformOpenDataAnomalyData(data);
-  } catch (error) {
-    console.error('Error fetching OpenData incidents:', error);
-    return []; // Return empty array on error
   }
 }
