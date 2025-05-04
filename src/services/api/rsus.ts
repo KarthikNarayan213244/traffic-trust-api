@@ -1,4 +1,3 @@
-
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { RSU } from "./types";
@@ -30,7 +29,7 @@ export async function fetchRSUs(options = {}): Promise<RSU[]> {
     // Then try to fetch from Supabase
     try {
       console.log("Attempting to fetch RSUs from Supabase...");
-      const data = await fetchFromSupabase<"rsus">("rsus", { limit: 1000 }); // Increased limit
+      const data = await fetchFromSupabase<"rsus">("rsus", options);
       if (data.length > 0) {
         console.log(`Successfully fetched ${data.length} RSUs from Supabase`);
         return data;
@@ -43,7 +42,7 @@ export async function fetchRSUs(options = {}): Promise<RSU[]> {
     // Fallback to direct API
     try {
       console.log("Attempting to fetch RSUs from direct API...");
-      const apiData = await fetchData("rsus", { limit: 1000 }); // Increased limit
+      const apiData = await fetchData("rsus", options);
       if (apiData.length > 0) {
         console.log(`Successfully fetched ${apiData.length} RSUs from direct API`);
         return apiData;
@@ -54,60 +53,70 @@ export async function fetchRSUs(options = {}): Promise<RSU[]> {
     }
     
     console.log("All data sources failed, using mock data");
-    return getMockRSUs(40); // Generate more mock RSUs
+    return getMockRSUs();
   } catch (error) {
     console.error("All RSU data sources failed:", error);
-    return getMockRSUs(40); // Generate more mock RSUs as fallback
+    return getMockRSUs();
   }
 }
 
-// Mock data for RSUs - now generates a specified number of units
-export function getMockRSUs(count = 40): RSU[] {
-  console.log(`Generating ${count} mock RSUs for Hyderabad area`);
-  
-  // Key locations in Hyderabad for placing RSUs
-  const hyderabadLocations = [
-    { name: "Hitech City", lat: 17.4435, lng: 78.3772 },
-    { name: "Charminar", lat: 17.3616, lng: 78.4747 },
-    { name: "Banjara Hills", lat: 17.4156, lng: 78.4347 },
-    { name: "Gachibowli", lat: 17.4401, lng: 78.3489 },
-    { name: "Secunderabad", lat: 17.4399, lng: 78.4983 },
-    { name: "Madhapur", lat: 17.4482, lng: 78.3915 },
-    { name: "Jubilee Hills", lat: 17.4310, lng: 78.4069 },
-    { name: "Kukatpally", lat: 17.4934, lng: 78.4135 },
-    { name: "Begumpet", lat: 17.4424, lng: 78.4673 },
-    { name: "Shamshabad", lat: 17.2403, lng: 78.4294 }
-  ];
-  
-  const rsus: RSU[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    // Choose a base location and add some random offset
-    const baseLocation = hyderabadLocations[i % hyderabadLocations.length];
-    const randomLat = baseLocation.lat + (Math.random() * 0.05 - 0.025); // Small variance
-    const randomLng = baseLocation.lng + (Math.random() * 0.05 - 0.025);
-    
-    // Generate RSU ID with sequence number
-    const rsuId = `RSU-${(i + 1).toString().padStart(3, '0')}`;
-    
-    // Randomize coverage radius between 350-650 meters
-    const coverageRadius = Math.floor(350 + Math.random() * 300);
-    
-    // 90% active, 10% inactive
-    const status = Math.random() > 0.1 ? 'Active' : 'Inactive';
-    
-    rsus.push({ 
-      rsu_id: rsuId, 
+// Mock data for RSUs - now used only as a last resort
+export function getMockRSUs(): RSU[] {
+  return [
+    { 
+      rsu_id: "RSU-001", 
       location: {
-        lat: randomLat,
-        lng: randomLng
+        lat: 17.4435,
+        lng: 78.3772
       }, 
-      lat: randomLat, 
-      lng: randomLng, 
-      status: status,
-      coverage_radius: coverageRadius
-    });
-  }
-  
-  return rsus;
+      lat: 17.4435, 
+      lng: 78.3772, 
+      status: 'Active',
+      coverage_radius: 500
+    },
+    { 
+      rsu_id: "RSU-002", 
+      location: {
+        lat: 17.4401,
+        lng: 78.3489
+      }, 
+      lat: 17.4401, 
+      lng: 78.3489, 
+      status: 'Active',
+      coverage_radius: 450
+    },
+    { 
+      rsu_id: "RSU-003", 
+      location: {
+        lat: 17.4344,
+        lng: 78.3826
+      }, 
+      lat: 17.4344, 
+      lng: 78.3826, 
+      status: 'Active',
+      coverage_radius: 550
+    },
+    { 
+      rsu_id: "RSU-004", 
+      location: {
+        lat: 17.4156,
+        lng: 78.4347
+      }, 
+      lat: 17.4156, 
+      lng: 78.4347, 
+      status: 'Inactive',
+      coverage_radius: 400
+    },
+    { 
+      rsu_id: "RSU-005", 
+      location: {
+        lat: 17.4399,
+        lng: 78.4983
+      }, 
+      lat: 17.4399, 
+      lng: 78.4983, 
+      status: 'Active',
+      coverage_radius: 600
+    }
+  ];
 }

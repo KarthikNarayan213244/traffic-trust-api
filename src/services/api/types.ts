@@ -1,3 +1,4 @@
+
 export interface Vehicle {
   vehicle_id: string;
   owner_name: string;
@@ -11,8 +12,8 @@ export interface Vehicle {
   speed: number;
   heading: number;
   trust_score: number;
-  trust_score_change?: number;
-  trust_score_confidence?: number;
+  trust_score_change: number;
+  trust_score_confidence: number;
   status: string;
   timestamp: string;
 }
@@ -27,8 +28,6 @@ export interface RSU {
   lng: number;
   status: 'Active' | 'Inactive';
   coverage_radius: number;
-  heading?: number;
-  last_seen?: string; // Added this field to match what's being used in RsuMarkers.tsx
 }
 
 export interface Anomaly {
@@ -38,12 +37,11 @@ export interface Anomaly {
   type: string;
   severity: string;
   message: string;
-  status: 'Detected' | 'Resolved' | 'Under Investigation' | 'False Alarm';
+  status: 'Detected' | 'Resolved';
   ml_confidence: number;
-  // Direct coordinates for mapping
+  // Adding lat and lng properties to directly store coordinates
   lat?: number;
   lng?: number;
-  // Legacy location format (kept for backward compatibility)
   location?: {
     lat: number;
     lng: number;

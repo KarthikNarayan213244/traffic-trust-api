@@ -1,39 +1,29 @@
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
+import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
 import { libraries } from "./map/constants";
 import { Vehicle } from "@/services/api/types";
+import MLControls from "./MLControls";
+import ApiKeyControl from "./ApiKeyControl";
 import { useMapApiKey, markGoogleMapsAsLoaded } from "@/hooks/useMapApiKey";
 import { useMLSimulation } from "@/hooks/useMLSimulation";
-import { toast } from "@/hooks/use-toast";
-import MapLoadingStates from "./map/MapLoadingStates";
-import MapToolbar from "./map/MapToolbar";
-import MapStatusFooter from "./map/MapStatusFooter";
+import { useRealTimeData } from "@/hooks/useRealTimeData";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TrafficMapProps {
   vehicles?: any[];
   rsus?: any[];
   isLoading?: boolean;
   congestionData?: any[];
-  onBoundsChanged?: (bounds: any, zoom: number) => void;
-  vehicleCountSummary?: string;
-}
-
-// Add a global map reference for optimized rendering
-declare global {
-  interface Window {
-    map: any;
-  }
 }
 
 const TrafficMap: React.FC<TrafficMapProps> = ({
   vehicles: initialVehicles = [],
   rsus: initialRsus = [],
   isLoading: initialLoading = false,
-  congestionData: initialCongestionData = [],
-  onBoundsChanged,
-  vehicleCountSummary
+  congestionData: initialCongestionData = []
 }) => {
   // Custom hooks to manage state
   const { apiKey, handleApiKeySet } = useMapApiKey();
@@ -44,30 +34,31 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     changeModelAccuracy
   } = useMLSimulation();
   
-  // Map bounds and zoom state
-  const [currentBounds, setCurrentBounds] = useState<any>(null);
-  const [currentZoom, setCurrentZoom] = useState<number>(12);
+  // Using our new real-time data hooks
+  const { 
+    data: vehicles, 
+    isLoading: isVehiclesLoading, 
+    refreshData: refreshVehicles 
+  } = useRealTimeData('vehicle', initialVehicles);
   
-  // Use all available vehicles and RSUs without limiting
-  const vehicles = useMemo(() => {
-    console.log(`Using all ${initialVehicles.length} vehicles for display`);
-    return initialVehicles;
-  }, [initialVehicles]);
+  const { 
+    data: rsus, 
+    isLoading: isRsusLoading, 
+    refreshData: refreshRsus 
+  } = useRealTimeData('rsu', initialRsus);
   
-  const rsus = useMemo(() => {
-    // Don't limit RSUs - show all of them
-    console.log(`Displaying all ${initialRsus.length} RSUs`);
-    return initialRsus;
-  }, [initialRsus]);
+  const { 
+    data: congestionData, 
+    isLoading: isCongestionLoading, 
+    refreshData: refreshCongestion 
+  } = useRealTimeData('congestion', initialCongestionData);
   
-  const congestionData = useMemo(() => {
-    // Limit congestion data
-    const limit = Math.min(300, initialCongestionData.length);
-    return initialCongestionData.slice(0, limit);
-  }, [initialCongestionData]);
+  const { 
+    data: anomalies, 
+    isLoading: isAnomaliesLoading 
+  } = useRealTimeData('anomaly', []);
 
-  // Track last update time
-  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
 
   // Only initialize Google Maps when we have an API key
   const { isLoaded, loadError } = useJsApiLoader({
@@ -77,91 +68,79 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   });
 
   // Mark the Google Maps API as loaded to prevent multiple initializations
-  useEffect(() => {
-    if (isLoaded) {
-      markGoogleMapsAsLoaded();
-      
-      // Log when map loads
-      console.log("Google Maps API loaded successfully");
-    }
-  }, [isLoaded]);
-  
-  // Set up periodic data refresh with a cleanup function
-  useEffect(() => {
-    if (!isLiveMonitoring) return;
-    
-    // Update last updated timestamp
-    const refreshTimestamp = () => {
-      setLastUpdated(new Date());
-    };
-    
-    const intervalId = setInterval(() => {
-      refreshTimestamp();
-      
-      // Show minimal notification
-      toast({
-        title: "Data Refreshed",
-        description: `Updated with ${vehicles.length.toLocaleString()} vehicles and ${rsus.length} RSUs`,
-        duration: 2000, // 2 seconds
-      });
-    }, 60000); // Every 60 seconds
-    
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [isLiveMonitoring, vehicles.length, rsus.length]);
-  
-  // Handle map bounds changed
-  const handleMapBoundsChanged = (bounds: any, zoom: number) => {
-    setCurrentBounds(bounds);
-    setCurrentZoom(zoom);
-    
-    // Propagate to parent if needed
-    if (onBoundsChanged) {
-      onBoundsChanged(bounds, zoom);
-    }
-  };
+  if (isLoaded) {
+    markGoogleMapsAsLoaded();
+  }
   
   // Combined loading state
-  const isLoading = initialLoading;
+  const isLoading = initialLoading || isVehiclesLoading || isRsusLoading || isCongestionLoading || isAnomaliesLoading;
 
-  // First, handle all loading states with the new component
-  const loadingState = (
-    <MapLoadingStates 
-      isLoading={isLoading}
-      apiKey={apiKey}
-      loadError={loadError}
-      isLoaded={isLoaded}
-      handleApiKeySet={handleApiKeySet}
-    />
-  );
-  
-  if (isLoading || !apiKey || loadError || !isLoaded) {
-    return loadingState;
+  // Show loading skeleton
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
   }
 
-  // Convert modelLoadingProgress to number to fix the type error
-  const modelProgressValue = typeof modelLoadingProgress === 'string' 
-    ? parseInt(modelLoadingProgress, 10) 
-    : modelLoadingProgress;
+  // Show API key form if no key is set
+  if (!apiKey) {
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50 flex-col">
+        <p className="text-lg mb-4">Google Maps API Key Required</p>
+        <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+      </div>
+    );
+  }
 
-  // Log initial render statistics
-  console.log(`TrafficMap rendering with ${vehicles.length} vehicles, ${rsus.length} RSUs`);
-    
+  // Show error if Google Maps failed to load
+  if (loadError) {
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50">
+        <div className="text-center p-4">
+          <h3 className="text-lg font-medium text-red-600">Failed to load Google Maps</h3>
+          <p className="text-sm text-gray-500 mt-2">
+            Please check your internet connection and API key, then try again
+          </p>
+          <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if Google Maps is not loaded yet
+  if (!isLoaded) {
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <span className="ml-3">Loading maps...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
-      <MapToolbar 
-        isLiveMonitoring={isLiveMonitoring}
-        selectedAmbulance={selectedAmbulance as Vehicle | null}
-        modelAccuracy={modelAccuracy}
-        toggleLiveMonitoring={toggleLiveMonitoring}
-        resetRouting={resetRouting}
-        changeModelAccuracy={changeModelAccuracy}
-        isModelLoading={isModelLoading}
-        modelLoadingProgress={modelProgressValue}
-        apiKey={apiKey}
-        onApiKeySet={handleApiKeySet}
-      />
+      <div className="flex justify-between items-center">
+        <MLControls
+          isLiveMonitoring={isLiveMonitoring}
+          selectedAmbulance={selectedAmbulance}
+          modelAccuracy={modelAccuracy}
+          toggleLiveMonitoring={toggleLiveMonitoring}
+          resetRouting={resetRouting}
+          changeModelAccuracy={changeModelAccuracy}
+          modelProgress={isModelLoading ? modelLoadingProgress : 100}
+        />
+        
+        <ApiKeyControl
+          apiKey={apiKey}
+          onApiKeySet={handleApiKeySet}
+        />
+      </div>
 
       {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
       {isLoaded && (
@@ -170,23 +149,30 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
           rsus={rsus} 
           congestionData={congestionData} 
           isLiveMonitoring={isLiveMonitoring}
-          selectedAmbulance={selectedAmbulance as Vehicle | null}
+          selectedAmbulance={selectedAmbulance}
           onAmbulanceSelect={handleAmbulanceSelect}
           destination={destination}
           optimizedRoute={optimizedRoute}
           onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
-          onBoundsChanged={handleMapBoundsChanged}
-          vehicleCountSummary={vehicleCountSummary}
         />
       )}
       
-      <MapStatusFooter 
-        isLiveMonitoring={isLiveMonitoring}
-        vehicleCountSummary={vehicleCountSummary}
-        vehicleCount={initialVehicles.length}
-        rsuCount={initialRsus.length}
-        lastUpdated={lastUpdated}
-      />
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>
+          {isLiveMonitoring ? (
+            <>
+              <span className="text-green-500">●</span> LIVE: {vehicles.length} vehicles, {rsus.length} RSUs, {anomalies.length} anomalies detected
+            </>
+          ) : (
+            <>
+              <span className="text-amber-500">●</span> PAUSED: Real-time updates disabled
+            </>
+          )}
+        </span>
+        {modelsLoaded && isLiveMonitoring && (
+          <span>ML Model Update in: {mlUpdateCountdown}s</span>
+        )}
+      </div>
     </div>
   );
 };

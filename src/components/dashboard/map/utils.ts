@@ -1,54 +1,76 @@
 
-// Get color based on trust score
-export const getTrustScoreColor = (score?: number): string => {
-  // Default score if none provided
-  const trustScore = score !== undefined ? score : 75;
-  
-  // High trust (85-100): Green
-  if (trustScore >= 85) {
-    return '#22c55e'; // Green for high trust
-  } 
-  // Medium trust (70-84): Yellow/Amber
-  else if (trustScore >= 70) {
-    return '#fbbf24'; // Yellow/Amber for medium trust
-  } 
-  // Low trust (0-69): Red
-  else {
-    return '#ef4444'; // Red for low trust
-  }
+// Helper function to generate a marker color based on trust score
+export const getTrustScoreColor = (score: number) => {
+  if (score >= 90) return "green";
+  if (score >= 70) return "yellow";
+  if (score >= 50) return "orange";
+  return "red";
 };
 
-// Map style utilities
-export const getVehicleSize = (zoomLevel: number, vehicleType?: string, isSelected: boolean = false): number => {
-  // Base size scales with zoom level
-  const baseSize = Math.max(2, Math.min(7, zoomLevel - 7));
-  
-  if (isSelected) return baseSize * 1.8;
-  
-  switch (vehicleType?.toLowerCase()) {
-    case 'truck': return baseSize * 1.2;
-    case 'bus': return baseSize * 1.3;
-    case 'ambulance': return baseSize * 1.5;
-    case 'two-wheeler': return baseSize * 0.7;
-    default: return baseSize;
-  }
+// Helper function to generate a congestion level color
+export const getCongestionColor = (level: number) => {
+  if (level < 30) return "green";
+  if (level < 60) return "yellow";
+  if (level < 80) return "orange";
+  return "red";
 };
 
-// Clustering configuration for large numbers of vehicles
-export const getClusteringOptions = (zoomLevel: number) => {
-  return {
-    radius: Math.max(40, 100 - zoomLevel * 3), // Radius decreases as zoom increases
-    maxZoom: 16,
-    minPoints: zoomLevel < 12 ? 5 : zoomLevel < 14 ? 3 : 2
-  };
-};
-
-// Format timestamp to human-readable string (needed for compatibility)
-export const formatTimestamp = (timestamp: string): string => {
+// Helper function to format timestamps for display
+export const formatTimestamp = (timestamp: string) => {
   try {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  } catch (e) {
-    return 'Invalid time';
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    }).format(date);
+  } catch (error) {
+    console.error("Invalid timestamp:", timestamp);
+    return "Invalid date";
   }
+};
+
+// Helper function to get a color based on anomaly severity
+export const getSeverityColor = (severity: string) => {
+  switch (severity.toLowerCase()) {
+    case 'critical':
+      return "#EF4444"; // Red
+    case 'high':
+      return "#F59E0B"; // Amber
+    case 'medium':
+      return "#3B82F6"; // Blue
+    case 'low':
+      return "#10B981"; // Green
+    default:
+      return "#6B7280"; // Gray
+  }
+};
+
+// Helper function to generate realistic movement patterns
+export const calculateNewPosition = (
+  lat: number, 
+  lng: number, 
+  speed: number, 
+  heading: number,
+  timestamp: number
+): { lat: number, lng: number } => {
+  // Convert speed from km/h to degrees/second
+  // Approximation: 1 degree is about 111 km
+  const speedDegPerHour = speed / 111;
+  const speedDegPerSecond = speedDegPerHour / 3600;
+  
+  // Convert heading to radians
+  const headingRad = heading * Math.PI / 180;
+  
+  // Calculate movement in degrees
+  // We use timestamp to ensure movement is consistent with time
+  const moveTime = timestamp / 1000; // Convert to seconds
+  const latChange = Math.cos(headingRad) * speedDegPerSecond * moveTime;
+  const lngChange = Math.sin(headingRad) * speedDegPerSecond * moveTime;
+  
+  return {
+    lat: lat + latChange,
+    lng: lng + lngChange
+  };
 };

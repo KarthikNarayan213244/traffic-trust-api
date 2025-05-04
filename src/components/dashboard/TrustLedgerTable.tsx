@@ -14,13 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface TrustLedgerTableProps {
   data?: any[];
   isLoading?: boolean;
-  etherscanUrl?: string;
 }
 
 const TrustLedgerTable: React.FC<TrustLedgerTableProps> = ({
   data = [],
   isLoading = false,
-  etherscanUrl
 }) => {
   // Format timestamp
   const formatTimestamp = (timestamp: string) => {
