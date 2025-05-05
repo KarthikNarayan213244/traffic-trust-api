@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -53,9 +52,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [mapsInitialized, setMapsInitialized] = useState<boolean>(false);
 
   // Only initialize the maps API if we have a key
-  // We only do this once - the component will reload if the key changes
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
+    googleMapsApiKey: apiKey || "", // Ensure we always pass a string, never undefined
     libraries,
     id: "google-map-script",
   });
@@ -67,6 +65,54 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       setMapsInitialized(true);
     }
   }, [isLoaded, mapsInitialized]);
+
+  // Show loading skeleton
+  if (initialLoading && isLoading) {
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  }
+
+  // Show API key form if no key is set
+  if (!keyIsSet) {
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50 flex-col">
+        <p className="text-lg mb-4">Google Maps API Key Required</p>
+        <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+      </div>
+    );
+  }
+
+  // Show error if Google Maps failed to load
+  if (loadError) {
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50">
+        <div className="text-center p-4">
+          <h3 className="text-lg font-medium text-red-600">Failed to load Google Maps</h3>
+          <p className="text-sm text-gray-500 mt-2">
+            Please check your internet connection and API key, then try again
+          </p>
+          <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if Google Maps is not loaded yet
+  if (!isLoaded) {
+    return (
+      <div className="h-[400px] flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <span className="ml-3">Loading maps...</span>
+      </div>
+    );
+  }
 
   // Set up interval for data updates and ML inference when monitoring is active
   useEffect(() => {
@@ -205,54 +251,6 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     getIntervals
   ]);
 
-  // Show loading skeleton
-  if (initialLoading && isLoading) {
-    return (
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-10 w-40" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <Skeleton className="h-[400px] w-full" />
-      </div>
-    );
-  }
-
-  // Show API key form if no key is set
-  if (!keyIsSet) {
-    return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50 flex-col">
-        <p className="text-lg mb-4">Google Maps API Key Required</p>
-        <MapApiKeyForm onApiKeySet={handleApiKeySet} />
-      </div>
-    );
-  }
-
-  // Show error if Google Maps failed to load
-  if (loadError) {
-    return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50">
-        <div className="text-center p-4">
-          <h3 className="text-lg font-medium text-red-600">Failed to load Google Maps</h3>
-          <p className="text-sm text-gray-500 mt-2">
-            Please check your internet connection and API key, then try again
-          </p>
-          <MapApiKeyForm onApiKeySet={handleApiKeySet} />
-        </div>
-      </div>
-    );
-  }
-
-  // Show message if Google Maps is not loaded yet
-  if (!isLoaded) {
-    return (
-      <div className="h-[400px] flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <span className="ml-3">Loading maps...</span>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
@@ -285,7 +283,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
               onAmbulanceSelect={handleAmbulanceSelect}
               destination={destination}
               optimizedRoute={optimizedRoute}
-              onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
+              onMapClick={(latLng) => handleDestinationSelect(latLng)}
               anomalies={anomalies}
               apiKey={apiKey}
             />
