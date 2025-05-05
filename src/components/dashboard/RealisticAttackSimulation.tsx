@@ -74,30 +74,30 @@ const RealisticAttackSimulation: React.FC<RealisticAttackSimulationProps> = ({
     // Set callback for receiving attack results
     globalAttackSimulationEngine.setOnAttackGenerated((attack) => {
       // Add attack to anomalies if not already present
-      setAnomalies(prevAnomalies => {
-        const newAnomaly = {
-          id: attack.id,
-          type: attack.attack.name,
-          timestamp: attack.timestamp,
-          message: `${attack.attackerProfile} attempted ${attack.attack.name} on RSU ${attack.targetId}`,
-          severity: attack.attack.severity,
-          status: attack.detected ? (attack.mitigated ? "Mitigated" : "Detected") : "Undetected",
-          vehicle_id: null,
-          target_id: attack.targetId,
-          target_type: "RSU",
-          is_simulated: true,
-          attacker_profile: attack.attackerProfile,
-          attack_success: attack.success,
-          network_impact: attack.networkImpact,
-          affected_nodes: attack.affectedNodes
-        };
-        
-        // Only add if not already present
-        if (!prevAnomalies.some(a => a.id === attack.id)) {
-          return [...prevAnomalies, newAnomaly];
-        }
-        return prevAnomalies;
-      });
+      const newAnomaly = {
+        id: attack.id,
+        type: attack.attack.name,
+        timestamp: attack.timestamp,
+        message: `${attack.attackerProfile} attempted ${attack.attack.name} on RSU ${attack.targetId}`,
+        severity: attack.attack.severity,
+        status: attack.detected ? (attack.mitigated ? "Mitigated" : "Detected") : "Undetected",
+        vehicle_id: null,
+        target_id: attack.targetId,
+        target_type: "RSU",
+        is_simulated: true,
+        attacker_profile: attack.attackerProfile,
+        attack_success: attack.success,
+        network_impact: attack.networkImpact,
+        affected_nodes: attack.affectedNodes
+      };
+      
+      // Create a new array with the anomaly added (only if not already present)
+      const updatedAnomalies = anomalies.some(a => a.id === attack.id)
+        ? anomalies
+        : [...anomalies, newAnomaly];
+      
+      // Update anomalies state with the new array
+      setAnomalies(updatedAnomalies);
       
       // Show toast for critical attacks
       if (attack.attack.severity === 'Critical' && attack.success) {
@@ -133,7 +133,7 @@ const RealisticAttackSimulation: React.FC<RealisticAttackSimulationProps> = ({
       // Clean up
       globalAttackSimulationEngine.stop();
     };
-  }, [setAnomalies, setRsus, toast]);
+  }, [anomalies, setAnomalies, setRsus, toast]);
 
   // Effect for attack simulation when both simulation and live monitoring are active
   useEffect(() => {

@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { GoogleMap, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { Vehicle } from "@/services/api/types";
@@ -65,7 +64,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         location: new google.maps.LatLng(point.lat, point.lng),
         stopover: false
       })) : 
-      createOptimizedWaypoints(origin, destination, congestionData);
+      createOptimizedWaypoints(origin, destination);
 
     const directionsService = new google.maps.DirectionsService();
     
