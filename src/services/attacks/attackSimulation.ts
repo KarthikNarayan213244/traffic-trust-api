@@ -1,4 +1,3 @@
-
 import { AttackVector, ALL_ATTACK_VECTORS, getRandomAttackVector } from './attackTypes';
 import { Attacker, AttackerPool, globalAttackerPool } from './attackerModel';
 import { NetworkTopology, globalNetworkTopology } from './networkSimulation';
@@ -179,7 +178,7 @@ export class AttackSimulationEngine {
     if (this.running && this.simulationTimer) {
       clearInterval(this.simulationTimer);
       const newInterval = this.calculateSimulationInterval();
-      this.simulationTimer = setInterval(() => this.simulationCycle(this.networkTopology.nodes.values()), newInterval);
+      this.simulationTimer = setInterval(() => this.simulationCycle(Array.from(this.networkTopology.nodes.values())), newInterval);
     }
   }
   

@@ -6,9 +6,10 @@ import { CongestionZone } from "@/services/api/types";
 
 interface CongestionHeatmapProps {
   congestionData: CongestionZone[];
+  map?: google.maps.Map | null;
 }
 
-const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData }) => {
+const CongestionHeatmap: React.FC<CongestionHeatmapProps> = ({ congestionData, map }) => {
   // Prepare heatmap data with enhanced density for more realistic patterns
   const heatmapData = useMemo(() => {
     if (!congestionData || !congestionData.length) {

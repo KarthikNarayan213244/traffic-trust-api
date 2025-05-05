@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,7 +94,7 @@ const RealisticAttackSimulation: React.FC<RealisticAttackSimulationProps> = ({
         
         // Only add if not already present
         if (!prevAnomalies.some(a => a.id === attack.id)) {
-          return [newAnomaly, ...prevAnomalies];
+          return [...prevAnomalies, newAnomaly];
         }
         return prevAnomalies;
       });

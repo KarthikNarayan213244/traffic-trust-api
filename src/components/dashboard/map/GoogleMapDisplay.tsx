@@ -6,7 +6,7 @@ import { defaultCenter, mapContainerStyle, mapOptions, libraries } from "./const
 import VehicleMarkers from "./VehicleMarkers";
 import RsuMarkers from "./RsuMarkers";
 import CongestionHeatmap from "./CongestionHeatmap";
-import MapOverlays from "./MapOverlays";
+import MapOverlays from "../MapOverlays";
 import RsuTrustOverlay from "./RsuTrustOverlay";
 import AttackVisualizations from "./AttackVisualizations";
 import { createOptimizedWaypoints } from "./WaypointOptimizer";
