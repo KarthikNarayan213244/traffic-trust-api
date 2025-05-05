@@ -79,6 +79,8 @@ export type Database = {
           id: string
           new_value: number
           old_value: number
+          target_id: string | null
+          target_type: string | null
           timestamp: string
           tx_id: string
           vehicle_id: string
@@ -89,6 +91,8 @@ export type Database = {
           id?: string
           new_value: number
           old_value: number
+          target_id?: string | null
+          target_type?: string | null
           timestamp?: string
           tx_id: string
           vehicle_id: string
@@ -99,6 +103,8 @@ export type Database = {
           id?: string
           new_value?: number
           old_value?: number
+          target_id?: string | null
+          target_type?: string | null
           timestamp?: string
           tx_id?: string
           vehicle_id?: string

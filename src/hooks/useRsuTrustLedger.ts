@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { fetchFromSupabase } from "@/services/api/supabase/fetch";
 import { toast } from "@/hooks/use-toast";
@@ -18,7 +19,7 @@ export const useRsuTrustLedger = () => {
       
       let data: any[] = [];
       
-      // First try to fetch directly from Supabase with the target_type filter
+      // First try to fetch with filter if target_type is available
       try {
         data = await fetchFromSupabase('trustLedger', { 
           filters: { target_type: 'RSU' },
@@ -30,7 +31,7 @@ export const useRsuTrustLedger = () => {
       } catch (error) {
         console.warn("Could not filter by target_type, trying alternative approach:", error);
         
-        // Try to get all data and filter client-side
+        // Fallback: get all data and filter client-side
         const allData = await fetchFromSupabase('trustLedger', {
           limit: 1000,
           orderBy: { field: 'timestamp', ascending: false }
