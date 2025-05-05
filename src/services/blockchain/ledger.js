@@ -1,148 +1,142 @@
 
 import { ethers } from 'ethers';
+import { getContract, getSigner, getProvider } from './provider';
 import { toast } from "@/hooks/use-toast";
-import { getContract, initReadonlyProvider } from './provider';
+import { TRUST_LEDGER_ABI, TRUST_LEDGER_ADDRESS } from './constants';
 
-// Function to get consistent mock data
-const getConsistentMockData = (targetType = null) => {
-  // Check if we have stored mock data in localStorage
-  const storedMockData = localStorage.getItem('blockchain_mock_ledger');
-  if (storedMockData) {
-    try {
-      const data = JSON.parse(storedMockData);
-      // Filter by target type if specified
-      return targetType ? data.filter(entry => entry.target_type === targetType) : data;
-    } catch (error) {
-      console.error("Error parsing stored mock data:", error);
-      // Continue to generate new mock data if parsing fails
-    }
-  }
-  
-  // Generate consistent mock data
-  const mockData = [];
-  const vehiclePrefixes = ['TS07', 'TS08', 'TS09', 'TS10'];
-  const rsuPrefixes = ['RSU-A', 'RSU-B', 'RSU-C', 'RSU-HYD'];
-  const now = Date.now();
-  const seed = 12345; // Fixed seed for consistent randomness
-  
-  // Simple deterministic random function using seed
-  const seededRandom = (max, min = 0) => {
-    const x = Math.sin(seed * (mockData.length + 1)) * 10000;
-    return Math.floor((x - Math.floor(x)) * (max - min) + min);
-  };
-  
-  // Generate 20 mock entries for vehicles with consistent data
-  for (let i = 0; i < 20; i++) {
-    const oldValue = 60 + seededRandom(30); // 60-90
-    const change = seededRandom(20) - 5; // -5 to +15 with bias towards positive
-    const newValue = Math.max(0, Math.min(100, oldValue + change));
-    const actions = ["Trust Stake", "Trust Update", "Certificate Renewal"];
-    const vehiclePrefix = vehiclePrefixes[seededRandom(vehiclePrefixes.length)];
-    const vehicleNumber = 1000 + seededRandom(9000);
-    
-    mockData.push({
-      tx_id: `0x${(1000000 + i).toString(16)}${(900000000 + i * 1000).toString(16)}`, 
-      vehicle_id: `${vehiclePrefix}-${vehicleNumber}`, 
-      target_id: `${vehiclePrefix}-${vehicleNumber}`,
-      target_type: 'Vehicle',
-      action: actions[i % actions.length], // Cycle through actions deterministically
-      amount: 1 + seededRandom(50), // 1-50 tokens
-      old_value: oldValue,
-      new_value: newValue,
-      timestamp: new Date(now - (i * 3600000)).toISOString() // Entries 1 hour apart
-    });
-  }
-  
-  // Generate 15 mock entries for RSUs
-  for (let i = 0; i < 15; i++) {
-    const oldValue = 70 + seededRandom(25); // 70-95
-    const change = seededRandom(15) - 10; // -10 to +5 with bias towards negative
-    const newValue = Math.max(0, Math.min(100, oldValue + change));
-    const actions = ["Trust Update", "Attack Detected", "RSU_QUARANTINED", "Blockchain Protection"];
-    const rsuPrefix = rsuPrefixes[seededRandom(rsuPrefixes.length)];
-    const rsuNumber = 1 + seededRandom(20);
-    
-    mockData.push({
-      tx_id: `0x${(2000000 + i).toString(16)}${(800000000 + i * 1000).toString(16)}`,
-      vehicle_id: 'SYSTEM', // System update for RSUs
-      target_id: `${rsuPrefix}-${rsuNumber}`,
-      target_type: 'RSU',
-      action: actions[i % actions.length], // Cycle through actions deterministically
-      amount: 1 + seededRandom(25), // 1-25 tokens
-      old_value: oldValue,
-      new_value: newValue,
-      timestamp: new Date(now - (i * 2400000)).toISOString() // Entries 40 min apart
-    });
-  }
-  
-  // Sort by timestamp (newest first)
-  const sortedData = mockData.sort((a, b) => 
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
-  
-  // Store in localStorage for consistency across reloads
+/**
+ * Get trust ledger entries from the blockchain
+ */
+export const getTrustLedger = async () => {
   try {
-    localStorage.setItem('blockchain_mock_ledger', JSON.stringify(sortedData));
-  } catch (error) {
-    console.error("Error storing mock data in localStorage:", error);
-  }
-  
-  // Filter by target type if specified
-  return targetType ? sortedData.filter(entry => entry.target_type === targetType) : sortedData;
-};
-
-export const getTrustLedger = async (targetType = null) => {
-  try {
-    // Initialize readonly provider if not already connected with a wallet
-    if (!getContract()) {
-      const initialized = initReadonlyProvider();
-      if (!initialized) {
-        throw new Error("Failed to initialize blockchain connection");
-      }
+    const contract = getContract();
+    if (!contract) {
+      console.warn("Contract not initialized, using mock data");
+      return getMockTrustLedgerData();
     }
     
-    // Try to get data from the actual contract
-    try {
-      const contract = getContract();
+    // Check if the contract has a getTrustLedger method
+    if (typeof contract.getTrustLedger === 'function') {
+      // If the contract has a getTrustLedger method, use it
       const ledger = await contract.getTrustLedger();
-      
-      // Transform the data to match our application format
-      const transformedData = ledger.map((entry, index) => {
-        // Determine if this is an RSU or Vehicle entry
-        const isRsu = entry.targetType === 'RSU' || 
-                     (entry.details && entry.details.includes('RSU')) ||
-                     !entry.vehicleId.startsWith('TS');
-        
-        return {
-          tx_id: `0x${Math.random().toString(16).substring(2, 10)}${Date.now().toString(16)}${index}`,
-          vehicle_id: isRsu ? 'SYSTEM' : (entry.vehicleId || `TS0${Math.floor(Math.random() * 3) + 7}-${Math.floor(Math.random() * 9000) + 1000}`),
-          target_id: isRsu ? `RSU-${Math.floor(Math.random() * 20) + 1}` : (entry.vehicleId || `TS0${Math.floor(Math.random() * 3) + 7}-${Math.floor(Math.random() * 9000) + 1000}`),
-          target_type: isRsu ? 'RSU' : 'Vehicle',
-          action: isRsu ? 
-            ['Trust Update', 'Attack Detected', 'RSU_QUARANTINED'][Math.floor(Math.random() * 3)] : 
-            "Trust Stake",
-          amount: parseInt(ethers.utils.formatEther(entry.amount || '0')) * 100,
-          timestamp: new Date(entry.timestamp ? entry.timestamp.toNumber() * 1000 : Date.now()).toISOString(),
-          old_value: Math.floor(Math.random() * 30) + 60,
-          new_value: Math.floor(Math.random() * 20) + 80,
-        };
-      });
-      
-      // Filter by target type if specified
-      return targetType ? transformedData.filter(entry => entry.target_type === targetType) : transformedData;
-    } catch (contractError) {
-      console.warn("Contract call failed, using mock data:", contractError);
-      throw contractError; // Let it fall through to the mock data
+      console.log("Blockchain trust ledger retrieved:", ledger);
+      return formatTrustLedgerData(ledger);
+    } 
+    
+    // Fall back to querying events if the contract doesn't have a direct method
+    // This will look for TrustUpdated or similar events from the contract
+    const provider = getProvider();
+    if (!provider) {
+      console.warn("Provider not available, using mock data");
+      return getMockTrustLedgerData();
     }
+    
+    // Look for past events (adjust event name based on your actual contract)
+    const filter = contract.filters.TrustUpdated ? 
+      contract.filters.TrustUpdated() : 
+      contract.filters.Staked ? 
+        contract.filters.Staked() : 
+        { address: contract.address };
+    
+    const events = await provider.getLogs({
+      fromBlock: 0,
+      toBlock: "latest",
+      address: contract.address
+    });
+    
+    console.log("Retrieved blockchain events:", events.length);
+    
+    if (events.length === 0) {
+      // If no events are found, return mock data
+      return getMockTrustLedgerData();
+    }
+    
+    return events.map(event => formatEventToLedgerEntry(event));
   } catch (error) {
     console.error("Error getting trust ledger:", error);
-    
-    // Use consistent mock data instead of generating random data each time
-    return getConsistentMockData(targetType);
+    console.warn("Contract call failed, using mock data:", error);
+    return getMockTrustLedgerData();
   }
 };
 
-// Get RSU-specific trust ledger
-export const getRsuTrustLedger = async () => {
-  return getTrustLedger('RSU');
+/**
+ * Format raw blockchain events to our ledger format
+ */
+const formatEventToLedgerEntry = (event) => {
+  return {
+    tx_id: event.transactionHash,
+    timestamp: new Date().toISOString(), // Blockchain doesn't provide exact time
+    vehicle_id: 'BLOCKCHAIN',
+    action: 'TRUST_UPDATE',
+    old_value: 0,
+    new_value: 0,
+    details: 'Blockchain trust update',
+    target_id: 'Unknown',
+    target_type: 'RSU'
+  };
+};
+
+/**
+ * Format raw trust ledger data from the blockchain
+ */
+const formatTrustLedgerData = (ledger) => {
+  if (!Array.isArray(ledger)) {
+    console.warn("Ledger data is not an array, using mock data");
+    return getMockTrustLedgerData();
+  }
+  
+  return ledger.map(entry => ({
+    tx_id: entry.txHash || `0x${Math.random().toString(36).substring(2, 15)}`,
+    timestamp: entry.timestamp ? new Date(entry.timestamp * 1000).toISOString() : new Date().toISOString(),
+    vehicle_id: entry.vehicle || entry.entityId || 'BLOCKCHAIN',
+    action: entry.action || 'TRUST_UPDATE',
+    old_value: entry.oldScore || 0,
+    new_value: entry.newScore || entry.score || 0,
+    details: entry.details || 'Blockchain trust update',
+    target_id: entry.entityId || entry.target || 'Unknown',
+    target_type: entry.targetType || 'RSU'
+  }));
+};
+
+/**
+ * Generate mock trust ledger data for testing
+ */
+const getMockTrustLedgerData = () => {
+  const now = new Date();
+  
+  return [
+    {
+      tx_id: `0x${Math.random().toString(36).substring(2, 15)}`,
+      timestamp: now.toISOString(),
+      vehicle_id: 'BLOCKCHAIN',
+      action: 'TRUST_UPDATE',
+      old_value: 80,
+      new_value: 90,
+      details: 'Blockchain protection added to RSU',
+      target_id: 'RSU-001',
+      target_type: 'RSU'
+    },
+    {
+      tx_id: `0x${Math.random().toString(36).substring(2, 15)}`,
+      timestamp: new Date(now.getTime() - 86400000).toISOString(), // 1 day ago
+      vehicle_id: 'BLOCKCHAIN',
+      action: 'ATTACK_MITIGATED',
+      old_value: 65,
+      new_value: 75,
+      details: 'Attack mitigated through blockchain validation',
+      target_id: 'RSU-002',
+      target_type: 'RSU'
+    },
+    {
+      tx_id: `0x${Math.random().toString(36).substring(2, 15)}`,
+      timestamp: new Date(now.getTime() - 172800000).toISOString(), // 2 days ago
+      vehicle_id: 'BLOCKCHAIN',
+      action: 'STAKE_ADDED',
+      old_value: 70,
+      new_value: 70,
+      details: 'Stake added for RSU protection',
+      target_id: 'RSU-003',
+      target_type: 'RSU'
+    }
+  ];
 };

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import WalletConnectButton from "@/components/WalletConnectButton";
@@ -145,6 +144,12 @@ const RsuTrustLedgerPage: React.FC = () => {
 
   const stats = getStats();
 
+  // For debugging
+  React.useEffect(() => {
+    console.log("RSU Ledger Data:", rsuLedgerData.length, "entries");
+    console.log("Blockchain Data:", blockchainLedgerData.length, "entries");
+  }, [rsuLedgerData, blockchainLedgerData]);
+
   return (
     <MainLayout>
       <div className="flex flex-col space-y-6">
@@ -236,7 +241,7 @@ const RsuTrustLedgerPage: React.FC = () => {
           
           <TabsContent value="blockchain">
             <BlockchainLedger 
-              data={blockchainLedgerData.filter(entry => entry.target_type === 'RSU')}
+              data={blockchainLedgerData}
               isLoading={isBlockchainLoading}
               isError={isBlockchainError}
               etherscanUrl=""
