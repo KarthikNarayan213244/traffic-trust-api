@@ -7,6 +7,8 @@ import VehicleMarkers from "./VehicleMarkers";
 import RsuMarkers from "./RsuMarkers";
 import CongestionHeatmap from "./CongestionHeatmap";
 import MapOverlays from "./MapOverlays";
+import RsuTrustOverlay from "./RsuTrustOverlay";
+import AttackVisualizations from "./AttackVisualizations";
 import { createOptimizedWaypoints } from "./WaypointOptimizer";
 
 // Update the props interface to include new fields
@@ -39,147 +41,171 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
+  const [showDirections, setShowDirections] = useState<boolean>(false);
+  const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
+  const [showAttacks, setShowAttacks] = useState<boolean>(true);
 
-  // Load stored map styles from local storage or use default
-  const storedMapStyle = typeof window !== 'undefined' ? localStorage.getItem('mapStyle') : null;
-  const defaultMapStyle = [
-    {
-      "featureType": "poi",
-      "stylers": [
-        { "visibility": "off" }
-      ]
-    },
-    {
-      "featureType": "transit",
-      "stylers": [
-        { "visibility": "off" }
-      ]
+  // Effect to calculate directions when destination or ambulance changes
+  useEffect(() => {
+    if (!window.google || !map || !selectedAmbulance || !destination) {
+      setDirections(null);
+      setShowDirections(false);
+      return;
     }
-  ];
-  const initialMapStyle = storedMapStyle ? JSON.parse(storedMapStyle) : defaultMapStyle;
-  const [mapStyle, setMapStyle] = useState(initialMapStyle);
 
-  // Save map style to local storage
-  const handleStyleChange = useCallback((newStyle) => {
-    setMapStyle(newStyle);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('mapStyle', JSON.stringify(newStyle));
-    }
-  }, []);
+    // Start position is the selected ambulance
+    const origin = {
+      lat: selectedAmbulance.lat || defaultCenter.lat,
+      lng: selectedAmbulance.lng || defaultCenter.lng
+    };
 
-  // Load map
-  const onLoad = useCallback((map: google.maps.Map) => {
+    // Prepare waypoints if we have an optimized route
+    const waypoints = optimizedRoute ? 
+      optimizedRoute.map(point => ({
+        location: new google.maps.LatLng(point.lat, point.lng),
+        stopover: false
+      })) : 
+      createOptimizedWaypoints(origin, destination, congestionData);
+
+    const directionsService = new google.maps.DirectionsService();
+    
+    directionsService.route({
+      origin: origin,
+      destination: destination,
+      waypoints: waypoints,
+      travelMode: google.maps.TravelMode.DRIVING,
+      optimizeWaypoints: true,
+      provideRouteAlternatives: true,
+      drivingOptions: {
+        departureTime: new Date(),
+        trafficModel: google.maps.TrafficModel.PESSIMISTIC
+      }
+    }, (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK) {
+        setDirections(result);
+        setShowDirections(true);
+      } else {
+        console.error(`Error fetching directions: ${status}`);
+        setDirections(null);
+      }
+    });
+  }, [map, selectedAmbulance, destination, optimizedRoute, congestionData]);
+
+  // Map load handler
+  const onMapLoad = useCallback((map: google.maps.Map) => {
     setMap(map);
   }, []);
 
-  // Unload map
-  const onUnmount = useCallback(() => {
-    setMap(null);
-  }, []);
-
-  // Calculate directions
-  useEffect(() => {
-    if (!destination || !selectedAmbulance || !window.google || !apiKey) return;
-
-    try {
-      const service = new window.google.maps.DirectionsService();
-      const origin = new window.google.maps.LatLng(selectedAmbulance.lat, selectedAmbulance.lng);
-      const destinationLatLng = new window.google.maps.LatLng(destination.lat, destination.lng);
-      
-      // Use optimized waypoints if available
-      const waypoints = createOptimizedWaypoints(optimizedRoute);
-      
-      service.route(
-        {
-          origin: origin,
-          destination: destinationLatLng,
-          travelMode: window.google.maps.TravelMode.DRIVING,
-          waypoints: waypoints,
-          optimizeWaypoints: true,
-        },
-        (result, status) => {
-          if (status === "OK" && result) {
-            setDirections(result);
-            setDirectionsStatus(status);
-          } else {
-            console.error("Directions request failed:", status);
-            setDirectionsStatus(status);
-          }
-        }
-      );
-    } catch (error) {
-      console.error("Error calculating directions:", error);
-      setDirectionsStatus(google.maps.DirectionsStatus.UNKNOWN_ERROR);
+  // Map click handler
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (e.latLng && onMapClick) {
+      onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
     }
-  }, [destination, selectedAmbulance, optimizedRoute, apiKey]);
-  
-  // Count congestion zones
-  const congestionZones = useMemo(() => {
-    return congestionData.length;
-  }, [congestionData]);
-  
+  }, [onMapClick]);
+
+  // Render destination marker
+  const renderDestinationMarker = useMemo(() => {
+    if (!destination || !showDirections) return null;
+
+    return (
+      <Marker
+        position={destination}
+        icon={{
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: "#FF0000",
+          fillOpacity: 0.8,
+          strokeWeight: 2,
+          strokeColor: "#FFFFFF"
+        }}
+        zIndex={1000}
+      />
+    );
+  }, [destination, showDirections]);
+
+  // Render directions
+  const renderDirections = useMemo(() => {
+    if (!directions || !showDirections) return null;
+
+    return (
+      <DirectionsRenderer
+        directions={directions}
+        options={{
+          suppressMarkers: true,
+          preserveViewport: true,
+          polylineOptions: {
+            strokeColor: "#4285F4",
+            strokeWeight: 5,
+            strokeOpacity: 0.8
+          }
+        }}
+      />
+    );
+  }, [directions, showDirections]);
+
+  if (!window.google) {
+    return (
+      <div className="h-[600px] flex items-center justify-center bg-gray-50">
+        Loading Google Maps...
+      </div>
+    );
+  }
+
   return (
-    <div className="relative h-[600px] w-full rounded-lg overflow-hidden border shadow-sm">
+    <div className="relative rounded-md overflow-hidden h-[600px] border">
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
-        zoom={14}
         center={defaultCenter}
-        options={{
-          ...mapOptions,
-          styles: mapStyle,
-        }}
-        onLoad={onLoad}
-        onUnmount={onUnmount}
-        onClick={(event) => {
-          if (event.latLng) {
-            const latLng = {
-              lat: event.latLng.lat(),
-              lng: event.latLng.lng()
-            };
-            onMapClick(latLng);
-          }
-        }}
+        zoom={13}
+        options={mapOptions}
+        onLoad={onMapLoad}
+        onClick={handleMapClick}
       >
-        <VehicleMarkers 
-          vehicles={vehicles} 
-          selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
-          onAmbulanceSelect={onAmbulanceSelect}
-          isSimulationRunning={isLiveMonitoring}
-        />
-        
-        <RsuMarkers rsus={rsus} />
-        
-        <CongestionHeatmap congestionData={congestionData} />
-        
-        {directions && (
-          <DirectionsRenderer
-            directions={directions}
-            options={{
-              polylineOptions: {
-                strokeColor: "#2563eb",
-                strokeOpacity: 0.7,
-                strokeWeight: 5,
-              },
-              suppressMarkers: true,
-            }}
+        {/* Render congestion heatmap if enabled */}
+        {showHeatmap && (
+          <CongestionHeatmap 
+            congestionData={congestionData} 
+            map={map}
           />
         )}
         
-        <MapOverlays
-          vehiclesCount={vehicles?.length || 0}
-          rsusCount={rsus?.length || 0}
-          congestionZones={congestionZones}
-          anomaliesCount={anomalies?.length || 0}
-          selectedAmbulance={selectedAmbulance}
-          destination={destination}
-          directionsStatus={directionsStatus}
+        {/* Render vehicle markers */}
+        <VehicleMarkers 
+          vehicles={vehicles}
+          isSimulationRunning={isLiveMonitoring}
+          selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
+          onAmbulanceSelect={onAmbulanceSelect}
+        />
+        
+        {/* Render RSU markers */}
+        <RsuMarkers rsus={rsus} />
+        
+        {/* Render destination and directions */}
+        {renderDestinationMarker}
+        {renderDirections}
+        
+        {/* Show trust overlay */}
+        <RsuTrustOverlay 
           rsus={rsus}
           anomalies={anomalies}
-          isSimulationRunning={isLiveMonitoring}
-          apiKey={apiKey}
         />
+        
+        {/* Show attack visualizations */}
+        {showAttacks && isLiveMonitoring && (
+          <AttackVisualizations 
+            anomalies={anomalies}
+            rsus={rsus}
+          />
+        )}
       </GoogleMap>
+      
+      {/* Map Controls */}
+      <MapOverlays 
+        showHeatmap={showHeatmap}
+        setShowHeatmap={setShowHeatmap}
+        showAttacks={showAttacks}
+        setShowAttacks={setShowAttacks}
+      />
     </div>
   );
 };

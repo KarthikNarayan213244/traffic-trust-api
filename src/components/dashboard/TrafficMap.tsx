@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -9,6 +8,7 @@ import { fetchVehicles, fetchCongestionData, fetchRSUs, fetchAnomalies } from "@
 import MLControls from "./MLControls";
 import ApiKeyControl from "./ApiKeyControl";
 import SmartTrafficSimulation from "./SmartTrafficSimulation";
+import RealisticAttackSimulation from "./RealisticAttackSimulation";
 import { useMapData } from "@/hooks/useMapData";
 import { useMLSimulation } from "@/hooks/useMLSimulation";
 import { useMapApiKey } from "@/hooks/useMapApiKey";
@@ -355,6 +355,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     );
   };
 
+  // The render function where the map and controls are rendered
   const renderMap = () => {
     return (
       <div className="space-y-2">
@@ -396,7 +397,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
           </div>
           
           <div className="space-y-4">
-            <SmartTrafficSimulation 
+            <RealisticAttackSimulation 
               rsus={rsus}
               anomalies={anomalies}
               isLiveMonitoring={isLiveMonitoring}
