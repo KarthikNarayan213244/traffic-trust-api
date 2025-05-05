@@ -1,6 +1,9 @@
 
-import { ApiEndpoint } from "../config";
+import { ENDPOINTS } from "../config";
 import { Vehicle, Rsu, Anomaly, TrustLedgerEntry, CongestionZone } from "../types";
+
+// Type for API endpoint keys
+export type ApiEndpoint = keyof typeof ENDPOINTS;
 
 // Type mapping for each endpoint's return type
 export type EndpointTypeMap = {

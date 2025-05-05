@@ -1,8 +1,8 @@
-
 import { supabase } from "./client";
-import { ApiEndpoint } from "../config";
+import { ENDPOINTS } from "../config";
 import { EndpointTypeMap, endpointToTableMap, ValidTableName, 
   isVehicleData, isRsuData, isAnomalyData, isTrustLedgerData, isCongestionData } from "./types";
+import { ApiEndpoint } from "./types";
 
 // Fetch data from Supabase with proper type handling
 export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, options: Record<string, any> = {}): Promise<EndpointTypeMap[T]> {

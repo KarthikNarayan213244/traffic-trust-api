@@ -24,8 +24,8 @@ export const mapOptions = {
   clickableIcons: false,
 };
 
-// Required libraries
-export const libraries: ("places" | "drawing" | "geometry" | "localContext" | "visualization")[] = ["places", "geometry", "visualization"];
+// Required libraries - updated to match expected type
+export const libraries = ["places", "drawing", "geometry", "visualization"] as const;
 
 // Vehicle types and their corresponding colors
 export const vehicleTypeColors: Record<string, string> = {
@@ -51,3 +51,19 @@ export const rsuStatusColors: Record<string, string> = {
 
 // Set the Google Maps API key from environment
 export const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+
+// Adding mapTheme export for MapContainer
+export const mapTheme = [
+  {
+    "featureType": "poi",
+    "stylers": [
+      { "visibility": "off" }
+    ]
+  },
+  {
+    "featureType": "transit",
+    "stylers": [
+      { "visibility": "off" }
+    ]
+  }
+];
