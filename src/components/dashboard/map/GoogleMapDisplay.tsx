@@ -38,7 +38,8 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // Replace process.env with import.meta.env
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   // Load stored map styles from local storage or use default
   const storedMapStyle = typeof window !== 'undefined' ? localStorage.getItem('mapStyle') : null;
