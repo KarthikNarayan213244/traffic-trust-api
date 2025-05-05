@@ -6,12 +6,14 @@ import TrafficMap from "@/components/dashboard/TrafficMap";
 import AnomalyChart from "@/components/dashboard/AnomalyChart";
 import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
 import AttackSimulationCard from "@/components/dashboard/AttackSimulationCard";
+import RsuTrustOverlay from "@/components/dashboard/map/RsuTrustOverlay";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Car, Radio, AlertTriangle, Shield, RefreshCw, BarChart3, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, fetchCongestionData } from "@/services/api";
 import { seedDatabaseWithTestData } from "@/services/api/supabase";
+import { updateRsuTrustScores } from "@/services/ml/rsuTrustScoring";
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +49,18 @@ const Dashboard: React.FC = () => {
       
       if (rsusResult.status === 'fulfilled') {
         console.log(`Loaded ${rsusResult.value?.length || 0} RSUs`);
-        setRsus(Array.isArray(rsusResult.value) ? rsusResult.value : []);
+        const loadedRsus = Array.isArray(rsusResult.value) ? rsusResult.value : [];
+        
+        // Set default trust scores for RSUs without them
+        const rsusWithTrust = loadedRsus.map(rsu => ({
+          ...rsu,
+          trust_score: rsu.trust_score || 90,
+          trust_score_change: rsu.trust_score_change || 0,
+          attack_detected: rsu.attack_detected || false,
+          quarantined: rsu.quarantined || false
+        }));
+        
+        setRsus(rsusWithTrust);
       }
       
       if (anomaliesResult.status === 'fulfilled') {
@@ -89,6 +102,17 @@ const Dashboard: React.FC = () => {
       setIsLoading(false);
     }
   }, []);
+
+  // Process anomalies to update RSU trust scores
+  useEffect(() => {
+    // Only process if we have both RSUs and anomalies loaded
+    if (rsus.length > 0 && anomalies.length > 0 && !isLoading) {
+      // Update RSU trust scores based on loaded anomalies
+      updateRsuTrustScores(rsus, anomalies).then(updatedRsus => {
+        setRsus(updatedRsus);
+      });
+    }
+  }, [rsus.length, anomalies.length, isLoading]);
 
   const seedDatabase = async () => {
     setIsSeeding(true);
@@ -220,8 +244,8 @@ const Dashboard: React.FC = () => {
             icon={AlertTriangle}
             color="danger"
             trend={{
-              value: anomalies.filter(a => a.severity === "Critical").length > 0 ? 
-                `${anomalies.filter(a => a.severity === "Critical").length} critical` : 
+              value: anomalies.filter(a => a.severity === "Critical" || a.severity === "High").length > 0 ? 
+                `${anomalies.filter(a => a.severity === "Critical" || a.severity === "High").length} critical` : 
                 "0 critical",
               label: "issues detected"
             }}
@@ -232,8 +256,8 @@ const Dashboard: React.FC = () => {
             isLoading={isLoading}
             icon={Shield}
             trend={{
-              value: "+15%",
-              label: "increase in trust"
+              value: `${rsus.filter(r => r.blockchain_protected).length} RSUs`,
+              label: "blockchain protected"
             }}
           />
         </div>
@@ -245,12 +269,16 @@ const Dashboard: React.FC = () => {
                 <CardTitle>Real-time Traffic Monitoring</CardTitle>
                 <CardDescription>View and track vehicles and roadside units across Hyderabad in real-time</CardDescription>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 relative">
                 <TrafficMap 
                   vehicles={vehicles}
                   rsus={rsus}
                   isLoading={isLoading}
                   congestionData={congestionData}
+                />
+                <RsuTrustOverlay 
+                  rsus={rsus}
+                  anomalies={anomalies}
                 />
               </CardContent>
             </Card>
@@ -273,7 +301,7 @@ const Dashboard: React.FC = () => {
                 <BarChart3 className="h-5 w-5" />
                 <span>Anomaly Distribution</span>
               </CardTitle>
-              <CardDescription>Recent vehicle anomalies by severity</CardDescription>
+              <CardDescription>Recent vehicle and RSU anomalies by severity</CardDescription>
             </CardHeader>
             <CardContent>
               <AnomalyChart 

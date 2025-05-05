@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { 
   Play, 
   Pause, 
@@ -11,9 +12,11 @@ import {
   AlertTriangle, 
   Shield, 
   Activity,
-  CirclePercent
+  CirclePercent,
+  Lock,
+  Zap
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { 
   globalAttackSimulationEngine,
   SimulationStats, 
@@ -33,7 +36,6 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
   setRsus,
   setAnomalies
 }) => {
-  const { toast } = useToast();
   const [attackFrequency, setAttackFrequency] = useState<number>(5);
   const [defenseLevel, setDefenseLevel] = useState<number>(70);
   const [simulationActive, setSimulationActive] = useState<boolean>(false);
@@ -50,11 +52,22 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
     networkDegradation: 0
   });
   const [selectedTab, setSelectedTab] = useState("overview");
+  const [countdownToNextAttack, setCountdownToNextAttack] = useState<number>(0);
 
   // Calculate derived statistics
   const getSuccessRate = () => {
     if (stats.attacksAttempted === 0) return 0;
     return Math.round((stats.attacksSuccessful / stats.attacksAttempted) * 100);
+  };
+
+  const getDetectionRate = () => {
+    if (stats.attacksAttempted === 0) return 0;
+    return Math.round((stats.attacksDetected / stats.attacksAttempted) * 100);
+  };
+
+  const getMitigationRate = () => {
+    if (stats.attacksDetected === 0) return 0;
+    return Math.round((stats.attacksMitigated / stats.attacksDetected) * 100);
   };
 
   const getNetworkHealth = () => {
@@ -64,6 +77,8 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
   // Initialize the attack simulation engine
   useEffect(() => {
     const handleAttack = (attack: AttackEvent) => {
+      console.log("Attack event received:", attack);
+      
       // Add attack to anomalies
       setAnomalies(prevAnomalies => {
         // Don't add duplicate attacks
@@ -75,7 +90,7 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
         const newAnomaly = {
           id: attack.id,
           type: attack.attack.name,
-          timestamp: attack.timestamp,
+          timestamp: attack.timestamp.toISOString(),
           message: `${attack.attackerProfile} attempted ${attack.attack.name} on RSU ${attack.targetId}`,
           severity: attack.attack.severity,
           status: attack.detected ? (attack.mitigated ? "Mitigated" : "Detected") : "Undetected",
@@ -104,14 +119,20 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
 
     // Set callbacks for the simulation engine
     globalAttackSimulationEngine.setOnAttackGenerated(handleAttack);
-    globalAttackSimulationEngine.setOnStatsUpdated(setStats);
-    globalAttackSimulationEngine.setOnRsusUpdated(setRsus);
+    globalAttackSimulationEngine.setOnStatsUpdated(newStats => {
+      console.log("Stats updated:", newStats);
+      setStats(newStats);
+    });
+    globalAttackSimulationEngine.setOnRsusUpdated(updatedRsus => {
+      console.log("RSUs updated:", updatedRsus.length);
+      setRsus(updatedRsus);
+    });
     
     return () => {
       // Clean up
       globalAttackSimulationEngine.stop();
     };
-  }, [setAnomalies, setRsus, toast]);
+  }, [setAnomalies, setRsus]);
 
   // Handle simulation state
   useEffect(() => {
@@ -140,7 +161,21 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
       globalAttackSimulationEngine.start(rsus);
     }
     
+    // Countdown timer for next attack
+    const countdownInterval = setInterval(() => {
+      setCountdownToNextAttack(prev => {
+        if (prev <= 0) {
+          // Calculate countdown based on frequency (higher frequency = shorter interval)
+          const baseInterval = Math.max(10, 30 - (attackFrequency / 2));
+          return Math.floor(baseInterval);
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
     return () => {
+      clearInterval(countdownInterval);
+      
       if (!simulationActive) {
         globalAttackSimulationEngine.stop();
       }
@@ -196,14 +231,26 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
       attackFrequency,
       defenseLevel
     });
+    
+    toast({
+      title: "Simulation Settings Updated",
+      description: "Attack frequency and defense level have been updated"
+    });
   };
 
   return (
     <Card className="bg-white shadow-md">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center">
-          <Shield size={18} className="text-primary mr-2" />
-          <span>RSU Attack Simulation</span>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield size={18} className="text-primary mr-1" />
+            <span>RSU Attack Simulation</span>
+          </div>
+          {simulationActive && (
+            <Badge variant="outline" className="bg-red-100 text-red-800 animate-pulse">
+              Active
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
@@ -241,6 +288,15 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
               </div>
             </div>
             
+            {simulationActive && (
+              <div className="text-center text-sm my-3">
+                Next attack simulation in: 
+                <span className="font-medium ml-1">
+                  {countdownToNextAttack}s
+                </span>
+              </div>
+            )}
+            
             <div className="flex flex-col gap-2 mt-4">
               <Button 
                 onClick={toggleSimulation}
@@ -270,6 +326,13 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
                 <RefreshCw size={14} className="mr-2" />
                 Reset Stats
               </Button>
+              
+              {!isLiveMonitoring && (
+                <div className="text-center text-xs text-amber-500 flex items-center justify-center gap-1 mt-1">
+                  <Zap size={14} />
+                  Enable Live Monitoring to run simulation
+                </div>
+              )}
             </div>
           </TabsContent>
           
@@ -310,6 +373,17 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
                   Security level of RSUs. Higher values improve attack detection and blockchain-based protection.
                 </div>
               </div>
+              
+              <div className="mt-6 pt-4 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <Lock size={16} className="text-green-600" />
+                  <span className="text-sm font-medium">Blockchain Protection</span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  RSUs with significant trust changes or detected attacks are automatically protected with blockchain
+                  transactions, making their security status tamper-proof.
+                </div>
+              </div>
             </div>
           </TabsContent>
           
@@ -319,14 +393,14 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
                 <div className="border rounded-lg p-3">
                   <div className="text-xs text-gray-500">Detection Rate</div>
                   <div className="font-medium text-lg">
-                    {stats.attacksAttempted === 0 ? 0 : Math.round((stats.attacksDetected / stats.attacksAttempted) * 100)}%
+                    {getDetectionRate()}%
                   </div>
                 </div>
                 
                 <div className="border rounded-lg p-3">
                   <div className="text-xs text-gray-500">Mitigation Rate</div>
                   <div className="font-medium text-lg">
-                    {stats.attacksDetected === 0 ? 0 : Math.round((stats.attacksMitigated / stats.attacksDetected) * 100)}%
+                    {getMitigationRate()}%
                   </div>
                 </div>
               </div>
@@ -345,6 +419,24 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
                   Blockchain transactions record trust changes and protect against tampering
+                </div>
+              </div>
+              
+              <div className="border rounded-lg p-3">
+                <div className="text-xs text-gray-500 mb-1">RSU Security Status</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-xs text-gray-500">Total</div>
+                    <div className="font-medium">{rsus.length}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Compromised</div>
+                    <div className="font-medium text-red-600">{stats.rsusCompromised}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Quarantined</div>
+                    <div className="font-medium text-amber-600">{stats.rsusQuarantined}</div>
+                  </div>
                 </div>
               </div>
             </div>

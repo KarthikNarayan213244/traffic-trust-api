@@ -223,7 +223,7 @@ export class NetworkTopology {
       quarantinedNodes: nodes.filter(n => n.status === 'quarantined').length,
       degradedNodes: nodes.filter(n => n.status === 'degraded').length,
       activeAttacks: nodes.reduce((sum, node) => sum + node.activeAttacks.length, 0),
-      averageThroughput: nodes.reduce((sum, node) => sum + node.throughput, 0) / nodes.length,
+      averageThroughput: nodes.reduce((sum, node) => sum + node.throughput, 0) / Math.max(1, nodes.length),
       criticalConnections: this.connections.filter(c => c.status === 'down').length,
     };
   }
@@ -251,5 +251,5 @@ function degreesToRadians(degrees: number): number {
   return degrees * (Math.PI/180);
 }
 
-// Create and export a global network topology
+// Create and export the global network topology
 export const globalNetworkTopology = new NetworkTopology();

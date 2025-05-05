@@ -1,3 +1,4 @@
+
 import * as tf from '@tensorflow/tfjs';
 import { toast } from "@/hooks/use-toast";
 import { stakeTrust } from "@/services/blockchain";
@@ -69,12 +70,14 @@ export const calculateRsuTrustScore = (
     });
     
     if (newAnomalies.length > 0) {
+      console.log(`Found ${newAnomalies.length} new anomalies for RSU ${rsuId}`);
+      
       // Add new anomalies to history
       securityState.anomalyHistory.push(
         ...newAnomalies.map(a => ({
           timestamp: a.timestamp,
           type: a.type,
-          severity: a.severity === 'High' ? 1.0 : 
+          severity: a.severity === 'High' || a.severity === 'Critical' ? 1.0 : 
                     a.severity === 'Medium' ? 0.6 : 0.3
         }))
       );
@@ -86,17 +89,21 @@ export const calculateRsuTrustScore = (
       
       // Consecutive anomalies counter
       securityState.consecutiveAnomalies += 1;
+      
+      console.log(`RSU ${rsuId} now has ${securityState.consecutiveAnomalies} consecutive anomalies`);
     } else {
       // Reset consecutive anomalies if no new anomalies
-      securityState.consecutiveAnomalies = 0;
+      securityState.consecutiveAnomalies = Math.max(0, securityState.consecutiveAnomalies - 1);
     }
     
     // Update quarantine status
     if (securityState.consecutiveAnomalies >= 3) {
       securityState.attackDetected = true;
+      console.log(`Attack detected on RSU ${rsuId}`);
       
       if (securityState.consecutiveAnomalies >= 5) {
         securityState.quarantined = true;
+        console.log(`RSU ${rsuId} has been quarantined!`);
       }
     }
     
@@ -105,17 +112,18 @@ export const calculateRsuTrustScore = (
     const oldScore = currentTrustScore || DEFAULT_TRUST_SCORE;
     
     if (newAnomalies.length === 0) {
-      // If no anomaly: Tₙ₊₁ = Tₙ + 0.01·(1–Tₙ)
+      // If no anomaly: Tₙ₊₁ = Tₙ + 0.01·(1–Tₙ/100)
       newTrustScore = oldScore + TRUST_INCREASE_FACTOR * (100 - oldScore);
     } else {
-      // If anomaly: Tₙ₊₁ = Tₙ – 0.1·severity
+      // If anomaly: Tₙ₊₁ = Tₙ – 0.1·severity*100
       const avgSeverity = newAnomalies.reduce((sum, a) => {
-        const severityValue = a.severity === 'High' ? 1.0 : 
+        const severityValue = a.severity === 'High' || a.severity === 'Critical' ? 1.0 : 
                              a.severity === 'Medium' ? 0.6 : 0.3;
         return sum + severityValue;
       }, 0) / newAnomalies.length;
       
       newTrustScore = oldScore - TRUST_DECREASE_FACTOR * (avgSeverity * 100);
+      console.log(`Trust score for RSU ${rsuId} decreased from ${oldScore} to ${newTrustScore} due to anomalies`);
     }
     
     // Ensure trust score stays between 0 and 100
@@ -130,6 +138,10 @@ export const calculateRsuTrustScore = (
       Math.abs(trustChange) >= BLOCKCHAIN_UPDATE_THRESHOLD || 
       securityState.attackDetected || 
       securityState.quarantined;
+    
+    if (blockchainUpdateNeeded) {
+      console.log(`RSU ${rsuId} trust score change of ${trustChange} requires blockchain update`);
+    }
     
     return {
       score: Math.round(newTrustScore),
@@ -158,6 +170,8 @@ export const updateRsuTrustScores = async (
   anomalies: any[]
 ): Promise<any[]> => {
   try {
+    console.log(`Updating trust scores for ${rsus.length} RSUs with ${anomalies.length} anomalies`);
+    
     // Count of blockchain transactions in this update
     let blockchainTransactions = 0;
     
@@ -201,13 +215,19 @@ export const updateRsuTrustScores = async (
           }
           
           blockchainTransactions++;
-          console.log(`Logged trust update for RSU ${rsu.rsu_id} to blockchain: ${trustResult.score}, txId: ${txId}`);
+          console.log(`Successfully logged trust update for RSU ${rsu.rsu_id} to blockchain: ${trustResult.score}, txId: ${txId}`);
           
           // Show toast for quarantined RSUs
           if (trustResult.quarantined) {
             toast({
               title: "RSU Quarantined",
               description: `RSU ${rsu.rsu_id} has been quarantined due to suspicious activity. Trust score: ${trustResult.score}`,
+              variant: "destructive"
+            });
+          } else if (trustResult.attackDetected) {
+            toast({
+              title: "Attack Detected",
+              description: `Attack detected on RSU ${rsu.rsu_id}. Trust score decreased to: ${trustResult.score}`,
               variant: "destructive"
             });
           }
@@ -222,6 +242,11 @@ export const updateRsuTrustScores = async (
     // Log blockchain transaction summary
     if (blockchainTransactions > 0) {
       console.log(`Updated ${blockchainTransactions} RSU trust scores on blockchain`);
+      toast({
+        title: "Trust Scores Updated",
+        description: `Updated ${blockchainTransactions} RSU trust scores on the blockchain`,
+        variant: "default"
+      });
     }
     
     return updatedRsus;
@@ -244,7 +269,7 @@ export const generateRsuAttacks = (
     {type: "Sybil Attack", severity: "High"},
     {type: "Data Tampering", severity: "Medium"},
     {type: "Denial of Service", severity: "High"},
-    {type: "Malicious Data Injection", severity: "High"},
+    {type: "Malicious Data Injection", severity: "Critical"},
     {type: "Message Replay", severity: "Medium"},
     {type: "Protocol Violation", severity: "Low"}
   ];
@@ -254,13 +279,14 @@ export const generateRsuAttacks = (
     // Skip already quarantined RSUs
     if (rsu.quarantined) return;
     
-    // Random chance to generate an attack
+    // Random chance to generate an attack, increased if attack probability is higher
     if (Math.random() < attackProbability) {
       const attack = attackTypes[Math.floor(Math.random() * attackTypes.length)];
       
       // Create the anomaly record
+      const anomalyId = `sim-anomaly-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       generatedAnomalies.push({
-        id: `sim-anomaly-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        id: anomalyId,
         type: attack.type,
         timestamp: now,
         message: `Simulated ${attack.type} detected on RSU ${rsu.rsu_id}`,

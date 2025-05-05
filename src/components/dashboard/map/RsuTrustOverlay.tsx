@@ -72,7 +72,7 @@ const RsuTrustOverlay: React.FC<RsuTrustOverlayProps> = ({
             return (
               <div 
                 key={rsu.rsu_id}
-                className={`p-2 rounded-md ${bgColor} border border-${statusColor} text-xs`}
+                className={`p-2 rounded-md ${bgColor} border border-${statusColor.replace('text-', '')} text-xs`}
               >
                 <div className="flex justify-between items-center">
                   <div className="font-medium">{rsu.rsu_id}</div>
@@ -94,15 +94,32 @@ const RsuTrustOverlay: React.FC<RsuTrustOverlayProps> = ({
                       )}
                     </div>
                   </div>
-                  {recentAnomalies.length > 0 && (
+                  {rsu.blockchain_protected && (
                     <Badge 
                       variant="outline" 
-                      className="text-xs"
+                      className="text-xs bg-blue-50 text-blue-800"
                     >
-                      {recentAnomalies[0].type}
+                      Blockchain
                     </Badge>
                   )}
                 </div>
+                
+                {recentAnomalies.length > 0 && (
+                  <div className="mt-1 flex items-center justify-between">
+                    <div className="text-muted-foreground text-xs">Latest Anomaly:</div>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-[10px] ${
+                        recentAnomalies[0].severity === 'Critical' ? 'bg-red-50 text-red-800' :
+                        recentAnomalies[0].severity === 'High' ? 'bg-orange-50 text-orange-800' :
+                        recentAnomalies[0].severity === 'Medium' ? 'bg-amber-50 text-amber-800' :
+                        'bg-yellow-50 text-yellow-800'
+                      }`}
+                    >
+                      {recentAnomalies[0].type}
+                    </Badge>
+                  </div>
+                )}
                 
                 {rsu.location && (
                   <div className="text-muted-foreground mt-1">{rsu.location}</div>
