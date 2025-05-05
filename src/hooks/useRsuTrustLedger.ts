@@ -11,6 +11,7 @@ export const useRsuTrustLedger = () => {
   const [isError, setIsError] = useState<boolean>(false);
   const [isBlockchainLoading, setIsBlockchainLoading] = useState<boolean>(false);
   const [isBlockchainError, setIsBlockchainError] = useState<boolean>(false);
+  const [etherscanUrl, setEtherscanUrl] = useState<string>('');
 
   const loadRsuLedgerData = async () => {
     try {
@@ -138,12 +139,16 @@ export const useRsuTrustLedger = () => {
         return false;
       });
       
-      if (rsuData.length === 0) {
-        throw new Error("No RSU-related blockchain entries found");
-      }
-      
       console.log("Blockchain RSU trust ledger data loaded:", rsuData.length);
       setBlockchainLedgerData(rsuData);
+      
+      // Set Etherscan URL
+      const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS || 
+        localStorage.getItem('env_VITE_CONTRACT_ADDRESS');
+      
+      if (contractAddress) {
+        setEtherscanUrl(`https://goerli.etherscan.io/address/${contractAddress}`);
+      }
       
     } catch (error) {
       console.error("Error fetching blockchain RSU trust ledger:", error);
@@ -253,5 +258,6 @@ export const useRsuTrustLedger = () => {
     handleRefresh,
     loadRsuLedgerData,
     loadBlockchainData,
+    etherscanUrl,
   };
 };

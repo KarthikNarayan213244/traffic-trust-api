@@ -29,6 +29,7 @@ const RsuTrustLedgerPage: React.FC = () => {
     handleRefresh,
     loadRsuLedgerData,
     loadBlockchainData,
+    etherscanUrl,
   } = useRsuTrustLedger();
 
   // Get summary statistics
