@@ -10,6 +10,9 @@ let apiInitialized = false;
 // Create a variable to track if we're in the process of reloading
 let isReloading = false;
 
+// This module-level variable will help prevent multiple initializations with different keys
+let firstLoadComplete = false;
+
 export const useMapApiKey = () => {
   // Maintain a ref to detect if this is the first render
   const isFirstRender = useRef(true);
@@ -29,6 +32,7 @@ export const useMapApiKey = () => {
       if (envKey) {
         console.log("Using Maps API key from environment variable");
         globalApiKey = envKey;
+        firstLoadComplete = true;
         return envKey;
       }
       
@@ -37,13 +41,14 @@ export const useMapApiKey = () => {
       if (storedKey) {
         console.log("Loaded Maps API key from localStorage");
         globalApiKey = storedKey;
+        firstLoadComplete = true;
         return storedKey;
       }
     } catch (error) {
       console.error("Error reading Maps API key:", error);
     }
     
-    // No key found anywhere, set empty string to global key
+    // No key found anywhere, set empty string to global key but don't mark as loaded
     globalApiKey = "";
     return "";
   };
@@ -95,6 +100,7 @@ export const useMapApiKey = () => {
       // Mark as initialized if this is the first time setting it
       if (newApiKey && !apiInitialized) {
         apiInitialized = true;
+        firstLoadComplete = true;
       }
     } catch (error) {
       console.error("Error saving Maps API key to localStorage:", error);
@@ -114,9 +120,16 @@ export const useMapApiKey = () => {
       // Mark as initialized if we have a key on first render
       if (apiKey && !apiInitialized) {
         apiInitialized = true;
+        firstLoadComplete = true;
       }
     }
   }, [apiKey]);
 
-  return { apiKey, handleApiKeySet, keyIsSet };
+  // Return our API key state and an indicator of whether the first load is complete
+  return { 
+    apiKey, 
+    handleApiKeySet, 
+    keyIsSet,
+    isFirstLoadComplete: firstLoadComplete
+  };
 };

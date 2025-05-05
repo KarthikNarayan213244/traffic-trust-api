@@ -34,7 +34,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   congestionData: initialCongestionData = []
 }) => {
   // Custom hooks to manage state
-  const { apiKey, handleApiKeySet, keyIsSet } = useMapApiKey();
+  const { apiKey, handleApiKeySet, keyIsSet, isFirstLoadComplete } = useMapApiKey();
   const { vehicles, rsus, congestionData, anomalies, isLoading, setVehicles, setRsus, setCongestionData, setAnomalies } = useMapData(
     initialVehicles, 
     initialRsus, 
@@ -52,9 +52,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
   const [mapsInitialized, setMapsInitialized] = useState<boolean>(false);
 
-  // Only initialize the maps API if we have a key
+  // Only initialize the maps API if we have a key and it's the first load
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey || "", // Always use the value from the hook
+    googleMapsApiKey: apiKey || "", 
     libraries,
     id: "google-map-script"
   });
@@ -67,7 +67,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     }
   }, [isLoaded, mapsInitialized]);
 
-  // Set up interval for data updates and ML inference when monitoring is active
+  // Data update intervals
   const setupIntervals = useCallback(() => {
     if (!isLiveMonitoring || isModelLoading) return null;
     
@@ -251,7 +251,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
           <p className="text-sm text-gray-500 mt-2">
             Please check your internet connection and API key, then try again
           </p>
-          <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+          <div className="mt-4">
+            <MapApiKeyForm onApiKeySet={handleApiKeySet} />
+          </div>
         </div>
       </div>
     );
@@ -343,6 +345,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     return renderLoadingSkeleton();
   }
 
+  // Ensure we have an API key before attempting to load the map
   if (!keyIsSet) {
     return renderApiKeyNeeded();
   }

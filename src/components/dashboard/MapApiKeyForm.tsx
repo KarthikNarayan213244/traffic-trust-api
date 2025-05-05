@@ -38,8 +38,14 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
+      // Ensure we're passing a non-empty string
       onApiKeySet(apiKey.trim());
       setShowDialog(false);
+      
+      toast({
+        title: "API Key Saved",
+        description: "Your Google Maps API key has been saved.",
+      });
     } else {
       toast({
         title: "API Key Required",

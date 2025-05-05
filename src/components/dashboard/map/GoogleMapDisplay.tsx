@@ -80,7 +80,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
 
   // Calculate directions
   useEffect(() => {
-    if (!destination || !selectedAmbulance || !window.google) return;
+    if (!destination || !selectedAmbulance || !window.google || !apiKey) return;
 
     try {
       const service = new window.google.maps.DirectionsService();
@@ -112,7 +112,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
       console.error("Error calculating directions:", error);
       setDirectionsStatus(google.maps.DirectionsStatus.UNKNOWN_ERROR);
     }
-  }, [destination, selectedAmbulance, optimizedRoute]);
+  }, [destination, selectedAmbulance, optimizedRoute, apiKey]);
   
   // Count congestion zones
   const congestionZones = useMemo(() => {
