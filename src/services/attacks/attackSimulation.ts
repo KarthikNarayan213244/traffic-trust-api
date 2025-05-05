@@ -85,6 +85,7 @@ export class AttackSimulationEngine {
   private onStatsUpdatedCallback: ((stats: SimulationStats) => void) | null = null;
   private onRsusUpdatedCallback: ((rsus: any[]) => void) | null = null;
   private currentRsus: any[] = [];
+  private attackEventHistory: AttackEvent[] = [];
 
   constructor() {
     this.resetStats();
@@ -126,6 +127,9 @@ export class AttackSimulationEngine {
     
     // Immediately trigger an update to make sure we have initial values
     this.simulationCycle();
+    
+    // Update stats to ensure UI gets latest values
+    this.emitStatsUpdate();
   }
 
   stop() {
@@ -143,9 +147,7 @@ export class AttackSimulationEngine {
     this.stats.activeAttackers = 0;
     
     // Trigger final stats update
-    if (this.onStatsUpdatedCallback) {
-      this.onStatsUpdatedCallback(this.stats);
-    }
+    this.emitStatsUpdate();
   }
 
   isRunning(): boolean {
@@ -206,6 +208,9 @@ export class AttackSimulationEngine {
             affectedNodes: [anomaly.target_id]
           };
           
+          // Store attack event in history
+          this.attackEventHistory.push(attackEvent);
+          
           // Emit attack event
           if (this.onAttackGeneratedCallback) {
             this.onAttackGeneratedCallback(attackEvent);
@@ -231,6 +236,9 @@ export class AttackSimulationEngine {
       // Get network stats
       const networkStats = this.networkTopology.getNetworkStats();
       this.stats.networkDegradation = 1 - (networkStats.averageThroughput / 100);
+      
+      // Emit updated stats
+      this.emitStatsUpdate();
     } else {
       // If no attacks were generated, still update RSUs to potentially increase trust scores
       const updatedRsus = await updateRsuTrustScores(this.currentRsus, []);
@@ -246,11 +254,19 @@ export class AttackSimulationEngine {
       if (this.onRsusUpdatedCallback) {
         this.onRsusUpdatedCallback(updatedRsus);
       }
+      
+      // Emit updated stats
+      this.emitStatsUpdate();
     }
-    
-    // Update stats
+  }
+
+  private emitStatsUpdate() {
     if (this.onStatsUpdatedCallback) {
-      this.onStatsUpdatedCallback(this.stats);
+      // Make sure we have accurate stats before emitting
+      this.updateStatsFromRsus(this.currentRsus);
+      
+      // Send stats update
+      this.onStatsUpdatedCallback({...this.stats});
     }
   }
 
@@ -309,13 +325,28 @@ export class AttackSimulationEngine {
 
   // Update stats based on RSU states
   private updateStatsFromRsus(rsus: any[]): void {
+    if (!rsus || rsus.length === 0) return;
+    
     // Count compromised and quarantined RSUs
     this.stats.rsusCompromised = rsus.filter(rsu => rsu.attack_detected).length;
     this.stats.rsusQuarantined = rsus.filter(rsu => rsu.quarantined).length;
     
     // Count trust updates and blockchain transactions
-    this.stats.trustUpdates = rsus.filter(rsu => rsu.trust_score_change !== 0).length;
-    this.stats.blockchainTxs = rsus.filter(rsu => rsu.blockchain_protected).length;
+    const trustUpdates = rsus.filter(rsu => 
+      rsu.trust_score_change !== undefined && 
+      rsu.trust_score_change !== null && 
+      rsu.trust_score_change !== 0
+    ).length;
+    
+    const blockchainTxs = rsus.filter(rsu => 
+      rsu.blockchain_protected === true
+    ).length;
+    
+    // Only update counts if they've increased
+    this.stats.trustUpdates = Math.max(this.stats.trustUpdates, trustUpdates);
+    this.stats.blockchainTxs = Math.max(this.stats.blockchainTxs, blockchainTxs);
+    
+    console.log(`Stats updated - Compromised: ${this.stats.rsusCompromised}, Quarantined: ${this.stats.rsusQuarantined}, Trust Updates: ${this.stats.trustUpdates}, Blockchain Txs: ${this.stats.blockchainTxs}`);
   }
 
   resetStats() {
@@ -332,10 +363,11 @@ export class AttackSimulationEngine {
       networkDegradation: 0
     };
     
+    // Clear attack history
+    this.attackEventHistory = [];
+    
     // Trigger stats update
-    if (this.onStatsUpdatedCallback) {
-      this.onStatsUpdatedCallback(this.stats);
-    }
+    this.emitStatsUpdate();
   }
 
   // Update simulation options
@@ -352,6 +384,16 @@ export class AttackSimulationEngine {
       const newInterval = this.calculateSimulationInterval();
       this.simulationTimer = setInterval(() => this.simulationCycle(), newInterval);
     }
+  }
+  
+  // Get current simulation stats
+  getStats(): SimulationStats {
+    return {...this.stats};
+  }
+  
+  // Get all attack events that have occurred
+  getAttackHistory(): AttackEvent[] {
+    return [...this.attackEventHistory];
   }
 }
 

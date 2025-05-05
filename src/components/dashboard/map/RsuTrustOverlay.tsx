@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertOctagon, AlertTriangle, CheckCircle, Shield } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CheckCircle, Shield, Lock } from "lucide-react";
 
 interface RsuTrustOverlayProps {
   rsus: any[];
@@ -20,7 +20,8 @@ const RsuTrustOverlay: React.FC<RsuTrustOverlayProps> = ({
     rsu.attack_detected || 
     rsu.quarantined || 
     (rsu.trust_score_change && Math.abs(rsu.trust_score_change) >= 2) ||
-    rsu.trust_score < 70
+    rsu.trust_score < 70 ||
+    rsu.blockchain_protected
   );
   
   if (notableRsus.length === 0) {
@@ -28,7 +29,7 @@ const RsuTrustOverlay: React.FC<RsuTrustOverlayProps> = ({
   }
 
   return (
-    <Card className="absolute left-4 bottom-4 w-72 bg-background/90 backdrop-blur-sm border-muted shadow-lg max-h-64 overflow-auto">
+    <Card className="absolute left-4 bottom-4 w-80 bg-background/90 backdrop-blur-sm border-muted shadow-lg max-h-80 overflow-auto">
       <CardContent className="p-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-medium flex items-center gap-1">
@@ -36,6 +37,22 @@ const RsuTrustOverlay: React.FC<RsuTrustOverlayProps> = ({
             RSU Trust Monitoring
           </h3>
           <Badge variant="secondary" className="text-xs">Live</Badge>
+        </div>
+        
+        {/* Summary stats */}
+        <div className="grid grid-cols-3 gap-1 mb-3 text-xs border-b pb-2">
+          <div className="text-center">
+            <div className="font-medium">{rsus.filter(r => r.attack_detected).length}</div>
+            <div className="text-muted-foreground">Compromised</div>
+          </div>
+          <div className="text-center">
+            <div className="font-medium">{rsus.filter(r => r.quarantined).length}</div>
+            <div className="text-muted-foreground">Quarantined</div>
+          </div>
+          <div className="text-center">
+            <div className="font-medium">{rsus.filter(r => r.blockchain_protected).length}</div>
+            <div className="text-muted-foreground">Blockchain</div>
+          </div>
         </div>
         
         <div className="space-y-2 mt-2">
@@ -97,9 +114,9 @@ const RsuTrustOverlay: React.FC<RsuTrustOverlayProps> = ({
                   {rsu.blockchain_protected && (
                     <Badge 
                       variant="outline" 
-                      className="text-xs bg-blue-50 text-blue-800"
+                      className="text-xs bg-blue-50 text-blue-800 flex items-center gap-1"
                     >
-                      Blockchain
+                      <Lock size={10} /> Blockchain
                     </Badge>
                   )}
                 </div>

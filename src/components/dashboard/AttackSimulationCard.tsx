@@ -74,6 +74,15 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
     return Math.round((1 - stats.networkDegradation) * 100);
   };
 
+  const getRsusCompromisedCount = () => {
+    // First check stats, then fallback to counting from rsus array
+    if (stats.rsusCompromised > 0) {
+      return stats.rsusCompromised;
+    } else {
+      return rsus.filter(rsu => rsu.attack_detected || rsu.quarantined).length;
+    }
+  };
+
   // Initialize the attack simulation engine
   useEffect(() => {
     const handleAttack = (attack: AttackEvent) => {
@@ -124,7 +133,7 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
       setStats(newStats);
     });
     globalAttackSimulationEngine.setOnRsusUpdated(updatedRsus => {
-      console.log("RSUs updated:", updatedRsus.length);
+      console.log("RSUs updated from simulation:", updatedRsus.length);
       setRsus(updatedRsus);
     });
     
@@ -153,11 +162,15 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
     // Update options if they've changed
     globalAttackSimulationEngine.updateOptions({
       attackFrequency,
-      defenseLevel
+      defenseLevel,
+      enableNetworkEffects: true,
+      enableVisualization: true,
+      realTimeSimulation: true
     });
     
     // Start the simulation if not already running
     if (!globalAttackSimulationEngine.isRunning()) {
+      console.log("Starting simulation with", rsus.length, "RSUs");
       globalAttackSimulationEngine.start(rsus);
     }
     
@@ -198,6 +211,8 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
       
       if (newState) {
         // Starting simulation
+        console.log("Starting attack simulation with", rsus.length, "RSUs");
+        globalAttackSimulationEngine.resetStats();
         globalAttackSimulationEngine.start(rsus);
         toast({
           title: "Attack Simulation Started",
@@ -229,7 +244,10 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
   const updateSimulationOptions = () => {
     globalAttackSimulationEngine.updateOptions({
       attackFrequency,
-      defenseLevel
+      defenseLevel,
+      enableNetworkEffects: true,
+      enableVisualization: true,
+      realTimeSimulation: true
     });
     
     toast({
@@ -267,24 +285,36 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
                 <AlertTriangle className="text-amber-500 mb-1" size={20} />
                 <div className="text-xs text-gray-500">Attacks</div>
                 <div className="text-2xl font-bold">{stats.attacksAttempted}</div>
+                <div className="text-xs text-muted-foreground">
+                  {stats.attacksSuccessful} successful
+                </div>
               </div>
               
               <div className="border rounded-lg p-4 flex flex-col items-center justify-center text-center">
                 <CirclePercent className="text-blue-500 mb-1" size={20} />
                 <div className="text-xs text-gray-500">Success Rate</div>
                 <div className="text-2xl font-bold">{getSuccessRate()}%</div>
+                <div className="text-xs text-muted-foreground">
+                  of attacks
+                </div>
               </div>
               
               <div className="border rounded-lg p-4 flex flex-col items-center justify-center text-center">
                 <Shield className="text-red-500 mb-1" size={20} />
                 <div className="text-xs text-gray-500">RSUs Compromised</div>
-                <div className="text-2xl font-bold">{stats.rsusCompromised}</div>
+                <div className="text-2xl font-bold">{getRsusCompromisedCount()}</div>
+                <div className="text-xs text-muted-foreground">
+                  {stats.rsusQuarantined} quarantined
+                </div>
               </div>
               
               <div className="border rounded-lg p-4 flex flex-col items-center justify-center text-center">
                 <Activity className="text-green-500 mb-1" size={20} />
                 <div className="text-xs text-gray-500">Network Health</div>
                 <div className="text-2xl font-bold">{getNetworkHealth()}%</div>
+                <div className="text-xs text-muted-foreground">
+                  {stats.blockchainTxs} blockchain txs
+                </div>
               </div>
             </div>
             
@@ -431,7 +461,7 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">Compromised</div>
-                    <div className="font-medium text-red-600">{stats.rsusCompromised}</div>
+                    <div className="font-medium text-red-600">{getRsusCompromisedCount()}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-500">Quarantined</div>
