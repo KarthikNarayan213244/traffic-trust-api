@@ -1,5 +1,5 @@
 
-import { AttackVector, ALL_ATTACK_VECTORS, getRandomAttackVector } from './attackTypes';
+import { AttackVector, ALL_ATTACK_VECTORS, getRandomAttackVector, ATTACK_VECTORS } from './attackTypes';
 import { Attacker, AttackerPool, globalAttackerPool } from './attackerModel';
 import { NetworkTopology, globalNetworkTopology } from './networkSimulation';
 import { v4 as uuidv4 } from 'uuid';
@@ -167,7 +167,7 @@ export class AttackSimulationEngine {
     const attack: Attack = this.convertVectorToAttack(attackVector);
     
     const attacker: Attacker = this.attackerPool.getRandomAttacker();
-    const attackSuccess = Math.random() < (attacker.profile.skill);
+    const attackSuccess = Math.random() < (attacker.profile.skill / 100);
     const attackDetected = attackSuccess && (Math.random() > (this.options.defenseLevel / 100));
     const attackMitigated = attackDetected && (Math.random() > 0.5);
     const networkImpact = attackSuccess ? (Math.random() * 0.05) : 0;
@@ -177,6 +177,9 @@ export class AttackSimulationEngine {
       targetRsu.trustScore -= (attack.severity === 'Critical' ? 0.3 : 0.1);
       targetRsu.trustScore = Math.max(0, targetRsu.trustScore);
       this.stats.rsusCompromised++;
+      
+      // Record blockchain transaction for compromised RSU
+      this.stats.blockchainTxs++;
     }
     
     // Update stats
@@ -225,10 +228,7 @@ export class AttackSimulationEngine {
 
   // Helper to determine the category for an attack
   private getCategoryForAttack(attackId: string): string {
-    // Access the ATTACK_VECTORS object directly from attackTypes.ts import
-    // Need to import ATTACK_VECTORS directly rather than from ALL_ATTACK_VECTORS
-    const { ATTACK_VECTORS } = require('./attackTypes');
-    
+    // Directly use the imported ATTACK_VECTORS
     for (const [category, attacks] of Object.entries(ATTACK_VECTORS)) {
       if (Array.isArray(attacks) && attacks.some((a: any) => a.id === attackId)) {
         return category;

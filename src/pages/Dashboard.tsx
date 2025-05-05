@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
 import TrafficMap from "@/components/dashboard/TrafficMap";
 import AnomalyChart from "@/components/dashboard/AnomalyChart";
 import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
+import AttackSimulationCard from "@/components/dashboard/AttackSimulationCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Car, Radio, AlertTriangle, Shield, RefreshCw, BarChart3, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -236,20 +238,33 @@ const Dashboard: React.FC = () => {
           />
         </div>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>Real-time Traffic Monitoring</CardTitle>
-            <CardDescription>View and track vehicles and roadside units across Hyderabad in real-time</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <TrafficMap 
-              vehicles={vehicles}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Real-time Traffic Monitoring</CardTitle>
+                <CardDescription>View and track vehicles and roadside units across Hyderabad in real-time</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <TrafficMap 
+                  vehicles={vehicles}
+                  rsus={rsus}
+                  isLoading={isLoading}
+                  congestionData={congestionData}
+                />
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div>
+            <AttackSimulationCard
               rsus={rsus}
-              isLoading={isLoading}
-              congestionData={congestionData}
+              isLiveMonitoring={autoRefresh}
+              setRsus={setRsus}
+              setAnomalies={setAnomalies}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>

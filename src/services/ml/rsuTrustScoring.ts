@@ -6,6 +6,7 @@ import { stakeTrust } from "@/services/blockchain";
 const TRUST_INCREASE_FACTOR = 0.01;  // If no anomaly, increase trust by this factor * (1-currentTrust)
 const TRUST_DECREASE_FACTOR = 0.1;   // If anomaly detected, decrease trust by this factor * severity
 const DEFAULT_TRUST_SCORE = 90;      // Default trust score for new RSUs
+const BLOCKCHAIN_UPDATE_THRESHOLD = 2; // Minimum trust change to trigger blockchain update
 
 // Keep track of RSU security status
 interface RsuSecurityState {
@@ -18,6 +19,7 @@ interface RsuSecurityState {
   quarantined: boolean;
   lastUpdateTime: string;
   consecutiveAnomalies: number;
+  blockchainTxId?: string; // Last blockchain transaction ID
 }
 
 // RSU security state storage
@@ -47,6 +49,7 @@ export const calculateRsuTrustScore = (
   change: number;
   attackDetected: boolean;
   quarantined: boolean;
+  blockchainUpdated: boolean;
 } => {
   try {
     // Get or initialize RSU security state
@@ -121,11 +124,19 @@ export const calculateRsuTrustScore = (
     // Update lastUpdateTime
     securityState.lastUpdateTime = now.toISOString();
     
+    // Determine if blockchain update is needed
+    const trustChange = Math.round(newTrustScore - oldScore);
+    const blockchainUpdateNeeded = 
+      Math.abs(trustChange) >= BLOCKCHAIN_UPDATE_THRESHOLD || 
+      securityState.attackDetected || 
+      securityState.quarantined;
+    
     return {
       score: Math.round(newTrustScore),
-      change: Math.round(newTrustScore - oldScore),
+      change: trustChange,
       attackDetected: securityState.attackDetected,
-      quarantined: securityState.quarantined
+      quarantined: securityState.quarantined,
+      blockchainUpdated: blockchainUpdateNeeded
     };
   } catch (error) {
     console.error("Error calculating RSU trust score:", error);
@@ -135,7 +146,8 @@ export const calculateRsuTrustScore = (
       score: currentTrustScore || DEFAULT_TRUST_SCORE,
       change: 0,
       attackDetected: false,
-      quarantined: false
+      quarantined: false,
+      blockchainUpdated: false
     };
   }
 };
@@ -146,6 +158,9 @@ export const updateRsuTrustScores = async (
   anomalies: any[]
 ): Promise<any[]> => {
   try {
+    // Count of blockchain transactions in this update
+    let blockchainTransactions = 0;
+    
     // Update each RSU with a new trust score
     const updatedRsus = await Promise.all(rsus.map(async (rsu) => {
       const trustResult = calculateRsuTrustScore(
@@ -160,22 +175,42 @@ export const updateRsuTrustScores = async (
         trust_score_change: trustResult.change,
         attack_detected: trustResult.attackDetected,
         quarantined: trustResult.quarantined,
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
+        blockchain_protected: trustResult.blockchainUpdated
       };
       
-      // Log trust update to blockchain if significant change or security status change
-      if (Math.abs(trustResult.change) >= 2 || 
-          trustResult.attackDetected || 
-          trustResult.quarantined) {
+      // Log trust update to blockchain if needed
+      if (trustResult.blockchainUpdated) {
         try {
+          // Prepare reason code
+          const reasonCode = trustResult.quarantined ? 'RSU_QUARANTINED' : 
+                            trustResult.attackDetected ? 'ATTACK_DETECTED' : 
+                            'TRUST_UPDATE';
+          
           // Use blockchain staking for significant trust changes
-          await stakeTrust(
+          const txId = await stakeTrust(
             rsu.rsu_id, 
             trustResult.score,
-            `RSU_TRUST_UPDATE${trustResult.quarantined ? '_QUARANTINED' : 
-              trustResult.attackDetected ? '_ATTACKED' : ''}`
+            reasonCode
           );
-          console.log(`Logged trust update for RSU ${rsu.rsu_id} to blockchain: ${trustResult.score}`);
+          
+          // Store blockchain transaction ID
+          const securityState = rsuSecurityStates[rsu.rsu_id];
+          if (securityState) {
+            securityState.blockchainTxId = txId;
+          }
+          
+          blockchainTransactions++;
+          console.log(`Logged trust update for RSU ${rsu.rsu_id} to blockchain: ${trustResult.score}, txId: ${txId}`);
+          
+          // Show toast for quarantined RSUs
+          if (trustResult.quarantined) {
+            toast({
+              title: "RSU Quarantined",
+              description: `RSU ${rsu.rsu_id} has been quarantined due to suspicious activity. Trust score: ${trustResult.score}`,
+              variant: "destructive"
+            });
+          }
         } catch (error) {
           console.error(`Failed to log trust update to blockchain for RSU ${rsu.rsu_id}:`, error);
         }
@@ -183,6 +218,11 @@ export const updateRsuTrustScores = async (
       
       return updatedRsu;
     }));
+    
+    // Log blockchain transaction summary
+    if (blockchainTransactions > 0) {
+      console.log(`Updated ${blockchainTransactions} RSU trust scores on blockchain`);
+    }
     
     return updatedRsus;
   } catch (error) {
