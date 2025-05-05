@@ -7,6 +7,7 @@ import { Vehicle } from "@/services/api/types";
 import { fetchVehicles, fetchCongestionData, fetchRSUs, fetchAnomalies } from "@/services/api";
 import MLControls from "./MLControls";
 import ApiKeyControl from "./ApiKeyControl";
+import SmartTrafficSimulation from "./SmartTrafficSimulation";
 import { useMapData } from "@/hooks/useMapData";
 import { useMLSimulation } from "@/hooks/useMLSimulation";
 import { useMapApiKey } from "@/hooks/useMapApiKey";
@@ -14,7 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   updateCongestionData, 
   processVehiclesForAnomalies, 
-  updateTrustScores 
+  updateTrustScores,
+  updateRsuTrustScores 
 } from "@/services/ml";
 
 interface TrafficMapProps {
@@ -93,6 +95,11 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         const updatedVehicles = await updateTrustScores(vehicles, anomalies);
         setVehicles(updatedVehicles);
         console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
+        
+        // Update RSU trust scores
+        const updatedRsus = await updateRsuTrustScores(rsus, anomalies);
+        setRsus(updatedRsus);
+        console.log(`Updated trust scores for ${updatedRsus.length} RSUs using ML`);
       })();
     }
     
@@ -149,6 +156,17 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       });
     }, intervals.rsus);
     
+    // RSU trust update interval
+    const rsuTrustInterval = setInterval(() => {
+      if (modelsLoaded) {
+        // Update RSU trust scores
+        updateRsuTrustScores(rsus, anomalies).then(updatedRsus => {
+          setRsus(updatedRsus);
+          console.log(`Updated trust scores for ${updatedRsus.length} RSUs using ML`);
+        });
+      }
+    }, intervals.rsus);
+    
     // ML model update countdown
     const countdownInterval = setInterval(() => {
       setMlUpdateCountdown(prev => {
@@ -178,6 +196,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       clearInterval(vehicleInterval);
       clearInterval(congestionInterval);
       clearInterval(rsuInterval);
+      clearInterval(rsuTrustInterval);
       clearInterval(mlUpdateInterval);
       clearInterval(countdownInterval);
     };
@@ -255,26 +274,41 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         />
       </div>
 
-      {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
-      {isLoaded && mapsInitialized && (
-        <GoogleMapDisplay 
-          vehicles={vehicles} 
-          rsus={rsus} 
-          congestionData={congestionData} 
-          isLiveMonitoring={isLiveMonitoring}
-          selectedAmbulance={selectedAmbulance}
-          onAmbulanceSelect={handleAmbulanceSelect}
-          destination={destination}
-          optimizedRoute={optimizedRoute}
-          onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
-        />
-      )}
-      
-      {modelsLoaded && isLiveMonitoring && (
-        <div className="flex justify-end text-xs text-muted-foreground">
-          <span>ML Model Update in: {mlUpdateCountdown}s</span>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-3">
+          {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
+          {isLoaded && mapsInitialized && (
+            <GoogleMapDisplay 
+              vehicles={vehicles} 
+              rsus={rsus} 
+              congestionData={congestionData} 
+              isLiveMonitoring={isLiveMonitoring}
+              selectedAmbulance={selectedAmbulance}
+              onAmbulanceSelect={handleAmbulanceSelect}
+              destination={destination}
+              optimizedRoute={optimizedRoute}
+              onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
+              anomalies={anomalies}
+            />
+          )}
         </div>
-      )}
+        
+        <div className="space-y-4">
+          <SmartTrafficSimulation 
+            rsus={rsus}
+            anomalies={anomalies}
+            isLiveMonitoring={isLiveMonitoring}
+            setRsus={setRsus}
+            setAnomalies={setAnomalies}
+          />
+          
+          {modelsLoaded && isLiveMonitoring && (
+            <div className="flex justify-end text-xs text-muted-foreground">
+              <span>ML Model Update in: {mlUpdateCountdown}s</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

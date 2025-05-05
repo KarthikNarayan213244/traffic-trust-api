@@ -3,6 +3,7 @@ import React from "react";
 import MapInfoOverlay from "./MapInfoOverlay";
 import MapStatsOverlay from "./MapStatsOverlay";
 import EmergencyRoutePanel from "./EmergencyRoutePanel";
+import RsuTrustOverlay from "./RsuTrustOverlay";
 import { Vehicle } from "@/services/api";
 
 interface MapOverlaysProps {
@@ -14,6 +15,9 @@ interface MapOverlaysProps {
   destination: google.maps.LatLngLiteral | null;
   directionsStatus: google.maps.DirectionsStatus | null;
   apiKey?: string;
+  rsus?: any[];
+  anomalies?: any[];
+  isSimulationRunning?: boolean;
 }
 
 const MapOverlays: React.FC<MapOverlaysProps> = ({
@@ -24,7 +28,10 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
   selectedAmbulance,
   destination,
   directionsStatus,
-  apiKey
+  apiKey,
+  rsus = [],
+  anomalies = [],
+  isSimulationRunning = false
 }) => {
   return (
     <>
@@ -42,6 +49,13 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
           destination={destination} 
           directionsStatus={directionsStatus}
           apiKey={apiKey}
+        />
+      )}
+      
+      {isSimulationRunning && rsus.length > 0 && (
+        <RsuTrustOverlay 
+          rsus={rsus}
+          anomalies={anomalies}
         />
       )}
     </>
