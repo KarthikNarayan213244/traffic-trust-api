@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { stakeTrust } from "@/services/blockchain";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -17,16 +17,25 @@ interface StakeTrustDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialRsuId?: string; // Added this prop to support RSU staking
 }
 
 const StakeTrustDialog: React.FC<StakeTrustDialogProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  initialRsuId = "",
 }) => {
   const [vehicleId, setVehicleId] = useState<string>("");
   const [amount, setAmount] = useState<string>("0.1");
   const [isStaking, setIsStaking] = useState<boolean>(false);
+
+  // Set the vehicleId when initialRsuId changes
+  useEffect(() => {
+    if (initialRsuId) {
+      setVehicleId(initialRsuId);
+    }
+  }, [initialRsuId]);
 
   const handleStake = async () => {
     try {

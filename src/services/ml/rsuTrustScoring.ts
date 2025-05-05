@@ -66,7 +66,7 @@ const recordRsuTrustChange = async (
     };
     
     // Write to database
-    const { error } = await fetch('/api/trust-ledger', {
+    const response = await fetch('/api/trust-ledger', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -74,8 +74,8 @@ const recordRsuTrustChange = async (
       body: JSON.stringify(trustEntry),
     });
     
-    if (error) {
-      console.error("Failed to write RSU trust change to ledger:", error);
+    if (!response.ok) {
+      console.error("Failed to write RSU trust change to ledger:", await response.text());
       return null;
     }
     
