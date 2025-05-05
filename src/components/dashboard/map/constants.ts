@@ -1,66 +1,53 @@
 
-// Storage key for API key
-export const API_KEY_STORAGE_KEY = "traffic_management_maps_api_key";
+// Export the API key storage key for consistent use across the app
+export const API_KEY_STORAGE_KEY = 'google_maps_api_key';
 
-// Hyderabad coordinates
+// Default map center (Hyderabad)
 export const defaultCenter = {
-  lat: 17.3850,
-  lng: 78.4867
+  lat: 17.385044,
+  lng: 78.486671,
 };
 
-// Map container style
+// Default container style
 export const mapContainerStyle = {
-  width: '100%',
-  height: '400px',
+  height: "100%",
+  width: "100%",
 };
 
-// Map options
+// Default map options
 export const mapOptions = {
   disableDefaultUI: false,
   zoomControl: true,
-  streetViewControl: false,
   mapTypeControl: true,
+  streetViewControl: false,
   fullscreenControl: true,
+  clickableIcons: false,
 };
 
-// Libraries to load with Google Maps
-export const libraries: ["visualization"] = ["visualization"];
+// Required libraries
+export const libraries: ("places" | "drawing" | "geometry" | "localContext" | "visualization")[] = ["places", "geometry", "visualization"];
 
-// Map theme - slightly muted colors to make markers stand out
-export const mapTheme = [
-  {
-    featureType: "all",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#7c93a3" }, { lightness: "-10" }]
-  },
-  {
-    featureType: "administrative.country",
-    elementType: "geometry",
-    stylers: [{ visibility: "on" }]
-  },
-  {
-    featureType: "administrative.province",
-    elementType: "geometry.fill",
-    stylers: [{ visibility: "on" }]
-  },
-  {
-    featureType: "landscape",
-    elementType: "geometry.fill",
-    stylers: [{ color: "#f7f7f7" }]
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.fill",
-    stylers: [{ visibility: "simplified" }]
-  },
-  {
-    featureType: "road",
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }]
-  },
-  {
-    featureType: "water",
-    elementType: "geometry.fill",
-    stylers: [{ color: "#c7eced" }]
-  }
-];
+// Vehicle types and their corresponding colors
+export const vehicleTypeColors: Record<string, string> = {
+  "CAR": "#3b82f6",    // Blue
+  "TAXI": "#eab308",   // Yellow
+  "BUS": "#22c55e",    // Green
+  "TRUCK": "#f97316",  // Orange
+  "BIKE": "#8b5cf6",   // Purple
+  "AMBULANCE": "#ef4444", // Red
+  "POLICE": "#0ea5e9", // Light blue
+  "FIRE": "#dc2626",   // Dark red
+  "OTHER": "#6b7280"   // Gray
+};
+
+// RSU status colors
+export const rsuStatusColors: Record<string, string> = {
+  "Active": "#22c55e",   // Green
+  "Inactive": "#6b7280", // Gray
+  "Warning": "#f59e0b",  // Orange
+  "Error": "#ef4444",    // Red
+  "Maintenance": "#8b5cf6" // Purple
+};
+
+// Set the Google Maps API key from environment
+export const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
