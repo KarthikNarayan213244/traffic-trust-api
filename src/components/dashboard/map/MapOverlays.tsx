@@ -42,6 +42,9 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
     rsu.blockchain_protected
   );
 
+  // If the simulation is running or there are notable RSUs, we want to show the overlay
+  const shouldShowRsuTrustOverlay = (isSimulationRunning || hasNotableRsus) && rsus.length > 0;
+
   return (
     <>
       <MapInfoOverlay />
@@ -61,8 +64,8 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
         />
       )}
       
-      {/* Always show the RSU Trust overlay if there are notable RSUs */}
-      {hasNotableRsus && rsus.length > 0 && (
+      {/* Always show the RSU Trust overlay if there are notable RSUs or simulation is running */}
+      {shouldShowRsuTrustOverlay && (
         <RsuTrustOverlay 
           rsus={rsus}
           anomalies={anomalies}

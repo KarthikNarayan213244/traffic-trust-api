@@ -256,6 +256,10 @@ const AttackSimulationCard: React.FC<AttackSimulationCardProps> = ({
     });
   };
 
+  console.log("Current stats:", stats);
+  console.log("Success rate:", getSuccessRate());
+  console.log("Compromised RSUs:", getRsusCompromisedCount());
+
   return (
     <Card className="bg-white shadow-md">
       <CardHeader className="pb-2">
