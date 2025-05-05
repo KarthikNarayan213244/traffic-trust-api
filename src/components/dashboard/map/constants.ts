@@ -24,8 +24,9 @@ export const mapOptions = {
   clickableIcons: false,
 };
 
-// Required libraries - using string array instead of readonly array to avoid TypeScript error
-export const libraries = ["places", "drawing", "geometry", "visualization"];
+// Required libraries for Google Maps API
+// Type as any to resolve Library type issues
+export const libraries: any = ["places", "drawing", "geometry", "visualization"];
 
 // Vehicle types and their corresponding colors
 export const vehicleTypeColors: Record<string, string> = {

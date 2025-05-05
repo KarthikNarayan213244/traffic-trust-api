@@ -1,7 +1,7 @@
 
 // Export all API functions
 export * from './types';
-export * from './config';
+export { ENDPOINTS, fetchData } from './config';
 export * from './vehicles';
 export * from './rsus';
 export * from './anomalies';

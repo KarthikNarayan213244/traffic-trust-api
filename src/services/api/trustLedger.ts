@@ -2,12 +2,12 @@
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { TrustLedgerEntry } from "./types";
-import { ApiEndpoint } from "./config";
+import { ApiEndpoint } from "./supabase/types";
 
 export async function fetchTrustLedger(options = {}): Promise<TrustLedgerEntry[]> {
   try {
     // First try to fetch from Supabase
-    const data = await fetchFromSupabase<"trustLedger">("trustLedger", options);
+    const data = await fetchFromSupabase("trustLedger", options);
     return data;
   } catch (error) {
     console.error("Error fetching trust ledger from Supabase:", error);

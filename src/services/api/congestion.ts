@@ -1,13 +1,13 @@
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { CongestionZone } from "./types";
-import { ApiEndpoint } from "./config";
+import { ApiEndpoint } from "./supabase/types";
 
 // Renamed function to match import expectations across the app
 export async function fetchCongestionData(options = {}): Promise<CongestionZone[]> {
   try {
     // First try to fetch from Supabase
-    const data = await fetchFromSupabase<"congestion">("congestion", options);
+    const data = await fetchFromSupabase("congestion", options);
     return data;
   } catch (error) {
     console.error("Error fetching congestion zones from Supabase:", error);

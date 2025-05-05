@@ -16,17 +16,17 @@ export const REQUEST_TIMEOUT = 30000;
 // Default number of retries for failed requests
 export const REQUEST_RETRIES = 3;
 
-// API endpoints
+// API endpoints as string values for proper type matching
 export const ENDPOINTS = {
-  VEHICLES: '/vehicles',
-  RSUS: '/rsus',
-  ANOMALIES: '/anomalies',
-  TRUST_LEDGER: '/trust-ledger',
-  CONGESTION: '/congestion',
-  SIMULATION: '/simulation',
+  vehicles: 'vehicles',
+  rsus: 'rsus',
+  anomalies: 'anomalies',
+  trustLedger: 'trustLedger',
+  congestion: 'congestion',
+  simulation: 'simulation',
 };
 
-// Type definition for API endpoint keys
+// Type definition for API endpoint keys - this needs to match the keys in ENDPOINTS
 export type ApiEndpoint = keyof typeof ENDPOINTS;
 
 // Authentication key (if needed)

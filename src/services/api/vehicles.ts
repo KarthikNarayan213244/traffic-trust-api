@@ -2,12 +2,12 @@
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { Vehicle } from "./types";
-import { ApiEndpoint } from "./config";
+import { ApiEndpoint } from "./supabase/types";
 
 export async function fetchVehicles(options = {}): Promise<Vehicle[]> {
   try {
     // First try to fetch from Supabase
-    const data = await fetchFromSupabase<"vehicles">("vehicles", options);
+    const data = await fetchFromSupabase("vehicles", options);
     return data;
   } catch (error) {
     console.error("Error fetching vehicles from Supabase:", error);

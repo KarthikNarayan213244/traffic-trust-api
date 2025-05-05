@@ -1,3 +1,4 @@
+
 import { supabase } from "./client";
 import { ENDPOINTS } from "../config";
 import { EndpointTypeMap, endpointToTableMap, ValidTableName, 
@@ -5,7 +6,7 @@ import { EndpointTypeMap, endpointToTableMap, ValidTableName,
 import { ApiEndpoint } from "./types";
 
 // Fetch data from Supabase with proper type handling
-export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, options: Record<string, any> = {}): Promise<EndpointTypeMap[T]> {
+export async function fetchFromSupabase<K extends ApiEndpoint>(endpoint: K, options: Record<string, any> = {}): Promise<EndpointTypeMap[K]> {
   // Get the corresponding table name for this endpoint
   const tableName = endpointToTableMap[endpoint] as ValidTableName;
   
@@ -48,7 +49,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
     
     // Transform data to match the expected types based on the endpoint
     if (!result.data || result.data.length === 0) {
-      return [] as EndpointTypeMap[T];
+      return [] as EndpointTypeMap[K];
     }
     
     // Type-safe transformation of data based on the endpoint
@@ -72,7 +73,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
             location: item.location,
             status: item.status
           };
-        }).filter(Boolean) as EndpointTypeMap[T];
+        }).filter(Boolean) as EndpointTypeMap[K];
         
       case "rsus":
         return result.data.map(item => {
@@ -88,7 +89,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
             lat: item.lat,
             lng: item.lng
           };
-        }).filter(Boolean) as EndpointTypeMap[T];
+        }).filter(Boolean) as EndpointTypeMap[K];
         
       case "anomalies":
         return result.data.map(item => {
@@ -105,7 +106,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
             message: item.message || '',
             status: item.status
           };
-        }).filter(Boolean) as EndpointTypeMap[T];
+        }).filter(Boolean) as EndpointTypeMap[K];
         
       case "trustLedger":
         return result.data.map(item => {
@@ -122,7 +123,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
             new_value: item.new_value,
             details: item.details
           };
-        }).filter(Boolean) as EndpointTypeMap[T];
+        }).filter(Boolean) as EndpointTypeMap[K];
         
       case "congestion":
         return result.data.map(item => {
@@ -138,12 +139,12 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
             congestion_level: item.congestion_level,
             updated_at: item.updated_at
           };
-        }).filter(Boolean) as EndpointTypeMap[T];
+        }).filter(Boolean) as EndpointTypeMap[K];
         
       default:
         // For safety, fallback to direct return but this should never happen
         console.warn(`No specific transformation for endpoint ${endpoint}, returning raw data`);
-        return result.data as EndpointTypeMap[T];
+        return result.data as EndpointTypeMap[K];
     }
   } catch (error) {
     console.error(`Error fetching from ${tableName}:`, error);

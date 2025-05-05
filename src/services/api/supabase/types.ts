@@ -6,13 +6,13 @@ import { Vehicle, Rsu, Anomaly, TrustLedgerEntry, CongestionZone } from "../type
 export type ApiEndpoint = keyof typeof ENDPOINTS;
 
 // Type mapping for each endpoint's return type
-export type EndpointTypeMap = {
+export interface EndpointTypeMap {
   vehicles: Vehicle[];
   rsus: Rsu[];
   anomalies: Anomaly[];
   trustLedger: TrustLedgerEntry[];
   congestion: CongestionZone[];
-};
+}
 
 // Map API endpoints to their corresponding Supabase table names
 export const endpointToTableMap = {
