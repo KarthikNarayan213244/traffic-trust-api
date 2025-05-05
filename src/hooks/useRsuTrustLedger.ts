@@ -21,7 +21,7 @@ export const useRsuTrustLedger = () => {
       
       // First try to fetch with filter if target_type is available
       try {
-        data = await fetchFromSupabase('trustLedger', { 
+        data = await fetchFromSupabase('trust_ledger', { 
           filters: { target_type: 'RSU' },
           limit: 1000,
           orderBy: { field: 'timestamp', ascending: false }
@@ -32,7 +32,7 @@ export const useRsuTrustLedger = () => {
         console.warn("Could not filter by target_type, trying alternative approach:", error);
         
         // Fallback: get all data and filter client-side
-        const allData = await fetchFromSupabase('trustLedger', {
+        const allData = await fetchFromSupabase('trust_ledger', {
           limit: 1000,
           orderBy: { field: 'timestamp', ascending: false }
         });

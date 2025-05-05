@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import WalletConnectButton from "@/components/WalletConnectButton";
@@ -38,7 +39,10 @@ const RsuTrustLedgerPage: React.FC = () => {
     const attacks = rsuLedgerData.filter(entry => 
       entry.status === 'Attack Detected' || 
       entry.action === 'Attack Detected' ||
-      entry.action === 'ATTACK_DETECTED'
+      entry.action === 'ATTACK_DETECTED' ||
+      entry.type === 'Sybil Attack' ||
+      entry.type === 'Denial of Service' ||
+      entry.type === 'Malicious Data Injection'
     ).length;
     
     const quarantined = rsuLedgerData.filter(entry => 
@@ -77,7 +81,7 @@ const RsuTrustLedgerPage: React.FC = () => {
         return;
       }
       
-      // Generate simulated attacks (50% chance)
+      // Generate simulated attacks with higher probability (50% chance)
       const anomalies = generateRsuAttacks(rsus, 0.5);
       
       if (anomalies.length === 0) {
