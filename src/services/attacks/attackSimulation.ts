@@ -225,8 +225,10 @@ export class AttackSimulationEngine {
 
   // Helper to determine the category for an attack
   private getCategoryForAttack(attackId: string): string {
-    const attackVectors = require('./attackTypes').ATTACK_VECTORS;
-    for (const [category, attacks] of Object.entries(attackVectors)) {
+    // Import directly from attackTypes instead of using require
+    const { ATTACK_VECTORS } = ALL_ATTACK_VECTORS;
+    
+    for (const [category, attacks] of Object.entries(ATTACK_VECTORS)) {
       if (Array.isArray(attacks) && attacks.some((a: any) => a.id === attackId)) {
         return category;
       }

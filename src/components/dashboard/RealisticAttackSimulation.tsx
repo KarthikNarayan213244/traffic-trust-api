@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,7 +40,7 @@ interface RealisticAttackSimulationProps {
   anomalies: any[];
   isLiveMonitoring: boolean;
   setRsus: (rsus: any[]) => void;
-  setAnomalies: (anomalies: any[]) => void;
+  setAnomalies: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const RealisticAttackSimulation: React.FC<RealisticAttackSimulationProps> = ({
