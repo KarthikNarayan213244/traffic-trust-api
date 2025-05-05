@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -26,9 +27,6 @@ interface TrafficMapProps {
   congestionData?: any[];
 }
 
-// Keep track of whether the maps API has already been initialized
-let mapsApiInitialized = false;
-
 const TrafficMap: React.FC<TrafficMapProps> = ({
   vehicles: initialVehicles = [],
   rsus: initialRsus = [],
@@ -54,7 +52,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
   const [mapsInitialized, setMapsInitialized] = useState<boolean>(false);
 
-  // Only initialize the maps API if we have a key and it hasn't been initialized yet
+  // Only initialize the maps API if we have a key
+  // We only do this once - the component will reload if the key changes
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
     libraries,
@@ -202,7 +201,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   }, [
     isLiveMonitoring, modelsLoaded, isModelLoading, 
     setVehicles, setRsus, setCongestionData, setAnomalies,
-    vehicles, congestionData, anomalies, 
+    vehicles, congestionData, anomalies, rsus,
     getIntervals
   ]);
 
@@ -288,6 +287,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
               optimizedRoute={optimizedRoute}
               onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
               anomalies={anomalies}
+              apiKey={apiKey}
             />
           )}
         </div>

@@ -17,6 +17,7 @@ interface MapOverlaysProps {
   rsus?: any[];
   anomalies?: any[];
   isSimulationRunning?: boolean;
+  apiKey?: string;
 }
 
 const MapOverlays: React.FC<MapOverlaysProps> = ({
@@ -29,7 +30,8 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
   directionsStatus,
   rsus = [],
   anomalies = [],
-  isSimulationRunning = false
+  isSimulationRunning = false,
+  apiKey
 }) => {
   return (
     <>
@@ -46,6 +48,7 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
           ambulance={selectedAmbulance} 
           destination={destination} 
           directionsStatus={directionsStatus}
+          apiKey={apiKey}
         />
       )}
       

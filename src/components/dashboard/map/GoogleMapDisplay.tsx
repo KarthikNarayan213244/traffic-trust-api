@@ -21,6 +21,7 @@ interface GoogleMapDisplayProps {
   optimizedRoute: google.maps.LatLngLiteral[] | null;
   onMapClick: (latLng: google.maps.LatLngLiteral) => void;
   anomalies?: any[];
+  apiKey?: string;
 }
 
 const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
@@ -34,6 +35,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   optimizedRoute,
   onMapClick,
   anomalies = [],
+  apiKey,
 }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
@@ -167,6 +169,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
           rsus={rsus}
           anomalies={anomalies}
           isSimulationRunning={isLiveMonitoring}
+          apiKey={apiKey}
         />
       </GoogleMap>
     </div>
