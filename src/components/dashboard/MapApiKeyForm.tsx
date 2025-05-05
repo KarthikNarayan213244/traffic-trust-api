@@ -24,7 +24,9 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
   
   // Update our local state when the global API key changes
   useEffect(() => {
-    setApiKey(currentApiKey || "");
+    if (currentApiKey !== undefined) {
+      setApiKey(currentApiKey || "");
+    }
   }, [currentApiKey]);
   
   // Show dialog automatically if no API key is set

@@ -7,6 +7,8 @@ import { toast } from "@/hooks/use-toast";
 let globalApiKey: string | null = null;
 // Create a module-level variable to track if the Maps API has been initialized
 let apiInitialized = false;
+// Create a variable to track if we're in the process of reloading
+let isReloading = false;
 
 export const useMapApiKey = () => {
   // Maintain a ref to detect if this is the first render
@@ -41,7 +43,7 @@ export const useMapApiKey = () => {
       console.error("Error reading Maps API key:", error);
     }
     
-    // No key found anywhere
+    // No key found anywhere, set empty string to global key
     globalApiKey = "";
     return "";
   };
@@ -52,12 +54,16 @@ export const useMapApiKey = () => {
   
   // Handle API key set
   const handleApiKeySet = useCallback((newApiKey: string) => {
-    if (newApiKey === apiKey) return;
+    if (newApiKey === apiKey || isReloading) return;
     
     try {
       // If the API has already been initialized with a different key,
       // we need to reload the page to prevent conflicts
       if (apiInitialized && apiKey && newApiKey !== apiKey) {
+        // Prevent multiple reloads
+        if (isReloading) return;
+        isReloading = true;
+        
         toast({
           title: "API Key Updated",
           description: "The Google Maps API key has been updated. Reloading the application.",
@@ -75,7 +81,7 @@ export const useMapApiKey = () => {
         return;
       }
       
-      // Update global key first
+      // Update global key first to ensure consistency
       globalApiKey = newApiKey;
       
       // Update localStorage

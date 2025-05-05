@@ -54,7 +54,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 
   // Only initialize the maps API if we have a key
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey || "", // Ensure we always pass a string, never undefined
+    googleMapsApiKey: apiKey || "", // Always use the value from the hook
     libraries,
     id: "google-map-script"
   });
@@ -233,31 +233,17 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     };
   }, [setupIntervals]);
 
-  // Show loading skeleton
-  if (initialLoading && isLoading) {
-    return (
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-10 w-40" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <Skeleton className="h-[400px] w-full" />
-      </div>
-    );
-  }
-
-  // Show API key form if no key is set
-  if (!keyIsSet) {
+  // Render functions
+  const renderApiKeyNeeded = () => {
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50 flex-col">
         <p className="text-lg mb-4">Google Maps API Key Required</p>
         <MapApiKeyForm onApiKeySet={handleApiKeySet} />
       </div>
     );
-  }
+  };
 
-  // Show error if Google Maps failed to load
-  if (loadError) {
+  const renderLoadingError = () => {
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50">
         <div className="text-center p-4">
@@ -269,75 +255,107 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         </div>
       </div>
     );
-  }
+  };
 
-  // Show message if Google Maps is not loaded yet
-  if (!isLoaded) {
+  const renderLoadingSkeleton = () => {
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  };
+
+  const renderLoadingMaps = () => {
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         <span className="ml-3">Loading maps...</span>
       </div>
     );
-  }
+  };
 
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <MLControls
-          isLiveMonitoring={isLiveMonitoring}
-          selectedAmbulance={selectedAmbulance}
-          modelAccuracy={modelAccuracy}
-          toggleLiveMonitoring={toggleLiveMonitoring}
-          resetRouting={resetRouting}
-          changeModelAccuracy={changeModelAccuracy}
-          modelProgress={isModelLoading ? modelLoadingProgress : 100}
-        />
-        
-        <ApiKeyControl
-          apiKey={apiKey}
-          onApiKeySet={handleApiKeySet}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-3">
-          {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
-          {isLoaded && (
-            <GoogleMapDisplay 
-              vehicles={vehicles} 
-              rsus={rsus} 
-              congestionData={congestionData} 
-              isLiveMonitoring={isLiveMonitoring}
-              selectedAmbulance={selectedAmbulance}
-              onAmbulanceSelect={handleAmbulanceSelect}
-              destination={destination}
-              optimizedRoute={optimizedRoute}
-              onMapClick={(latLng) => handleDestinationSelect(latLng)}
-              anomalies={anomalies}
-              apiKey={apiKey}
-            />
-          )}
-        </div>
-        
-        <div className="space-y-4">
-          <SmartTrafficSimulation 
-            rsus={rsus}
-            anomalies={anomalies}
+  const renderMap = () => {
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <MLControls
             isLiveMonitoring={isLiveMonitoring}
-            setRsus={setRsus}
-            setAnomalies={setAnomalies}
+            selectedAmbulance={selectedAmbulance}
+            modelAccuracy={modelAccuracy}
+            toggleLiveMonitoring={toggleLiveMonitoring}
+            resetRouting={resetRouting}
+            changeModelAccuracy={changeModelAccuracy}
+            modelProgress={isModelLoading ? modelLoadingProgress : 100}
           />
           
-          {modelsLoaded && isLiveMonitoring && (
-            <div className="flex justify-end text-xs text-muted-foreground">
-              <span>ML Model Update in: {mlUpdateCountdown}s</span>
-            </div>
-          )}
+          <ApiKeyControl
+            apiKey={apiKey}
+            onApiKeySet={handleApiKeySet}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-3">
+            {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
+            {isLoaded && (
+              <GoogleMapDisplay 
+                vehicles={vehicles} 
+                rsus={rsus} 
+                congestionData={congestionData} 
+                isLiveMonitoring={isLiveMonitoring}
+                selectedAmbulance={selectedAmbulance}
+                onAmbulanceSelect={handleAmbulanceSelect}
+                destination={destination}
+                optimizedRoute={optimizedRoute}
+                onMapClick={(latLng) => handleDestinationSelect(latLng)}
+                anomalies={anomalies}
+                apiKey={apiKey}
+              />
+            )}
+          </div>
+          
+          <div className="space-y-4">
+            <SmartTrafficSimulation 
+              rsus={rsus}
+              anomalies={anomalies}
+              isLiveMonitoring={isLiveMonitoring}
+              setRsus={setRsus}
+              setAnomalies={setAnomalies}
+            />
+            
+            {modelsLoaded && isLiveMonitoring && (
+              <div className="flex justify-end text-xs text-muted-foreground">
+                <span>ML Model Update in: {mlUpdateCountdown}s</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Main render logic
+  if (initialLoading && isLoading) {
+    return renderLoadingSkeleton();
+  }
+
+  if (!keyIsSet) {
+    return renderApiKeyNeeded();
+  }
+
+  if (loadError) {
+    return renderLoadingError();
+  }
+
+  if (!isLoaded) {
+    return renderLoadingMaps();
+  }
+
+  return renderMap();
 };
 
 export default TrafficMap;

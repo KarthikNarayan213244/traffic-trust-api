@@ -82,31 +82,36 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   useEffect(() => {
     if (!destination || !selectedAmbulance || !window.google) return;
 
-    const service = new window.google.maps.DirectionsService();
-    const origin = new window.google.maps.LatLng(selectedAmbulance.lat, selectedAmbulance.lng);
-    const destinationLatLng = new window.google.maps.LatLng(destination.lat, destination.lng);
-    
-    // Use optimized waypoints if available
-    const waypoints = createOptimizedWaypoints(optimizedRoute);
-    
-    service.route(
-      {
-        origin: origin,
-        destination: destinationLatLng,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-        waypoints: waypoints,
-        optimizeWaypoints: true,
-      },
-      (result, status) => {
-        if (status === "OK" && result) {
-          setDirections(result);
-          setDirectionsStatus(status);
-        } else {
-          console.error("Directions request failed:", status);
-          setDirectionsStatus(status);
+    try {
+      const service = new window.google.maps.DirectionsService();
+      const origin = new window.google.maps.LatLng(selectedAmbulance.lat, selectedAmbulance.lng);
+      const destinationLatLng = new window.google.maps.LatLng(destination.lat, destination.lng);
+      
+      // Use optimized waypoints if available
+      const waypoints = createOptimizedWaypoints(optimizedRoute);
+      
+      service.route(
+        {
+          origin: origin,
+          destination: destinationLatLng,
+          travelMode: window.google.maps.TravelMode.DRIVING,
+          waypoints: waypoints,
+          optimizeWaypoints: true,
+        },
+        (result, status) => {
+          if (status === "OK" && result) {
+            setDirections(result);
+            setDirectionsStatus(status);
+          } else {
+            console.error("Directions request failed:", status);
+            setDirectionsStatus(status);
+          }
         }
-      }
-    );
+      );
+    } catch (error) {
+      console.error("Error calculating directions:", error);
+      setDirectionsStatus(google.maps.DirectionsStatus.UNKNOWN_ERROR);
+    }
   }, [destination, selectedAmbulance, optimizedRoute]);
   
   // Count congestion zones
@@ -127,11 +132,13 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         onLoad={onLoad}
         onUnmount={onUnmount}
         onClick={(event) => {
-          const latLng = {
-            lat: event.latLng.lat(),
-            lng: event.latLng.lng()
-          };
-          onMapClick(latLng);
+          if (event.latLng) {
+            const latLng = {
+              lat: event.latLng.lat(),
+              lng: event.latLng.lng()
+            };
+            onMapClick(latLng);
+          }
         }}
       >
         <VehicleMarkers 
