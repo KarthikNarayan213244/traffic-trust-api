@@ -111,7 +111,8 @@ export class AttackSimulationEngine {
     }
     
     const interval = this.calculateSimulationInterval();
-    this.simulationTimer = setInterval(() => this.simulationCycle(Array.from(this.networkTopology.nodes.values())), interval);
+    const nodes = Array.from(this.networkTopology.nodes.values());
+    this.simulationTimer = setInterval(() => this.simulationCycle(nodes), interval);
   }
 
   stop() {
@@ -224,8 +225,9 @@ export class AttackSimulationEngine {
 
   // Helper to determine the category for an attack
   private getCategoryForAttack(attackId: string): string {
-    for (const [category, attacks] of Object.entries(require('./attackTypes').ATTACK_VECTORS)) {
-      if (attacks.some((a: any) => a.id === attackId)) {
+    const attackVectors = require('./attackTypes').ATTACK_VECTORS;
+    for (const [category, attacks] of Object.entries(attackVectors)) {
+      if (Array.isArray(attacks) && attacks.some((a: any) => a.id === attackId)) {
         return category;
       }
     }
@@ -329,7 +331,8 @@ export class AttackSimulationEngine {
     if (this.running && this.simulationTimer) {
       clearInterval(this.simulationTimer);
       const newInterval = this.calculateSimulationInterval();
-      this.simulationTimer = setInterval(() => this.simulationCycle(Array.from(this.networkTopology.nodes.values())), newInterval);
+      const nodes = Array.from(this.networkTopology.nodes.values());
+      this.simulationTimer = setInterval(() => this.simulationCycle(nodes), newInterval);
     }
   }
 }

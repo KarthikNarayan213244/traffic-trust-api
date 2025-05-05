@@ -92,7 +92,7 @@ const RealisticAttackSimulation: React.FC<RealisticAttackSimulationProps> = ({
       };
       
       // Create a new array with the anomaly added (only if not already present)
-      setAnomalies(prevAnomalies => {
+      setAnomalies((prevAnomalies) => {
         if (prevAnomalies.some(a => a.id === attack.id)) {
           return prevAnomalies;
         }
