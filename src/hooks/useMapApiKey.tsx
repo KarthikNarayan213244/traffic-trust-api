@@ -5,6 +5,8 @@ import { toast } from "@/hooks/use-toast";
 
 // Create a module-level variable to store the API key across component instances
 let globalApiKey: string | null = null;
+// Create a module-level variable to track if the Maps API has been initialized
+let apiInitialized = false;
 
 export const useMapApiKey = () => {
   // Maintain a ref to detect if this is the first render
@@ -48,7 +50,7 @@ export const useMapApiKey = () => {
   const [apiKey, setApiKey] = useState<string>(getStoredKey);
   const [keyIsSet, setKeyIsSet] = useState<boolean>(!!getStoredKey());
   
-  // This is critical for consistency - update our state if global key changes
+  // Update our state if global key changes
   useEffect(() => {
     if (globalApiKey !== null && globalApiKey !== apiKey) {
       console.log("Syncing with global API key");
@@ -61,6 +63,26 @@ export const useMapApiKey = () => {
     if (newApiKey === apiKey) return;
     
     try {
+      // If the API has already been initialized with a different key,
+      // we need to reload the page to prevent conflicts
+      if (apiInitialized && apiKey && newApiKey !== apiKey) {
+        toast({
+          title: "API Key Updated",
+          description: "The Google Maps API key has been updated. Reloading the application.",
+        });
+        
+        // Update global key and localStorage before reloading
+        globalApiKey = newApiKey;
+        localStorage.setItem(API_KEY_STORAGE_KEY, newApiKey);
+        
+        // Give the toast a moment to be seen
+        setTimeout(() => {
+          console.log("API key changed, reloading page to prevent initialization conflicts");
+          window.location.reload();
+        }, 2000);
+        return;
+      }
+      
       // Update global key first
       globalApiKey = newApiKey;
       
@@ -72,19 +94,9 @@ export const useMapApiKey = () => {
       setApiKey(newApiKey);
       setKeyIsSet(!!newApiKey);
       
-      // Only force reload if we're past initial render and key is changing
-      // This prevents the Maps API from being loaded twice with different keys
-      if (!isFirstRender.current && apiKey) {
-        toast({
-          title: "API Key Updated",
-          description: "The Google Maps API key has been updated. Reloading the application.",
-        });
-        
-        // Give the toast a moment to be seen
-        setTimeout(() => {
-          console.log("API key changed, reloading page to prevent initialization conflicts");
-          window.location.reload();
-        }, 2000);
+      // Mark as initialized if this is the first time setting it
+      if (newApiKey && !apiInitialized) {
+        apiInitialized = true;
       }
     } catch (error) {
       console.error("Error saving Maps API key to localStorage:", error);
@@ -99,7 +111,12 @@ export const useMapApiKey = () => {
   // After first render, update flag
   useEffect(() => {
     isFirstRender.current = false;
-  }, []);
+    
+    // Mark as initialized if we have a key on first render
+    if (apiKey && !apiInitialized) {
+      apiInitialized = true;
+    }
+  }, [apiKey]);
 
   return { apiKey, handleApiKeySet, keyIsSet };
 };

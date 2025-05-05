@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -119,36 +120,46 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     if (!isLiveMonitoring || isModelLoading) return;
 
     const intervals = getIntervals();
+    let vehicleInterval: NodeJS.Timeout;
+    let congestionInterval: NodeJS.Timeout;
+    let rsuInterval: NodeJS.Timeout;
+    let rsuTrustInterval: NodeJS.Timeout;
+    let countdownInterval: NodeJS.Timeout;
+    let mlUpdateInterval: NodeJS.Timeout;
     
     // First update immediately on start
     if (modelsLoaded) {
       (async () => {
-        // Update congestion data with ML predictions
-        const updatedCongestion = await updateCongestionData(congestionData);
-        setCongestionData(updatedCongestion);
-        console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
-        
-        // Process vehicles for anomalies
-        const detectedAnomalies = await processVehiclesForAnomalies(vehicles);
-        if (detectedAnomalies.length > 0) {
-          setAnomalies(prev => [...detectedAnomalies, ...prev]);
-          console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
+        try {
+          // Update congestion data with ML predictions
+          const updatedCongestion = await updateCongestionData(congestionData);
+          setCongestionData(updatedCongestion);
+          console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+          
+          // Process vehicles for anomalies
+          const detectedAnomalies = await processVehiclesForAnomalies(vehicles);
+          if (detectedAnomalies.length > 0) {
+            setAnomalies(prev => [...detectedAnomalies, ...prev]);
+            console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
+          }
+          
+          // Update vehicle trust scores
+          const updatedVehicles = await updateTrustScores(vehicles, anomalies);
+          setVehicles(updatedVehicles);
+          console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
+          
+          // Update RSU trust scores
+          const updatedRsus = await updateRsuTrustScores(rsus, anomalies);
+          setRsus(updatedRsus);
+          console.log(`Updated trust scores for ${updatedRsus.length} RSUs using ML`);
+        } catch (error) {
+          console.error("Error in initial ML update:", error);
         }
-        
-        // Update vehicle trust scores
-        const updatedVehicles = await updateTrustScores(vehicles, anomalies);
-        setVehicles(updatedVehicles);
-        console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
-        
-        // Update RSU trust scores
-        const updatedRsus = await updateRsuTrustScores(rsus, anomalies);
-        setRsus(updatedRsus);
-        console.log(`Updated trust scores for ${updatedRsus.length} RSUs using ML`);
       })();
     }
     
     // Vehicle data update interval
-    const vehicleInterval = setInterval(() => {
+    vehicleInterval = setInterval(() => {
       fetchVehicles({ limit: 1000 }).then(data => {
         if (Array.isArray(data)) {
           setVehicles(data);
@@ -161,6 +172,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
                 setAnomalies(prev => [...detectedAnomalies, ...prev]);
                 console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
               }
+            }).catch(error => {
+              console.error("Error processing anomalies:", error);
             });
           }
         }
@@ -170,14 +183,19 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     }, intervals.vehicles);
 
     // Congestion data update with ML prediction interval
-    const congestionInterval = setInterval(() => {
+    congestionInterval = setInterval(() => {
       fetchCongestionData({ limit: 500 }).then(async data => {
         if (Array.isArray(data)) {
           // If ML models are loaded, use them to update congestion predictions
           if (modelsLoaded) {
-            const updatedCongestion = await updateCongestionData(data);
-            setCongestionData(updatedCongestion);
-            console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+            try {
+              const updatedCongestion = await updateCongestionData(data);
+              setCongestionData(updatedCongestion);
+              console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+            } catch (error) {
+              console.error("Error updating congestion with ML:", error);
+              setCongestionData(data);
+            }
           } else {
             setCongestionData(data);
             console.log(`Updated ${data.length} congestion data points`);
@@ -189,7 +207,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     }, intervals.congestion);
     
     // RSU data update interval
-    const rsuInterval = setInterval(() => {
+    rsuInterval = setInterval(() => {
       fetchRSUs({ limit: 100 }).then(data => {
         if (Array.isArray(data)) {
           setRsus(data);
@@ -201,18 +219,20 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     }, intervals.rsus);
     
     // RSU trust update interval
-    const rsuTrustInterval = setInterval(() => {
+    rsuTrustInterval = setInterval(() => {
       if (modelsLoaded) {
         // Update RSU trust scores
         updateRsuTrustScores(rsus, anomalies).then(updatedRsus => {
           setRsus(updatedRsus);
           console.log(`Updated trust scores for ${updatedRsus.length} RSUs using ML`);
+        }).catch(error => {
+          console.error("Error updating RSU trust scores:", error);
         });
       }
     }, intervals.rsus);
     
     // ML model update countdown
-    const countdownInterval = setInterval(() => {
+    countdownInterval = setInterval(() => {
       setMlUpdateCountdown(prev => {
         if (prev <= 0) {
           return Math.floor(intervals.modelUpdate / 1000);
@@ -222,7 +242,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     }, 1000);
     
     // ML model update interval (more intensive analysis)
-    const mlUpdateInterval = setInterval(() => {
+    mlUpdateInterval = setInterval(() => {
       if (modelsLoaded) {
         console.log("Running comprehensive ML model updates...");
         
@@ -230,6 +250,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         updateTrustScores(vehicles, anomalies).then(updatedVehicles => {
           setVehicles(updatedVehicles);
           console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
+        }).catch(error => {
+          console.error("Error in ML model update:", error);
         });
         
         setMlUpdateCountdown(Math.floor(intervals.modelUpdate / 1000));
@@ -246,8 +268,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     };
   }, [
     isLiveMonitoring, modelsLoaded, isModelLoading, 
+    vehicles, rsus, congestionData, anomalies,
     setVehicles, setRsus, setCongestionData, setAnomalies,
-    vehicles, congestionData, anomalies, rsus,
     getIntervals
   ]);
 
