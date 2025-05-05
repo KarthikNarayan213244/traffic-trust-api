@@ -5,13 +5,14 @@ import { toast } from "@/hooks/use-toast";
 
 // Create a module-level variable to store the API key across component instances
 let globalApiKey: string | null = null;
-// Create a module-level variable to track if the Maps API has been initialized
+// Track if the Maps API has been initialized
 let apiInitialized = false;
-// Create a variable to track if we're in the process of reloading
+// Track if we're in the process of reloading
 let isReloading = false;
-
-// This module-level variable will help prevent multiple initializations with different keys
+// Track if this is the first load
 let firstLoadComplete = false;
+// Store a loader ID to ensure consistency
+let currentLoaderId: string = "google-map-script";
 
 export const useMapApiKey = () => {
   // Maintain a ref to detect if this is the first render
@@ -48,7 +49,7 @@ export const useMapApiKey = () => {
       console.error("Error reading Maps API key:", error);
     }
     
-    // No key found anywhere, set empty string to global key but don't mark as loaded
+    // No key found anywhere, set empty string to global key
     globalApiKey = "";
     return "";
   };
@@ -125,11 +126,15 @@ export const useMapApiKey = () => {
     }
   }, [apiKey]);
 
+  // Return a consistent loader ID to prevent conflicts
+  const getLoaderId = useCallback(() => currentLoaderId, []);
+
   // Return our API key state and an indicator of whether the first load is complete
   return { 
     apiKey, 
     handleApiKeySet, 
     keyIsSet,
-    isFirstLoadComplete: firstLoadComplete
+    isFirstLoadComplete: firstLoadComplete,
+    getLoaderId
   };
 };

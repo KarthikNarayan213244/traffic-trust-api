@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
 import GoogleMapDisplay from "./map/GoogleMapDisplay";
@@ -34,7 +34,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   congestionData: initialCongestionData = []
 }) => {
   // Custom hooks to manage state
-  const { apiKey, handleApiKeySet, keyIsSet, isFirstLoadComplete } = useMapApiKey();
+  const { apiKey, handleApiKeySet, keyIsSet, isFirstLoadComplete, getLoaderId } = useMapApiKey();
   const { vehicles, rsus, congestionData, anomalies, isLoading, setVehicles, setRsus, setCongestionData, setAnomalies } = useMapData(
     initialVehicles, 
     initialRsus, 
@@ -44,20 +44,25 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   
   const { 
     isLiveMonitoring, selectedAmbulance, destination, modelAccuracy, optimizedRoute,
-    isModelLoading, modelsLoaded, modelLoadingProgress,
+    isModelLoading, modelsLoaded, modelLoadingProgress, loadModelsByType,
     toggleLiveMonitoring, handleAmbulanceSelect, handleDestinationSelect, resetRouting,
     changeModelAccuracy, getIntervals 
-  } = useMLSimulation();
+  } = useMLSimulation(false); // Start with live monitoring off
   
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
   const [mapsInitialized, setMapsInitialized] = useState<boolean>(false);
+  const [activeIntervals, setActiveIntervals] = useState<{[key: string]: NodeJS.Timeout | null}>({});
+  const [lastIntervalRun, setLastIntervalRun] = useState<{[key: string]: number}>({});
 
-  // Only initialize the maps API if we have a key and it's the first load
-  const { isLoaded, loadError } = useJsApiLoader({
+  // Memoize the loader options to ensure they don't change between renders
+  const loaderOptions = useMemo(() => ({
     googleMapsApiKey: apiKey || "", 
     libraries,
-    id: "google-map-script"
-  });
+    id: getLoaderId(),
+  }), [apiKey, getLoaderId]);
+
+  // Only initialize the maps API if we have a key and it's the first load
+  const { isLoaded, loadError } = useJsApiLoader(loaderOptions);
 
   // Update maps initialization status
   useEffect(() => {
@@ -67,171 +72,241 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     }
   }, [isLoaded, mapsInitialized]);
 
-  // Data update intervals
-  const setupIntervals = useCallback(() => {
-    if (!isLiveMonitoring || isModelLoading) return null;
+  // Clear all intervals
+  const clearAllIntervals = useCallback(() => {
+    Object.values(activeIntervals).forEach(interval => {
+      if (interval) clearInterval(interval);
+    });
+    setActiveIntervals({});
+  }, [activeIntervals]);
+
+  // Function to check if an operation should run based on throttling
+  const shouldRunOperation = useCallback((operationKey: string, minInterval: number = 5000) => {
+    const now = Date.now();
+    const lastRun = lastIntervalRun[operationKey] || 0;
     
-    const intervals = getIntervals();
+    // Don't run if it's been less than minInterval since last run
+    if (now - lastRun < minInterval) {
+      return false;
+    }
     
-    // First update immediately on start
-    if (modelsLoaded) {
-      (async () => {
-        try {
-          // Update congestion data with ML predictions
-          const updatedCongestion = await updateCongestionData(congestionData);
-          setCongestionData(updatedCongestion);
-          console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+    // Update last run time
+    setLastIntervalRun(prev => ({
+      ...prev,
+      [operationKey]: now
+    }));
+    
+    return true;
+  }, [lastIntervalRun]);
+
+  // Function to fetch and process data
+  const fetchAndProcessData = useCallback(async (dataType: 'vehicles' | 'congestion' | 'rsus' | 'anomalies') => {
+    if (!shouldRunOperation(dataType)) return;
+    
+    try {
+      switch (dataType) {
+        case 'vehicles':
+          console.log("Fetching vehicle data...");
+          const vehicleData = await fetchVehicles({ limit: 1000 });
+          if (Array.isArray(vehicleData)) {
+            setVehicles(vehicleData);
+            console.log(`Updated ${vehicleData.length} vehicles`);
+          }
+          break;
           
-          // Process vehicles for anomalies
+        case 'congestion':
+          console.log("Fetching congestion data...");
+          const congestionResult = await fetchCongestionData({ limit: 500 });
+          if (Array.isArray(congestionResult)) {
+            setCongestionData(congestionResult);
+            console.log(`Updated ${congestionResult.length} congestion data points`);
+          }
+          break;
+          
+        case 'rsus':
+          console.log("Fetching RSU data...");
+          const rsuData = await fetchRSUs({ limit: 100 });
+          if (Array.isArray(rsuData)) {
+            setRsus(rsuData);
+            console.log(`Updated ${rsuData.length} RSUs`);
+          }
+          break;
+          
+        case 'anomalies':
+          console.log("Fetching anomaly data...");
+          const anomalyData = await fetchAnomalies({ limit: 200 });
+          if (Array.isArray(anomalyData)) {
+            setAnomalies(anomalyData);
+            console.log(`Updated ${anomalyData.length} anomalies`);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error(`Error fetching ${dataType} data:`, error);
+    }
+  }, [setVehicles, setCongestionData, setRsus, setAnomalies, shouldRunOperation]);
+
+  // ML processing with throttling
+  const runMLProcessing = useCallback(async (processingType: 'anomalyDetection' | 'congestionPrediction' | 'trustScoring' | 'rsuTrustScoring') => {
+    if (!modelsLoaded || !shouldRunOperation(processingType, 10000)) return;
+    
+    try {
+      switch (processingType) {
+        case 'anomalyDetection':
+          // Lazy load only the needed model
+          await loadModelsByType(['anomaly']);
+          console.log("Processing vehicles for anomalies...");
           const detectedAnomalies = await processVehiclesForAnomalies(vehicles);
           if (detectedAnomalies.length > 0) {
             setAnomalies(prev => [...detectedAnomalies, ...prev]);
             console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
           }
+          break;
           
-          // Update vehicle trust scores
+        case 'congestionPrediction':
+          // Lazy load only the needed model
+          await loadModelsByType(['traffic']);
+          console.log("Updating congestion predictions...");
+          const updatedCongestion = await updateCongestionData(congestionData);
+          setCongestionData(updatedCongestion);
+          console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
+          break;
+          
+        case 'trustScoring':
+          // Lazy load only the needed model
+          await loadModelsByType(['trust']);
+          console.log("Updating vehicle trust scores...");
           const updatedVehicles = await updateTrustScores(vehicles, anomalies);
           setVehicles(updatedVehicles);
           console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
+          break;
           
-          // Update RSU trust scores
+        case 'rsuTrustScoring':
+          // Lazy load only the needed model
+          await loadModelsByType(['trust']);
+          console.log("Updating RSU trust scores...");
           const updatedRsus = await updateRsuTrustScores(rsus, anomalies);
           setRsus(updatedRsus);
           console.log(`Updated trust scores for ${updatedRsus.length} RSUs using ML`);
-        } catch (error) {
-          console.error("Error in initial ML update:", error);
-        }
-      })();
+          break;
+      }
+    } catch (error) {
+      console.error(`Error in ML processing (${processingType}):`, error);
     }
-    
-    // Vehicle data update interval
-    const vehicleInterval = setInterval(() => {
-      fetchVehicles({ limit: 1000 }).then(data => {
-        if (Array.isArray(data)) {
-          setVehicles(data);
-          console.log(`Updated ${data.length} vehicles`);
-          
-          // If ML models are loaded, process vehicles for anomalies
-          if (modelsLoaded) {
-            processVehiclesForAnomalies(data).then(detectedAnomalies => {
-              if (detectedAnomalies.length > 0) {
-                setAnomalies(prev => [...detectedAnomalies, ...prev]);
-                console.log(`Detected ${detectedAnomalies.length} new anomalies using ML`);
-              }
-            }).catch(error => {
-              console.error("Error processing anomalies:", error);
-            });
-          }
-        }
-      }).catch(error => {
-        console.error("Error updating vehicles:", error);
-      });
-    }, intervals.vehicles);
+  }, [vehicles, congestionData, rsus, anomalies, modelsLoaded, setVehicles, setCongestionData, setRsus, setAnomalies, loadModelsByType, shouldRunOperation]);
 
-    // Congestion data update with ML prediction interval
+  // Setup intervals with dynamic timing based on model accuracy
+  useEffect(() => {
+    // Clean up previous intervals
+    clearAllIntervals();
+    
+    if (!isLiveMonitoring) return;
+    
+    const intervals = getIntervals();
+    // Increase minimum intervals to prevent overloading
+    const minIntervals = {
+      vehicles: Math.max(10000, intervals.vehicles),
+      congestion: Math.max(60000, intervals.congestion),
+      rsus: Math.max(45000, intervals.rsus),
+      modelUpdate: Math.max(120000, intervals.modelUpdate)
+    };
+    
+    // Data fetch intervals
+    const vehicleInterval = setInterval(() => {
+      fetchAndProcessData('vehicles');
+    }, minIntervals.vehicles);
+    
     const congestionInterval = setInterval(() => {
-      fetchCongestionData({ limit: 500 }).then(async data => {
-        if (Array.isArray(data)) {
-          // If ML models are loaded, use them to update congestion predictions
-          if (modelsLoaded) {
-            try {
-              const updatedCongestion = await updateCongestionData(data);
-              setCongestionData(updatedCongestion);
-              console.log(`Updated ${updatedCongestion.length} congestion data points with ML predictions`);
-            } catch (error) {
-              console.error("Error updating congestion with ML:", error);
-              setCongestionData(data);
-            }
-          } else {
-            setCongestionData(data);
-            console.log(`Updated ${data.length} congestion data points`);
-          }
-        }
-      }).catch(error => {
-        console.error("Error updating congestion data:", error);
-      });
-    }, intervals.congestion);
+      fetchAndProcessData('congestion');
+    }, minIntervals.congestion);
     
-    // RSU data update interval
     const rsuInterval = setInterval(() => {
-      fetchRSUs({ limit: 100 }).then(data => {
-        if (Array.isArray(data)) {
-          setRsus(data);
-          console.log(`Updated ${data.length} RSUs`);
-        }
-      }).catch(error => {
-        console.error("Error updating RSUs:", error);
-      });
-    }, intervals.rsus);
+      fetchAndProcessData('rsus');
+    }, minIntervals.rsus);
     
-    // RSU trust update interval
+    // ML processing intervals (with longer intervals)
+    const anomalyInterval = setInterval(() => {
+      if (modelsLoaded) {
+        runMLProcessing('anomalyDetection');
+      }
+    }, minIntervals.vehicles * 2);
+    
+    const congestionPredictionInterval = setInterval(() => {
+      if (modelsLoaded) {
+        runMLProcessing('congestionPrediction');
+      }
+    }, minIntervals.congestion * 1.5);
+    
+    const trustInterval = setInterval(() => {
+      if (modelsLoaded) {
+        runMLProcessing('trustScoring');
+      }
+    }, minIntervals.modelUpdate);
+    
     const rsuTrustInterval = setInterval(() => {
       if (modelsLoaded) {
-        // Update RSU trust scores
-        updateRsuTrustScores(rsus, anomalies).then(updatedRsus => {
-          setRsus(updatedRsus);
-          console.log(`Updated trust scores for ${updatedRsus.length} RSUs using ML`);
-        }).catch(error => {
-          console.error("Error updating RSU trust scores:", error);
-        });
+        runMLProcessing('rsuTrustScoring');
       }
-    }, intervals.rsus);
+    }, minIntervals.modelUpdate);
     
     // ML model update countdown
     const countdownInterval = setInterval(() => {
       setMlUpdateCountdown(prev => {
         if (prev <= 0) {
-          return Math.floor(intervals.modelUpdate / 1000);
+          return Math.floor(minIntervals.modelUpdate / 1000);
         }
         return prev - 1;
       });
     }, 1000);
     
-    // ML model update interval (more intensive analysis)
-    const mlUpdateInterval = setInterval(() => {
-      if (modelsLoaded) {
-        console.log("Running comprehensive ML model updates...");
-        
-        // Update trust scores based on all data
-        updateTrustScores(vehicles, anomalies).then(updatedVehicles => {
-          setVehicles(updatedVehicles);
-          console.log(`Updated trust scores for ${updatedVehicles.length} vehicles using ML`);
-        }).catch(error => {
-          console.error("Error in ML model update:", error);
-        });
-        
-        setMlUpdateCountdown(Math.floor(intervals.modelUpdate / 1000));
-      }
-    }, intervals.modelUpdate);
-
-    return {
+    // Store active intervals
+    setActiveIntervals({
       vehicleInterval,
       congestionInterval,
       rsuInterval,
+      anomalyInterval,
+      congestionPredictionInterval,
+      trustInterval,
       rsuTrustInterval,
-      mlUpdateInterval,
       countdownInterval
-    };
-  }, [
-    isLiveMonitoring, modelsLoaded, isModelLoading, 
-    vehicles, rsus, congestionData, anomalies,
-    setVehicles, setRsus, setCongestionData, setAnomalies,
-    getIntervals
-  ]);
-
-  // Clean up intervals
-  useEffect(() => {
-    const intervals = setupIntervals();
+    });
     
-    // Clean up all intervals on unmount or when dependencies change
-    return () => {
-      if (intervals) {
-        Object.values(intervals).forEach(interval => {
-          clearInterval(interval);
-        });
+    // Run initial data processing
+    if (modelsLoaded) {
+      (async () => {
+        // Load all required models first
+        await loadModelsByType(['traffic', 'anomaly', 'trust']);
+        
+        // Stagger operations to prevent simultaneous processing
+        setTimeout(() => runMLProcessing('congestionPrediction'), 1000);
+        setTimeout(() => runMLProcessing('anomalyDetection'), 3000);
+        setTimeout(() => runMLProcessing('trustScoring'), 5000);
+        setTimeout(() => runMLProcessing('rsuTrustScoring'), 7000);
+      })();
+    }
+    
+    return clearAllIntervals;
+  }, [isLiveMonitoring, modelsLoaded, getIntervals, clearAllIntervals, fetchAndProcessData, runMLProcessing, loadModelsByType]);
+
+  // Add visibility change detection to pause processing when tab is inactive
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log("Page hidden, pausing processing");
+        clearAllIntervals();
+      } else if (isLiveMonitoring) {
+        console.log("Page visible, resuming processing");
+        // Force a re-render which will re-establish intervals
+        setLastIntervalRun({});
       }
     };
-  }, [setupIntervals]);
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isLiveMonitoring, clearAllIntervals]);
 
   // Render functions
   const renderApiKeyNeeded = () => {
@@ -313,7 +388,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
                 onAmbulanceSelect={handleAmbulanceSelect}
                 destination={destination}
                 optimizedRoute={optimizedRoute}
-                onMapClick={(latLng) => handleDestinationSelect(latLng)}
+                onMapClick={(latLng) => handleDestinationSelect(latLng, congestionData)}
                 anomalies={anomalies}
                 apiKey={apiKey}
               />
@@ -330,8 +405,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
             />
             
             {modelsLoaded && isLiveMonitoring && (
-              <div className="flex justify-end text-xs text-muted-foreground">
+              <div className="flex flex-col text-xs text-muted-foreground">
                 <span>ML Model Update in: {mlUpdateCountdown}s</span>
+                <span>Active Backend: {loadModelsByType ? "WebGL" : "CPU"}</span>
               </div>
             )}
           </div>

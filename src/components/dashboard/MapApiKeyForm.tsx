@@ -38,6 +38,12 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
+      // Prevent repeated setting of the same key
+      if (apiKey.trim() === currentApiKey) {
+        setShowDialog(false);
+        return;
+      }
+      
       // Ensure we're passing a non-empty string
       onApiKeySet(apiKey.trim());
       setShowDialog(false);
