@@ -148,3 +148,102 @@ export function calculateRsuTrustAfterAttack(currentTrust: number, attackType: s
   
   return Math.round(newTrust);
 }
+
+// Update RSU trust scores based on anomalies and attacks
+export async function updateRsuTrustScores(rsus: any[], anomalies: any[]): Promise<any[]> {
+  try {
+    if (!rsus || !Array.isArray(rsus) || rsus.length === 0) {
+      return [];
+    }
+    
+    // Clone the RSUs array to avoid modifying the original
+    const updatedRsus = JSON.parse(JSON.stringify(rsus));
+    
+    // First, process any RSU-related anomalies
+    const rsuAnomalies = anomalies.filter(anomaly => 
+      (anomaly.target_type === 'RSU' || 
+       (anomaly.target_id && anomaly.target_id.includes('RSU')) ||
+       (anomaly.details && anomaly.details.toLowerCase().includes('rsu')))
+    );
+    
+    // Process each RSU
+    for (let i = 0; i < updatedRsus.length; i++) {
+      const rsu = updatedRsus[i];
+      
+      // Skip RSUs without an ID
+      if (!rsu.rsu_id) continue;
+      
+      // Initialize trust score if not present
+      if (rsu.trust_score === undefined) {
+        rsu.trust_score = 90;
+      }
+      
+      // Find anomalies related to this RSU
+      const relatedAnomalies = rsuAnomalies.filter(anomaly => 
+        anomaly.target_id === rsu.rsu_id || 
+        anomaly.rsu_id === rsu.rsu_id ||
+        (anomaly.details && anomaly.details.includes(rsu.rsu_id))
+      );
+      
+      // If there are anomalies, update the RSU trust score
+      if (relatedAnomalies.length > 0) {
+        // Start with current trust score
+        let newTrustScore = rsu.trust_score;
+        
+        // Apply trust score changes for each anomaly
+        for (const anomaly of relatedAnomalies) {
+          const attackType = anomaly.type || 'Unknown Attack';
+          const severity = anomaly.severity || 'Medium';
+          
+          // Calculate new trust score
+          newTrustScore = calculateRsuTrustAfterAttack(newTrustScore, attackType, severity);
+          
+          // Mark RSU as having detected an attack
+          rsu.attack_detected = true;
+        }
+        
+        // Store the trust score change
+        rsu.trust_score_change = newTrustScore - rsu.trust_score;
+        
+        // Update the trust score
+        rsu.trust_score = newTrustScore;
+        
+        // Check if RSU should be quarantined (trust score too low)
+        if (newTrustScore < 30) {
+          rsu.quarantined = true;
+        }
+        
+        // Mark as blockchain protected if severe attack
+        if (rsu.trust_score_change <= -20) {
+          rsu.blockchain_protected = true;
+        }
+      } else {
+        // No anomalies, gradually increase trust if it's below normal
+        if (rsu.trust_score < 90 && !rsu.quarantined) {
+          // Gradually recover trust (1-3 points per update)
+          const recoveryAmount = Math.floor(Math.random() * 3) + 1;
+          const newTrustScore = Math.min(90, rsu.trust_score + recoveryAmount);
+          
+          // Store the trust score change
+          rsu.trust_score_change = newTrustScore - rsu.trust_score;
+          
+          // Update the trust score
+          rsu.trust_score = newTrustScore;
+          
+          // Clear attack detection flag if trust is high enough
+          if (rsu.trust_score >= 60) {
+            rsu.attack_detected = false;
+          }
+        } else if (!rsu.trust_score_change) {
+          // No change in trust score
+          rsu.trust_score_change = 0;
+        }
+      }
+    }
+    
+    return updatedRsus;
+  } catch (error) {
+    console.error("Error updating RSU trust scores:", error);
+    return rsus; // Return original RSUs on error
+  }
+}
