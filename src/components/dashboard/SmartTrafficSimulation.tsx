@@ -75,7 +75,8 @@ const SmartTrafficSimulation: React.FC<SmartTrafficSimulationProps> = ({
       
       if (newAttacks.length > 0) {
         // Add new attacks to anomalies
-        setAnomalies(prev => [...newAttacks, ...prev]);
+        const updatedAnomalies = [...newAttacks, ...anomalies];
+        setAnomalies(updatedAnomalies);
         
         // Update stats
         setSimulationStats(prev => ({

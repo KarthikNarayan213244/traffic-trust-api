@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useMemo } from "react";
+
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { GoogleMap, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { Vehicle } from "@/services/api/types";
 import { defaultCenter, mapContainerStyle, mapOptions, libraries } from "./constants";
 import VehicleMarkers from "./VehicleMarkers";
 import RsuMarkers from "./RsuMarkers";
-import CongestionOverlay from "./CongestionOverlay";
+import CongestionHeatmap from "./CongestionHeatmap";
 import MapOverlays from "./MapOverlays";
 import { createOptimizedWaypoints } from "./WaypointOptimizer";
 
@@ -134,13 +135,13 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
       >
         <VehicleMarkers 
           vehicles={vehicles} 
-          selectedAmbulance={selectedAmbulance}
+          selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
           onAmbulanceSelect={onAmbulanceSelect}
         />
         
         <RsuMarkers rsus={rsus} />
         
-        <CongestionOverlay congestionData={congestionData} />
+        <CongestionHeatmap congestionData={congestionData} />
         
         {directions && (
           <DirectionsRenderer

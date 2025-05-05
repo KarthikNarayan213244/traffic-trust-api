@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 import { Marker } from "@react-google-maps/api";
 import { getTrustScoreColor } from "./utils";
@@ -18,6 +17,7 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
   selectedAmbulanceId,
   onAmbulanceSelect
 }) => {
+  
   const prevPositions = useRef<Map<string, google.maps.LatLng>>(new Map());
   const [animatedPositions, setAnimatedPositions] = useState<Map<string, google.maps.LatLng>>(new Map());
   
@@ -26,6 +26,7 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
   const animationDuration = 5000;
 
   useEffect(() => {
+    
     if (!isSimulationRunning || vehicles.length === 0 || !window.google) {
       return;
     }
@@ -85,6 +86,7 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
   }, [vehicles, isSimulationRunning]);
 
   const getVehicleIcon = (vehicle: Vehicle, isSelected: boolean) => {
+    
     if (!window.google) return null;
     
     const scale = isSelected ? 12 : 8;
@@ -107,7 +109,7 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
           scale: scale + 2,
         };
       case 'bus':
-        // Use a filled circle with larger scale for bus instead of RECTANGLE
+        
         return {
           ...icon,
           path: google.maps.SymbolPath.CIRCLE,
