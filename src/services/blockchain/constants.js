@@ -22,6 +22,11 @@ export const ETH_NODE_URL = import.meta.env.VITE_ETH_NODE_URL || "https://goerli
 // Blockchain explorer URLs
 export const EXPLORER_URL = "https://goerli.etherscan.io";
 
+// For backward compatibility - make ABI available via both specific names and a generic ABI reference
+export const ABI = TRUST_LEDGER_ABI;
+export const CONTRACT_ADDRESS = TRUST_LEDGER_ADDRESS;
+export const RPC_URL = ETH_NODE_URL;
+
 // Contract ABIs
 export const TRUST_LEDGER_ABI = [
   // Example ABI format for the TrustLedger contract

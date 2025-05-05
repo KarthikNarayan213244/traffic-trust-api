@@ -1,7 +1,10 @@
-
 import { ethers } from 'ethers';
 import { toast } from "@/hooks/use-toast";
-import { ABI, CONTRACT_ADDRESS, RPC_URL } from './constants';
+import { 
+  TRUST_LEDGER_ABI, 
+  TRUST_LEDGER_ADDRESS, 
+  ETH_NODE_URL 
+} from './constants';
 
 // Shared state for the blockchain connection
 let provider;
@@ -13,9 +16,9 @@ let connectedAddress = null;
 export const initReadonlyProvider = () => {
   try {
     // Use a JsonRpcProvider for read-only operations
-    const readonlyProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
-    console.log("Initialized readonly provider with RPC URL:", RPC_URL);
-    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, readonlyProvider);
+    const readonlyProvider = new ethers.providers.JsonRpcProvider(ETH_NODE_URL);
+    console.log("Initialized readonly provider with RPC URL:", ETH_NODE_URL);
+    contract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, readonlyProvider);
     return true;
   } catch (error) {
     console.error("Failed to initialize read-only provider:", error);
@@ -46,7 +49,7 @@ export const connectWallet = async () => {
       console.log("Connected to address:", connectedAddress);
       
       // Initialize contract with signer for sending transactions
-      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      contract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, signer);
       
       // Verify connection to Goerli
       const network = await provider.getNetwork();
@@ -71,7 +74,7 @@ export const connectWallet = async () => {
           // Re-initialize after network switch
           provider = new ethers.providers.Web3Provider(window.ethereum);
           signer = provider.getSigner();
-          contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+          contract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, signer);
           
           // Get the network again to confirm switch
           const updatedNetwork = await provider.getNetwork();

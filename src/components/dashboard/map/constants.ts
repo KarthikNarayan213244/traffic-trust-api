@@ -24,8 +24,8 @@ export const mapOptions = {
   clickableIcons: false,
 };
 
-// Required libraries - updated to match expected type
-export const libraries = ["places", "drawing", "geometry", "visualization"] as const;
+// Required libraries - using string array instead of readonly array to avoid TypeScript error
+export const libraries = ["places", "drawing", "geometry", "visualization"];
 
 // Vehicle types and their corresponding colors
 export const vehicleTypeColors: Record<string, string> = {
