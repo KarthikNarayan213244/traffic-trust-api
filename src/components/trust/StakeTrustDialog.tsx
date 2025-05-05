@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useStakingContract } from "@/services/blockchain/provider";
 
 interface StakeTrustDialogProps {
   isOpen: boolean;
@@ -37,14 +38,46 @@ const StakeTrustDialog: React.FC<StakeTrustDialogProps> = ({
     }
   }, [initialRsuId]);
 
+  // Use the staking contract for this operation
+  useEffect(() => {
+    if (isOpen) {
+      // Set the contract to Staking when the dialog opens
+      useStakingContract();
+    }
+  }, [isOpen]);
+
   const handleStake = async () => {
     try {
+      if (!vehicleId.trim()) {
+        toast({
+          title: "Input Error",
+          description: "Please enter a valid vehicle or RSU ID",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const amountValue = parseFloat(amount);
+      if (isNaN(amountValue) || amountValue <= 0) {
+        toast({
+          title: "Input Error",
+          description: "Please enter a valid amount greater than 0",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setIsStaking(true);
+      console.log("Attempting to stake", {
+        vehicleId,
+        amount: amountValue
+      });
       
       // Directly use stakeTrust function
-      const result = await stakeTrust(vehicleId, parseFloat(amount));
+      const result = await stakeTrust(vehicleId, amountValue);
       
       if (result) {
+        console.log("Staking successful");
         onClose();
         onSuccess();
       }
@@ -68,10 +101,10 @@ const StakeTrustDialog: React.FC<StakeTrustDialogProps> = ({
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="vehicleId">Vehicle ID</Label>
+            <Label htmlFor="vehicleId">Vehicle or RSU ID</Label>
             <Input
               id="vehicleId"
-              placeholder="e.g., HYD001"
+              placeholder="e.g., HYD001 or RSU-A-1"
               value={vehicleId}
               onChange={(e) => setVehicleId(e.target.value)}
             />

@@ -1,16 +1,21 @@
+
 import { ethers } from 'ethers';
 import { toast } from "@/hooks/use-toast";
 import { 
   TRUST_LEDGER_ABI, 
-  TRUST_LEDGER_ADDRESS, 
+  TRUST_LEDGER_ADDRESS,
+  STAKING_ABI,
+  STAKING_ADDRESS,
   ETH_NODE_URL 
 } from './constants';
 
 // Shared state for the blockchain connection
 let provider;
-let contract;
+let trustLedgerContract;
+let stakingContract;
 let signer;
 let connectedAddress = null;
+let currentContract = null; // Default to trustLedgerContract
 
 // Initialize a read-only provider for non-wallet operations
 export const initReadonlyProvider = () => {
@@ -18,7 +23,8 @@ export const initReadonlyProvider = () => {
     // Use a JsonRpcProvider for read-only operations
     const readonlyProvider = new ethers.providers.JsonRpcProvider(ETH_NODE_URL);
     console.log("Initialized readonly provider with RPC URL:", ETH_NODE_URL);
-    contract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, readonlyProvider);
+    trustLedgerContract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, readonlyProvider);
+    stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, readonlyProvider);
     return true;
   } catch (error) {
     console.error("Failed to initialize read-only provider:", error);
@@ -48,8 +54,10 @@ export const connectWallet = async () => {
       connectedAddress = await signer.getAddress();
       console.log("Connected to address:", connectedAddress);
       
-      // Initialize contract with signer for sending transactions
-      contract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, signer);
+      // Initialize contracts with signer for sending transactions
+      trustLedgerContract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, signer);
+      stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+      currentContract = stakingContract; // Set the current contract to staking by default
       
       // Verify connection to Goerli
       const network = await provider.getNetwork();
@@ -74,7 +82,9 @@ export const connectWallet = async () => {
           // Re-initialize after network switch
           provider = new ethers.providers.Web3Provider(window.ethereum);
           signer = provider.getSigner();
-          contract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, signer);
+          trustLedgerContract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, signer);
+          stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
+          currentContract = stakingContract;
           
           // Get the network again to confirm switch
           const updatedNetwork = await provider.getNetwork();
@@ -138,12 +148,23 @@ if (typeof window !== 'undefined' && window.ethereum) {
   });
 }
 
+// Select which contract to use - TrustLedger or Staking
+export const useStakingContract = () => {
+  currentContract = stakingContract;
+};
+
+export const useTrustLedgerContract = () => {
+  currentContract = trustLedgerContract;
+};
+
 // Get the connected address without triggering a wallet connection
 export const getConnectedAddress = () => {
   return connectedAddress;
 };
 
 // Export contract and provider for other modules
-export const getContract = () => contract;
+export const getContract = () => currentContract || stakingContract; // Default to staking contract
+export const getTrustLedgerContract = () => trustLedgerContract;
+export const getStakingContract = () => stakingContract;
 export const getSigner = () => signer;
 export const getProvider = () => provider;

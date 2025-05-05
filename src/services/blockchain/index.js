@@ -1,6 +1,11 @@
 
 // Re-export all blockchain functionality from a single entry point
-import { connectWallet, getConnectedAddress } from './provider';
+import { 
+  connectWallet, 
+  getConnectedAddress,
+  useStakingContract,
+  useTrustLedgerContract 
+} from './provider';
 import { getTrustLedger } from './ledger';
 import { stakeTrust, simulateStakeTrust } from './staking';
 
@@ -9,5 +14,7 @@ export {
   getConnectedAddress,
   getTrustLedger,
   stakeTrust,
-  simulateStakeTrust
+  simulateStakeTrust,
+  useStakingContract,
+  useTrustLedgerContract
 };
