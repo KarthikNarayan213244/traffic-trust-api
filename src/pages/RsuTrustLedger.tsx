@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import WalletConnectButton from "@/components/WalletConnectButton";
@@ -145,11 +146,12 @@ const RsuTrustLedgerPage: React.FC = () => {
 
   const stats = getStats();
 
-  // For debugging
+  // For debugging - enhance logging
   React.useEffect(() => {
     console.log("RSU Ledger Data:", rsuLedgerData.length, "entries");
     console.log("Blockchain Data:", blockchainLedgerData.length, "entries");
-  }, [rsuLedgerData, blockchainLedgerData]);
+    console.log("Etherscan URL:", etherscanUrl);
+  }, [rsuLedgerData, blockchainLedgerData, etherscanUrl]);
 
   return (
     <MainLayout>
@@ -158,6 +160,7 @@ const RsuTrustLedgerPage: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold">RSU Trust Ledger</h1>
             <p className="text-muted-foreground">Track RSU security events and blockchain protection</p>
+            {etherscanUrl && <NetworkInfo etherscanUrl={etherscanUrl} />}
           </div>
           <div className="flex items-center space-x-4">
             <Button

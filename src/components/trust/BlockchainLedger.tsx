@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, RefreshCw, PlusCircle, ExternalLink, Shield } from "lucide-react";
+import NetworkInfo from "@/components/trust/NetworkInfo";
 
 interface BlockchainLedgerProps {
   data: any[];
@@ -60,6 +61,11 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
     }
   };
 
+  // Log etherscanUrl when component renders or updates
+  React.useEffect(() => {
+    console.log("BlockchainLedger received etherscanUrl:", etherscanUrl);
+  }, [etherscanUrl]);
+
   // Error state
   if (isError) {
     return (
@@ -69,6 +75,7 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
           <CardDescription>
             Trust ledger data stored on the blockchain
           </CardDescription>
+          {etherscanUrl && <NetworkInfo etherscanUrl={etherscanUrl} />}
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -136,8 +143,19 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
     <Card>
       <CardHeader>
         <CardTitle>Blockchain Protection</CardTitle>
-        <CardDescription>
-          Trust ledger data stored on the blockchain for RSUs
+        <CardDescription className="flex flex-col space-y-1">
+          <span>Trust ledger data stored on the blockchain for RSUs</span>
+          {etherscanUrl && (
+            <a 
+              href={etherscanUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1 w-fit"
+            >
+              View contract on Etherscan
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">

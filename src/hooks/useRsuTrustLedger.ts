@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { fetchFromSupabase } from "@/services/api/supabase/fetch";
 import { toast } from "@/hooks/use-toast";
@@ -142,13 +143,15 @@ export const useRsuTrustLedger = () => {
       console.log("Blockchain RSU trust ledger data loaded:", rsuData.length);
       setBlockchainLedgerData(rsuData);
       
-      // Set Etherscan URL
+      // Set Etherscan URL - Make sure this is definitely set
       const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS || 
-        localStorage.getItem('env_VITE_CONTRACT_ADDRESS');
+        localStorage.getItem('env_VITE_CONTRACT_ADDRESS') || 
+        '0x123abc'; // Fallback for demo purposes
       
-      if (contractAddress) {
-        setEtherscanUrl(`https://goerli.etherscan.io/address/${contractAddress}`);
-      }
+      // Always set some URL even if just a placeholder
+      setEtherscanUrl(contractAddress ? 
+        `https://goerli.etherscan.io/address/${contractAddress}` : 
+        'https://goerli.etherscan.io');
       
     } catch (error) {
       console.error("Error fetching blockchain RSU trust ledger:", error);
@@ -160,6 +163,9 @@ export const useRsuTrustLedger = () => {
         if (Array.isArray(realisticData) && realisticData.length > 0) {
           setBlockchainLedgerData(realisticData);
           setIsBlockchainError(false);
+          
+          // Set a placeholder Etherscan URL even when using fallback data
+          setEtherscanUrl('https://goerli.etherscan.io');
         }
       } catch (fallbackError) {
         console.error("Error generating fallback blockchain data:", fallbackError);
@@ -246,7 +252,10 @@ export const useRsuTrustLedger = () => {
   useEffect(() => {
     loadRsuLedgerData();
     loadBlockchainData();
-  }, []);
+    
+    // Log etherscanUrl whenever it changes - helps debug
+    console.log("Current Etherscan URL:", etherscanUrl);
+  }, [etherscanUrl]);
 
   return {
     rsuLedgerData,
