@@ -5,16 +5,20 @@ import WalletConnectButton from "@/components/WalletConnectButton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { RefreshCw, Shield, AlertTriangle } from "lucide-react";
+import { RefreshCw, Shield, AlertTriangle, PlusCircle } from "lucide-react";
 import { useRsuTrustLedger } from "@/hooks/useRsuTrustLedger";
 import RsuTrustLedger from "@/components/trust/RsuTrustLedger";
 import BlockchainLedger from "@/components/trust/BlockchainLedger";
 import StakeTrustDialog from "@/components/trust/StakeTrustDialog";
 import NetworkInfo from "@/components/trust/NetworkInfo";
+import { generateRsuAttacks } from "@/services/ml/rsuTrustScoring";
+import { fetchFromSupabase } from "@/services/api/supabase/fetch";
+import { toast } from "@/hooks/use-toast";
 
 const RsuTrustLedgerPage: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
   const [selectedRsuId, setSelectedRsuId] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const {
     rsuLedgerData,
     blockchainLedgerData,
@@ -33,7 +37,8 @@ const RsuTrustLedgerPage: React.FC = () => {
     
     const attacks = rsuLedgerData.filter(entry => 
       entry.status === 'Attack Detected' || 
-      entry.action === 'Attack Detected'
+      entry.action === 'Attack Detected' ||
+      entry.action === 'ATTACK_DETECTED'
     ).length;
     
     const quarantined = rsuLedgerData.filter(entry => 
@@ -49,6 +54,74 @@ const RsuTrustLedgerPage: React.FC = () => {
       quarantined,
       blockchain
     };
+  };
+
+  // Generate simulated RSU security events
+  const handleGenerateEvents = async () => {
+    try {
+      setIsGenerating(true);
+      toast({
+        title: "Generating Events",
+        description: "Creating simulated RSU security events...",
+      });
+      
+      // Fetch RSUs first
+      const rsus = await fetchFromSupabase('rsus', { limit: 50 });
+      
+      if (!rsus || rsus.length === 0) {
+        toast({
+          title: "No RSUs Found",
+          description: "Please add RSUs to generate security events",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Generate simulated attacks (50% chance)
+      const anomalies = generateRsuAttacks(rsus, 0.5);
+      
+      if (anomalies.length === 0) {
+        toast({
+          title: "No Events Generated",
+          description: "Try again to generate security events",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Log the anomalies to the console
+      console.log(`Generated ${anomalies.length} simulated RSU security events`);
+      
+      // Store the anomalies
+      const response = await fetch('/api/anomalies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ anomalies }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to store anomalies');
+      }
+      
+      toast({
+        title: "Events Generated",
+        description: `Created ${anomalies.length} simulated RSU security events`,
+      });
+      
+      // Refresh the ledger data
+      handleRefresh();
+    } catch (error) {
+      console.error("Error generating RSU events:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate RSU security events",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const stats = getStats();
@@ -71,6 +144,16 @@ const RsuTrustLedgerPage: React.FC = () => {
             >
               <RefreshCw className={`h-4 w-4 ${(isLoading || isBlockchainLoading) ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleGenerateEvents}
+              disabled={isGenerating}
+              className="flex items-center gap-2"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>Generate Events</span>
             </Button>
             <WalletConnectButton />
           </div>

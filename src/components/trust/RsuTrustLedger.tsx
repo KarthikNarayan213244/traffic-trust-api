@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Table,
@@ -39,14 +38,18 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
 
   // Get badge for RSU state
   const getRsuStateBadge = (state: string) => {
-    if (state === 'Quarantined') {
+    const normalizedState = state?.toUpperCase() || '';
+    
+    if (normalizedState.includes('QUARANTIN')) {
       return <Badge className="bg-red-500 flex items-center gap-1"><AlertTriangle size={12} /> Quarantined</Badge>;
-    } else if (state === 'Attack Detected') {
+    } else if (normalizedState.includes('ATTACK')) {
       return <Badge className="bg-amber-500 flex items-center gap-1"><AlertTriangle size={12} /> Attack Detected</Badge>;
-    } else if (state === 'Blockchain Protected') {
+    } else if (normalizedState.includes('BLOCKCHAIN') || normalizedState.includes('PROTECTED')) {
       return <Badge className="bg-blue-500 flex items-center gap-1"><Shield size={12} /> Protected</Badge>;
-    } else if (state === 'Recovered') {
+    } else if (normalizedState.includes('RECOVER')) {
       return <Badge className="bg-green-500 flex items-center gap-1"><CheckCircle size={12} /> Recovered</Badge>;
+    } else if (normalizedState.includes('TRUST')) {
+      return <Badge className="bg-blue-400 flex items-center gap-1"><Shield size={12} /> Trust Update</Badge>;
     } else {
       return <Badge className="bg-gray-400">{state}</Badge>;
     }
@@ -68,13 +71,31 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
   const sortedData = React.useMemo(() => {
     if (!Array.isArray(data)) return [];
     
-    return [...data].sort((a, b) => {
+    // Filter to show only RSU entries
+    const rsuData = data.filter(entry => 
+      entry.target_type === 'RSU' || 
+      (entry.target_id && entry.target_id.includes('RSU')) ||
+      (entry.vehicle_id === 'SYSTEM' && entry.details && entry.details.toLowerCase().includes('rsu'))
+    );
+    
+    console.log(`Filtered ${data.length} entries to ${rsuData.length} RSU entries`);
+    
+    return [...rsuData].sort((a, b) => {
       try {
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
       } catch (error) {
         return 0;
       }
     });
+  }, [data]);
+
+  // Log the data we're working with
+  React.useEffect(() => {
+    if (data && data.length > 0) {
+      console.log(`RsuTrustLedger received ${data.length} entries, first entry:`, data[0]);
+    } else {
+      console.log("RsuTrustLedger received empty data");
+    }
   }, [data]);
 
   // Loading skeleton
@@ -124,7 +145,7 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
           <TableBody>
             <TableRow>
               <TableCell colSpan={5} className="text-center py-10">
-                No RSU trust ledger entries available
+                No RSU trust ledger entries available. Try using the "Generate Events" button.
               </TableCell>
             </TableRow>
           </TableBody>
@@ -146,15 +167,15 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedData.map((entry) => (
-            <TableRow key={entry.tx_id || entry.id}>
+          {sortedData.map((entry, index) => (
+            <TableRow key={entry.tx_id || entry.id || index}>
               <TableCell className="font-mono text-xs">
-                {entry.tx_id || entry.id}
+                {entry.tx_id || entry.id || `tx-${index}`}
               </TableCell>
               <TableCell>
                 {formatTimestamp(entry.timestamp)}
               </TableCell>
-              <TableCell>{entry.target_id || entry.rsu_id}</TableCell>
+              <TableCell>{entry.target_id || entry.rsu_id || "Unknown RSU"}</TableCell>
               <TableCell>
                 {getRsuStateBadge(entry.status || entry.action)}
               </TableCell>

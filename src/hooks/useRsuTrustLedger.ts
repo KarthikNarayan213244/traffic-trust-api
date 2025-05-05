@@ -17,14 +17,47 @@ export const useRsuTrustLedger = () => {
       setIsLoading(true);
       setIsError(false);
       
-      // Fetch RSU-specific trust ledger entries
+      // Try to fetch from trust API first
+      try {
+        const response = await fetch('/api/trust-ledger?target_type=RSU');
+        if (response.ok) {
+          const data = await response.json();
+          console.log("RSU trust ledger data loaded from API:", data?.length || 0);
+          setRsuLedgerData(Array.isArray(data) ? data : []);
+          return;
+        }
+      } catch (apiError) {
+        console.error("Error fetching from API, falling back to Supabase:", apiError);
+      }
+      
+      // Fetch RSU-specific trust ledger entries from Supabase as fallback
       const data = await fetchFromSupabase('trustLedger', { 
         filters: { target_type: 'RSU' },
         limit: 1000,
         orderBy: { field: 'timestamp', ascending: false }
       });
       
-      console.log("RSU trust ledger data loaded:", data?.length || 0);
+      console.log("RSU trust ledger data loaded from Supabase:", data?.length || 0);
+      
+      // If still no data, fallback to filtering on client side
+      if (!data || data.length === 0) {
+        const allData = await fetchFromSupabase('trustLedger', {
+          limit: 1000,
+          orderBy: { field: 'timestamp', ascending: false }
+        });
+        
+        // Filter to just get RSU data
+        const rsuData = allData ? allData.filter(entry => 
+          entry.target_type === 'RSU' || 
+          entry.vehicle_id === 'SYSTEM' ||
+          (entry.details && entry.details.toLowerCase().includes('rsu'))
+        ) : [];
+        
+        console.log("RSU trust ledger filtered from all data:", rsuData.length);
+        setRsuLedgerData(rsuData);
+        return;
+      }
+      
       setRsuLedgerData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching RSU trust ledger:", error);
