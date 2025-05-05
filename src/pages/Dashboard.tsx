@@ -1,14 +1,11 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import KpiCard from "@/components/dashboard/KpiCard";
 import TrafficMap from "@/components/dashboard/TrafficMap";
-import AnomalyChart from "@/components/dashboard/AnomalyChart";
-import TrustLedgerTable from "@/components/dashboard/TrustLedgerTable";
 import AttackSimulationCard from "@/components/dashboard/AttackSimulationCard";
 import RsuTrustOverlay from "@/components/dashboard/map/RsuTrustOverlay";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Radio, AlertTriangle, Shield, RefreshCw, BarChart3, Database } from "lucide-react";
+import { Car, Radio, AlertTriangle, Shield, RefreshCw, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { fetchVehicles, fetchRSUs, fetchAnomalies, fetchTrustLedger, fetchCongestionData } from "@/services/api";
@@ -174,6 +171,7 @@ const Dashboard: React.FC = () => {
   return (
     <MainLayout>
       <div className="flex flex-col space-y-6">
+        {/* Header with title and controls */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Hyderabad Traffic Trust Platform</h1>
@@ -218,6 +216,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
         
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard 
             title="Total Vehicles" 
@@ -262,70 +261,33 @@ const Dashboard: React.FC = () => {
           />
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Real-time Traffic Monitoring</CardTitle>
-                <CardDescription>View and track vehicles and roadside units across Hyderabad in real-time</CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 relative">
-                <TrafficMap 
-                  vehicles={vehicles}
-                  rsus={rsus}
-                  isLoading={isLoading}
-                  congestionData={congestionData}
-                />
-                <RsuTrustOverlay 
-                  rsus={rsus}
-                  anomalies={anomalies}
-                />
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div>
-            <AttackSimulationCard
-              rsus={rsus}
-              isLiveMonitoring={autoRefresh}
-              setRsus={setRsus}
-              setAnomalies={setAnomalies}
-            />
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="pb-0">
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                <span>Anomaly Distribution</span>
-              </CardTitle>
-              <CardDescription>Recent vehicle and RSU anomalies by severity</CardDescription>
+        {/* Main content area - Map and Attack Simulation */}
+        <div className="grid grid-cols-1 gap-6">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>Real-time Traffic Monitoring</CardTitle>
+              <CardDescription>View and track vehicles and roadside units across Hyderabad in real-time</CardDescription>
             </CardHeader>
-            <CardContent>
-              <AnomalyChart 
-                data={anomalies} 
-                isLoading={isLoading} 
+            <CardContent className="p-0 relative">
+              <TrafficMap 
+                vehicles={vehicles}
+                rsus={rsus}
+                isLoading={isLoading}
+                congestionData={congestionData}
+              />
+              <RsuTrustOverlay 
+                rsus={rsus}
+                anomalies={anomalies}
               />
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="pb-0">
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                <span>Blockchain Trust Ledger</span>
-              </CardTitle>
-              <CardDescription>Recent trust score changes secured by blockchain</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TrustLedgerTable 
-                data={trustLedger} 
-                isLoading={isLoading} 
-              />
-            </CardContent>
-          </Card>
+          <AttackSimulationCard
+            rsus={rsus}
+            isLiveMonitoring={autoRefresh}
+            setRsus={setRsus}
+            setAnomalies={setAnomalies}
+          />
         </div>
       </div>
     </MainLayout>
