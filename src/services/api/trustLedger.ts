@@ -2,6 +2,7 @@
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { FetchOptions } from "./supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Fetches trust ledger data from the API
@@ -62,9 +63,14 @@ export async function createAnomalies(anomalies: any[]): Promise<any[]> {
   try {
     console.log(`Storing ${anomalies.length} anomalies`);
     
-    // Try Direct Supabase Insert
+    // Try Direct Supabase Insert - using the supabase client directly
     try {
-      const { data, error } = await fetchFromSupabase("anomalies", {}, 'INSERT', anomalies);
+      // Use the supabase client to insert anomalies directly
+      const { data, error } = await supabase
+        .from('anomalies')
+        .insert(anomalies)
+        .select();
+      
       if (error) throw new Error(error.message);
       return data || [];
     } catch (supabaseError) {
