@@ -1,6 +1,8 @@
 
 import { ENDPOINTS } from '../config';
 
+export type ApiEndpoint = keyof typeof ENDPOINTS;
+
 // Define the mapping between endpoint names and their Supabase table names
 export interface SupabaseTableMap {
   vehicles: string;
