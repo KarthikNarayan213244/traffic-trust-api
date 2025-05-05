@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -132,35 +131,6 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
     );
   }
 
-  // Empty state
-  if (data.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Blockchain Protection</CardTitle>
-          <CardDescription>
-            Trust ledger data stored on the blockchain
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Shield className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No blockchain protection yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add blockchain protection to secure RSUs against attacks
-            </p>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-center border-t pt-4">
-          <Button onClick={onStakeClick} className="flex items-center gap-2">
-            <PlusCircle className="h-4 w-4" />
-            <span>Add Blockchain Protection</span>
-          </Button>
-        </CardFooter>
-      </Card>
-    );
-  }
-
   // Data loaded state
   return (
     <Card>
@@ -182,31 +152,39 @@ const BlockchainLedger: React.FC<BlockchainLedgerProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((entry, index) => (
-              <TableRow key={entry.tx_id || index}>
-                <TableCell className="font-mono text-xs">
-                  {formatTxId(entry.tx_id)}
-                </TableCell>
-                <TableCell>{formatTimestamp(entry.timestamp)}</TableCell>
-                <TableCell>
-                  {entry.target_id || entry.rsu_id || "RSU"}
-                </TableCell>
-                <TableCell>
-                  {getActionBadge(entry.action)}
-                </TableCell>
-                <TableCell>
-                  {entry.old_value !== undefined && entry.new_value !== undefined ? (
-                    <Badge className={entry.new_value >= entry.old_value ? "bg-green-500" : "bg-red-500"}>
-                      {entry.new_value}
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-blue-500">
-                      Protected
-                    </Badge>
-                  )}
+            {data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-10">
+                  No blockchain data available yet. Add blockchain protection to secure RSUs.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              data.map((entry, index) => (
+                <TableRow key={entry.tx_id || index}>
+                  <TableCell className="font-mono text-xs">
+                    {formatTxId(entry.tx_id)}
+                  </TableCell>
+                  <TableCell>{formatTimestamp(entry.timestamp)}</TableCell>
+                  <TableCell>
+                    {entry.target_id || entry.rsu_id || "RSU"}
+                  </TableCell>
+                  <TableCell>
+                    {getActionBadge(entry.action)}
+                  </TableCell>
+                  <TableCell>
+                    {entry.old_value !== undefined && entry.new_value !== undefined ? (
+                      <Badge className={entry.new_value >= entry.old_value ? "bg-green-500" : "bg-red-500"}>
+                        {entry.new_value}
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-blue-500">
+                        Protected
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

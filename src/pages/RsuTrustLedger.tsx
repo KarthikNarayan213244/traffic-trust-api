@@ -244,7 +244,7 @@ const RsuTrustLedgerPage: React.FC = () => {
               data={blockchainLedgerData}
               isLoading={isBlockchainLoading}
               isError={isBlockchainError}
-              etherscanUrl=""
+              etherscanUrl={etherscanUrl || ""}
               onRetry={loadBlockchainData}
               onStakeClick={() => {
                 setSelectedRsuId("");
