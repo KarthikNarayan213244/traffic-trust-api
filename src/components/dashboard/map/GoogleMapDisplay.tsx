@@ -155,6 +155,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
     }
   }, [map, selectedAmbulance, destination]);
 
+  // Safety check - don't render if Google Maps API is not available
   if (!window.google) {
     console.log("Google Maps API not loaded yet in GoogleMapDisplay render");
     return (
@@ -191,7 +192,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         {/* Congestion heatmap */}
         <CongestionHeatmap congestionData={congestionData} />
         
-        {/* Use Google Maps Directions service with optimized waypoints */}
+        {/* Only use directions service when we have all required elements and a valid API key */}
         {window.google && selectedAmbulance && destination && apiKey && isCalculatingDirections && (
           <DirectionsService
             options={{

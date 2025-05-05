@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -47,13 +48,22 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   } = useMLSimulation();
   
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
+  const [mapsInitialized, setMapsInitialized] = useState<boolean>(false);
 
-  // Only initialize Google Maps when we have an API key
+  // Only initialize Google Maps when we have an API key and haven't initialized yet
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey || "",  // Use empty string if no key is available
     libraries,
     id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
+
+  // Update maps initialization status
+  useEffect(() => {
+    if (isLoaded && !mapsInitialized) {
+      console.log("Google Maps API loaded successfully");
+      setMapsInitialized(true);
+    }
+  }, [isLoaded, mapsInitialized]);
 
   // Set up interval for data updates and ML inference when monitoring is active
   useEffect(() => {
@@ -243,7 +253,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       </div>
 
       {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
-      {isLoaded && (
+      {isLoaded && mapsInitialized && (
         <GoogleMapDisplay 
           vehicles={vehicles} 
           rsus={rsus} 

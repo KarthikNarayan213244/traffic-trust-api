@@ -12,36 +12,35 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { API_KEY_STORAGE_KEY } from "./map/constants";
+import { useMapApiKey } from "@/hooks/useMapApiKey";
 
 interface MapApiKeyFormProps {
   onApiKeySet: (apiKey: string) => void;
 }
 
 const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
+  const { apiKey: currentApiKey } = useMapApiKey();
   const [apiKey, setApiKey] = useState<string>("");
   const [showDialog, setShowDialog] = useState<boolean>(false);
   
-  // Check if API key exists in localStorage on component mount
+  // Update our local state when the global API key changes
   useEffect(() => {
-    const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    if (storedApiKey) {
-      setApiKey(storedApiKey);
-      // Don't automatically call onApiKeySet here to avoid multiple initializations
-      // Only set it when the user explicitly clicks Save
-    } else {
+    setApiKey(currentApiKey || "");
+  }, [currentApiKey]);
+  
+  // Show dialog automatically if no API key is set
+  useEffect(() => {
+    if (!currentApiKey) {
       setShowDialog(true);
     }
-  }, []);
+  }, [currentApiKey]);
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
-      localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
+      // We only use the onApiKeySet callback to update the key
+      // This ensures a single source of truth via useMapApiKey
       onApiKeySet(apiKey.trim());
       setShowDialog(false);
-      toast({
-        title: "API Key Saved",
-        description: "Google Maps is now ready to use.",
-      });
     } else {
       toast({
         title: "API Key Required",
@@ -60,10 +59,9 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
       <Button
         variant="outline"
         size="sm"
-        className="absolute top-3 left-3 z-10 bg-white/90"
         onClick={handleUpdateApiKey}
       >
-        Update Maps API Key
+        {currentApiKey ? "Update Maps API Key" : "Set Maps API Key"}
       </Button>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
