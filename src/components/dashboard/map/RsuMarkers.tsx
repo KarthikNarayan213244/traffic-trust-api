@@ -36,7 +36,7 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
             key={markerId}
             position={position}
             icon={{
-              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
               scale: 6,
               fillColor: fillColor,
               fillOpacity: 0.9,
