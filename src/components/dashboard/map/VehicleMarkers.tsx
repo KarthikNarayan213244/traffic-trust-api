@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState, useMemo } from "react";
+import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { Marker } from "@react-google-maps/api";
 import { getTrustScoreColor } from "./utils";
 import { defaultCenter } from "./constants";
@@ -10,6 +10,11 @@ interface VehicleMarkersProps {
   isSimulationRunning?: boolean;
   selectedAmbulanceId: string | null;
   onAmbulanceSelect: (vehicle: Vehicle) => void;
+}
+
+// Extend the Vehicle type to include optional properties used in this component
+interface ExtendedVehicle extends Vehicle {
+  has_anomaly?: boolean;
 }
 
 const VehicleMarkers: React.FC<VehicleMarkersProps> = ({ 
@@ -44,8 +49,9 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
     // Find the map instance (assuming there's only one on the page)
     const maps = document.querySelectorAll('div[aria-roledescription="map"]');
     if (maps.length > 0) {
-      const mapElement = maps[0];
-      const mapInstance = mapElement.__gm?.map;
+      const mapElement = maps[0] as HTMLElement;
+      // Use a type assertion with any to access the __gm property
+      const mapInstance = (mapElement as any).__gm?.map;
       
       if (mapInstance) {
         const handleZoomChange = () => {
@@ -81,15 +87,18 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
     // For other vehicles, apply the maxVisibleVehicles limit
     let filteredVehicles = vehicles.filter(v => v.vehicle_type?.toLowerCase() !== 'ambulance');
     
+    // Treat vehicles as ExtendedVehicle to access has_anomaly property
+    const extendedVehicles = filteredVehicles as ExtendedVehicle[];
+    
     // If too many vehicles, take a random sample but prioritize those with anomalies
-    if (filteredVehicles.length > maxVisibleVehicles) {
+    if (extendedVehicles.length > maxVisibleVehicles) {
       // Prioritize vehicles with anomalies or low trust scores
-      const priorityVehicles = filteredVehicles.filter(v => 
+      const priorityVehicles = extendedVehicles.filter(v => 
         v.trust_score < 30 || v.has_anomaly === true
       );
       
       // Take random sample from remaining vehicles
-      const remainingVehicles = filteredVehicles.filter(v => 
+      const remainingVehicles = extendedVehicles.filter(v => 
         v.trust_score >= 30 && v.has_anomaly !== true
       );
       
@@ -313,7 +322,7 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
             onClick={() => isAmbulance && handleAmbulanceClick(vehicle)}
             clickable={isAmbulance}
             zIndex={isAmbulance ? 100 : 10}
-            optimized={!isSelected} // Optimize non-selected markers for better performance
+            // Remove optimized prop as it's not supported in the type definition
             animation={isSelected ? google.maps.Animation.BOUNCE : undefined}
           />
         );

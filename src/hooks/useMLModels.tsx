@@ -14,6 +14,12 @@ const loadedModels = {
 // Global flag to prevent multiple parallel loading operations
 let isLoadingModels = false;
 
+// Define a more specific type for TensorFlow memory info
+interface ExtendedMemoryInfo extends tf.MemoryInfo {
+  numBytesInGPU?: number;
+  numBytesInGPUMax?: number;
+}
+
 export const useMLModels = (loadImmediately = false) => {
   const [isModelLoading, setIsModelLoading] = useState<boolean>(loadImmediately);
   const [modelsLoaded, setModelsLoaded] = useState<boolean>(
@@ -42,7 +48,8 @@ export const useMLModels = (loadImmediately = false) => {
           // Monitor WebGL memory and clear when needed
           setInterval(() => {
             try {
-              const memoryInfo = tf.memory();
+              // Cast to ExtendedMemoryInfo to access GPU properties
+              const memoryInfo = tf.memory() as ExtendedMemoryInfo;
               if (memoryInfo.numBytesInGPU) {
                 const numBytesInGPUUsed = memoryInfo.numBytesInGPU;
                 const numBytesInGPUMax = memoryInfo.numBytesInGPUMax || numBytesInGPUUsed * 1.5;
