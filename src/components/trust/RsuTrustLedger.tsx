@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Table,
@@ -50,6 +51,8 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
       return <Badge className="bg-green-500 flex items-center gap-1"><CheckCircle size={12} /> Recovered</Badge>;
     } else if (normalizedState.includes('TRUST')) {
       return <Badge className="bg-blue-400 flex items-center gap-1"><Shield size={12} /> Trust Update</Badge>;
+    } else if (normalizedState.includes('SYBIL') || normalizedState.includes('DENIAL') || normalizedState.includes('TAMPERING')) {
+      return <Badge className="bg-amber-500 flex items-center gap-1"><AlertTriangle size={12} /> {state}</Badge>;
     } else {
       return <Badge className="bg-gray-400">{state}</Badge>;
     }
@@ -177,7 +180,7 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
               </TableCell>
               <TableCell>{entry.target_id || entry.rsu_id || "Unknown RSU"}</TableCell>
               <TableCell>
-                {getRsuStateBadge(entry.status || entry.action)}
+                {getRsuStateBadge(entry.status || entry.action || entry.type)}
               </TableCell>
               <TableCell>
                 {entry.old_value !== undefined && entry.new_value !== undefined ? (

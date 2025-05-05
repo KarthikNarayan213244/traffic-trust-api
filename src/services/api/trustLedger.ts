@@ -1,3 +1,4 @@
+
 import { fetchData } from "./config";
 import { fetchFromSupabase } from "./supabase";
 import { FetchOptions } from "./supabase/types";
@@ -68,7 +69,19 @@ export async function createAnomalies(anomalies: any[]): Promise<any[]> {
     
     // Try Direct Supabase Insert for anomalies
     try {
-      // Format anomalies to ensure all required fields
+      // Get the column names from the anomalies table to ensure we're using the right ones
+      const { data: columns, error: columnsError } = await supabase
+        .from('anomalies')
+        .select('*')
+        .limit(1);
+        
+      if (columnsError) {
+        console.error("Error getting anomalies columns:", columnsError);
+      } else {
+        console.log("Anomalies table columns:", Object.keys(columns?.[0] || {}));
+      }
+      
+      // Format anomalies to ensure all required fields and map field names correctly
       const formattedAnomalies = anomalies.map(anomaly => ({
         id: anomaly.id || `anomaly-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
         type: anomaly.type,
@@ -76,10 +89,14 @@ export async function createAnomalies(anomalies: any[]): Promise<any[]> {
         message: anomaly.message || `${anomaly.type} detected on RSU ${anomaly.target_id}`,
         severity: anomaly.severity || "Medium",
         status: anomaly.status || "Detected",
-        vehicle_id: anomaly.vehicle_id || null,
-        target_id: anomaly.target_id,
-        target_type: anomaly.target_type || 'RSU'
+        vehicle_id: anomaly.vehicle_id || "SYSTEM",
+        // Only use target_id if it's a valid column in the table
+        ...(columns && Object.keys(columns[0] || {}).includes('target_id') ? { target_id: anomaly.target_id } : {}),
+        // Only use target_type if it's a valid column in the table
+        ...(columns && Object.keys(columns[0] || {}).includes('target_type') ? { target_type: anomaly.target_type || 'RSU' } : {})
       }));
+      
+      console.log("Formatted anomalies for insertion:", formattedAnomalies);
       
       // Use supabase client to directly insert anomalies
       const { data, error } = await supabase
@@ -88,8 +105,11 @@ export async function createAnomalies(anomalies: any[]): Promise<any[]> {
         .select();
       
       if (error) {
+        console.error("Supabase anomalies insert error:", error);
         throw new Error(error.message);
       }
+      
+      console.log("Successfully inserted anomalies:", data);
       
       // Also create trust ledger entries for each anomaly
       const trustResults = [];
@@ -123,15 +143,54 @@ export async function createAnomalies(anomalies: any[]): Promise<any[]> {
       return data || formattedAnomalies;
     } catch (supabaseError) {
       console.error("Error storing anomalies via Supabase:", supabaseError);
+      
+      // Fallback: Create just the trust ledger entries without the anomalies
+      const trustResults = [];
+      for (const anomaly of anomalies) {
+        try {
+          // Create trust ledger entry for this anomaly
+          const trustEntry = {
+            tx_id: `anomaly-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+            timestamp: anomaly.timestamp || new Date().toISOString(),
+            vehicle_id: 'SYSTEM',
+            action: anomaly.type,
+            old_value: 90, // Placeholder values
+            new_value: 70,
+            details: anomaly.message || `${anomaly.type} detected on RSU ${anomaly.target_id}`,
+            target_id: anomaly.target_id,
+            target_type: 'RSU'
+          };
+          
+          const result = await createTrustLedgerEntry(trustEntry);
+          trustResults.push(result);
+          
+          toast({
+            title: "Security Event Created",
+            description: `${anomaly.type} detected on RSU ${anomaly.target_id}`,
+            variant: "default"
+          });
+        } catch (entryError) {
+          console.error("Failed to create trust entry:", entryError);
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to create security events. Please try again.",
+        title: "Warning",
+        description: "Created security events, but couldn't store them as anomalies.",
         variant: "destructive"
       });
-      return [];
+      
+      return trustResults;
     }
   } catch (error) {
     console.error("Error creating anomalies:", error);
+    
+    toast({
+      title: "Error",
+      description: "Failed to create security events. Please try again.",
+      variant: "destructive"
+    });
+    
     return [];
   }
 }

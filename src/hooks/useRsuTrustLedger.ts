@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { fetchFromSupabase } from "@/services/api/supabase/fetch";
 import { toast } from "@/hooks/use-toast";
 import { stakeTrust, getTrustLedger } from "@/services/blockchain";
+import { supabase } from "@/integrations/supabase/client";
 
 export const useRsuTrustLedger = () => {
   const [rsuLedgerData, setRsuLedgerData] = useState<any[]>([]);
@@ -19,36 +20,55 @@ export const useRsuTrustLedger = () => {
       
       let data: any[] = [];
       
-      // First try to fetch with filter if target_type is available
+      // First try to fetch directly from the trust_ledger table
       try {
-        data = await fetchFromSupabase('trustLedger', { 
-          filters: { target_type: 'RSU' },
-          limit: 1000,
-          orderBy: { field: 'timestamp', ascending: false }
-        });
+        const { data: directData, error } = await supabase
+          .from('trust_ledger')
+          .select('*')
+          .eq('target_type', 'RSU')
+          .order('timestamp', { ascending: false })
+          .limit(1000);
+          
+        if (error) {
+          throw error;
+        }
         
-        console.log("Fetched RSU trust data with target_type filter:", data?.length || 0);
-      } catch (error) {
-        console.warn("Could not filter by target_type, trying alternative approach:", error);
+        data = directData || [];
+        console.log("Fetched RSU trust data directly from trust_ledger:", data?.length || 0);
+      } catch (directError) {
+        console.warn("Error fetching directly from trust_ledger, trying API approach:", directError);
         
-        // Fallback: get all data and filter client-side
-        const allData = await fetchFromSupabase('trustLedger', {
-          limit: 1000,
-          orderBy: { field: 'timestamp', ascending: false }
-        });
-        
-        // Filter for RSU-related entries
-        data = allData.filter(entry => 
-          (entry.target_type && entry.target_type === 'RSU') || 
-          (entry.target_id && entry.target_id.includes('RSU')) ||
-          (entry.details && entry.details.toLowerCase().includes('rsu')) ||
-          (entry.action && 
-            (entry.action === 'RSU_QUARANTINED' || 
-             entry.action === 'ATTACK_DETECTED' || 
-             entry.action.includes('RSU')))
-        );
-        
-        console.log(`Fetched and filtered ${allData.length} trust entries to ${data.length} RSU entries`);
+        // Try to fetch via the endpoint instead
+        try {
+          data = await fetchFromSupabase('trustLedger', { 
+            filters: { target_type: 'RSU' },
+            limit: 1000,
+            orderBy: { field: 'timestamp', ascending: false }
+          });
+          
+          console.log("Fetched RSU trust data with target_type filter:", data?.length || 0);
+        } catch (error) {
+          console.warn("Could not filter by target_type, trying alternative approach:", error);
+          
+          // Fallback: get all data and filter client-side
+          const allData = await fetchFromSupabase('trustLedger', {
+            limit: 1000,
+            orderBy: { field: 'timestamp', ascending: false }
+          });
+          
+          // Filter for RSU-related entries
+          data = allData.filter(entry => 
+            (entry.target_type && entry.target_type === 'RSU') || 
+            (entry.target_id && entry.target_id.includes('RSU')) ||
+            (entry.details && entry.details.toLowerCase().includes('rsu')) ||
+            (entry.action && 
+              (entry.action === 'RSU_QUARANTINED' || 
+               entry.action === 'ATTACK_DETECTED' || 
+               entry.action.includes('RSU')))
+          );
+          
+          console.log(`Fetched and filtered ${allData.length} trust entries to ${data.length} RSU entries`);
+        }
       }
       
       if (data.length === 0) {
