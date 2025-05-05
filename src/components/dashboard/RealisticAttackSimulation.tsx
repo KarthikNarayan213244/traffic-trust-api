@@ -92,12 +92,12 @@ const RealisticAttackSimulation: React.FC<RealisticAttackSimulationProps> = ({
       };
       
       // Create a new array with the anomaly added (only if not already present)
-      const updatedAnomalies = anomalies.some(a => a.id === attack.id)
-        ? anomalies
-        : [...anomalies, newAnomaly];
-      
-      // Update anomalies state with the new array
-      setAnomalies(updatedAnomalies);
+      setAnomalies(prevAnomalies => {
+        if (prevAnomalies.some(a => a.id === attack.id)) {
+          return prevAnomalies;
+        }
+        return [...prevAnomalies, newAnomaly];
+      });
       
       // Show toast for critical attacks
       if (attack.attack.severity === 'Critical' && attack.success) {
@@ -159,7 +159,9 @@ const RealisticAttackSimulation: React.FC<RealisticAttackSimulationProps> = ({
     });
     
     // Start the simulation if not already running
-    globalAttackSimulationEngine.start(rsus);
+    if (!globalAttackSimulationEngine.isRunning()) {
+      globalAttackSimulationEngine.start(rsus);
+    }
     
     // Countdown timer for next attack
     const countdownInterval = setInterval(() => {

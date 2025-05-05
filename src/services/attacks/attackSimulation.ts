@@ -1,3 +1,4 @@
+
 import { AttackVector, ALL_ATTACK_VECTORS, getRandomAttackVector } from './attackTypes';
 import { Attacker, AttackerPool, globalAttackerPool } from './attackerModel';
 import { NetworkTopology, globalNetworkTopology } from './networkSimulation';
@@ -102,8 +103,12 @@ export class AttackSimulationEngine {
   start(initialRsus: any[]) {
     if (this.running) return;
     this.running = true;
-    this.networkTopology.initialize(initialRsus);
-    this.attackerPool.seedAttackers(5);
+    this.networkTopology.initializeFromRSUs(initialRsus);
+    
+    // Add attackers to the pool
+    for (let i = 0; i < 5; i++) {
+      this.attackerPool.addAttacker();
+    }
     
     const interval = this.calculateSimulationInterval();
     this.simulationTimer = setInterval(() => this.simulationCycle(Array.from(this.networkTopology.nodes.values())), interval);
@@ -113,7 +118,11 @@ export class AttackSimulationEngine {
     if (!this.running) return;
     this.running = false;
     clearInterval(this.simulationTimer);
-    this.attackerPool.reset();
+    
+    // Clear the attackers
+    while (this.attackerPool.attackers.length > 0) {
+      this.attackerPool.removeAttacker(0);
+    }
   }
 
   isRunning(): boolean {
@@ -152,9 +161,12 @@ export class AttackSimulationEngine {
     
     this.stats.attacksAttempted++;
     
-    const attack: Attack = getRandomAttackVector();
+    // Get a random attack vector and convert it to Attack type
+    const attackVector: AttackVector = getRandomAttackVector();
+    const attack: Attack = this.convertVectorToAttack(attackVector);
+    
     const attacker: Attacker = this.attackerPool.getRandomAttacker();
-    const attackSuccess = Math.random() < (attacker.skillLevel / 100);
+    const attackSuccess = Math.random() < (attacker.profile.skill);
     const attackDetected = attackSuccess && (Math.random() > (this.options.defenseLevel / 100));
     const attackMitigated = attackDetected && (Math.random() > 0.5);
     const networkImpact = attackSuccess ? (Math.random() * 0.05) : 0;
@@ -175,7 +187,7 @@ export class AttackSimulationEngine {
     const attackEvent: AttackEvent = {
       id: uuidv4(),
       attack: attack,
-      attackerProfile: attacker.profile,
+      attackerProfile: attacker.profile.name,
       targetId: targetRsu.id,
       timestamp: new Date(),
       success: attackSuccess,
@@ -191,16 +203,46 @@ export class AttackSimulationEngine {
     }
   }
 
+  // Convert AttackVector to Attack for consistency
+  private convertVectorToAttack(vector: AttackVector): Attack {
+    return {
+      id: vector.id,
+      name: vector.name,
+      description: vector.description,
+      severity: vector.severity,
+      category: this.getCategoryForAttack(vector.id),
+      targetType: 'RSU',
+      likelyImpact: `Reduces trust score by ${vector.trustImpact}% and affects network performance by ${vector.networkImpact * 100}%`,
+      prerequisites: vector.requiresCompromisedRSU ? ['Compromised RSU Access'] : [],
+      mitigationStrategies: [vector.mitigationStrategy],
+      executionDetails: {
+        method: 'Automated Simulation',
+        payload: { signature: vector.signature }
+      }
+    };
+  }
+
+  // Helper to determine the category for an attack
+  private getCategoryForAttack(attackId: string): string {
+    for (const [category, attacks] of Object.entries(require('./attackTypes').ATTACK_VECTORS)) {
+      if (attacks.some((a: any) => a.id === attackId)) {
+        return category;
+      }
+    }
+    return 'unknown';
+  }
+
   private updateNetworkEffects(rsus: any[]) {
     if (!this.running) return;
     
     let totalNetworkDegradation = 0;
     
     rsus.forEach(rsu => {
-      // Simulate trust propagation
-      const neighbors = this.networkTopology.getNeighbors(rsu.id);
-      neighbors.forEach(neighborId => {
-        const neighbor = this.networkTopology.getNode(neighborId);
+      // For each RSU, get its neighboring RSUs
+      const neighborIds = this.getNeighboringRSUs(rsu.id, rsus);
+      
+      neighborIds.forEach(neighborId => {
+        const neighbor = rsus.find(r => r.rsu_id === neighborId);
         if (neighbor) {
           // Propagate trust (or distrust)
           neighbor.trustScore += (rsu.trustScore - neighbor.trustScore) * 0.01;
@@ -221,6 +263,43 @@ export class AttackSimulationEngine {
     if (this.onRsusUpdatedCallback) {
       this.onRsusUpdatedCallback(rsus);
     }
+  }
+
+  // Helper method to get neighboring RSUs based on location proximity
+  private getNeighboringRSUs(rsuId: string, allRsus: any[]): string[] {
+    const currentRsu = allRsus.find(r => r.rsu_id === rsuId);
+    if (!currentRsu) return [];
+    
+    // Simple proximity calculation (in real world, would use actual network topology)
+    return allRsus
+      .filter(r => r.rsu_id !== rsuId)
+      .filter(r => this.calculateDistance(
+        { lat: currentRsu.lat, lng: currentRsu.lng },
+        { lat: r.lat, lng: r.lng }
+      ) < 3) // 3km radius
+      .map(r => r.rsu_id);
+  }
+
+  // Calculate distance between two points in km
+  private calculateDistance(
+    point1: { lat: number, lng: number }, 
+    point2: { lat: number, lng: number }
+  ): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = this.degreesToRadians(point2.lat - point1.lat);
+    const dLon = this.degreesToRadians(point2.lng - point1.lng);
+    
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(this.degreesToRadians(point1.lat)) * Math.cos(this.degreesToRadians(point2.lat)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  private degreesToRadians(degrees: number): number {
+    return degrees * (Math.PI/180);
   }
 
   resetStats() {
