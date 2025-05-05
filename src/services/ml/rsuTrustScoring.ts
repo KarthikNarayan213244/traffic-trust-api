@@ -2,6 +2,8 @@
 import * as tf from '@tensorflow/tfjs';
 import { toast } from "@/hooks/use-toast";
 import { stakeTrust } from "@/services/blockchain";
+import { fetchFromSupabase } from "@/services/api/supabase/fetch";
+import { v4 as uuidv4 } from 'uuid';
 
 // Trust calculation parameters
 const TRUST_INCREASE_FACTOR = 0.01;  // If no anomaly, increase trust by this factor * (1-currentTrust)
@@ -38,6 +40,50 @@ const initRsuSecurityState = (rsuId: string): RsuSecurityState => {
     };
   }
   return rsuSecurityStates[rsuId];
+};
+
+// Record RSU trust changes to trust ledger
+const recordRsuTrustChange = async (
+  rsuId: string, 
+  oldScore: number, 
+  newScore: number, 
+  action: string,
+  details?: string
+) => {
+  try {
+    const txId = `rsu-trust-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    
+    const trustEntry = {
+      tx_id: txId,
+      timestamp: new Date().toISOString(),
+      vehicle_id: 'SYSTEM', // Using SYSTEM as the actor
+      target_id: rsuId,
+      target_type: 'RSU',
+      action: action,
+      old_value: oldScore,
+      new_value: newScore,
+      details: details || 'Trust score update'
+    };
+    
+    // Write to database
+    const { error } = await fetch('/api/trust-ledger', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(trustEntry),
+    });
+    
+    if (error) {
+      console.error("Failed to write RSU trust change to ledger:", error);
+      return null;
+    }
+    
+    return txId;
+  } catch (error) {
+    console.error("Error recording RSU trust change:", error);
+    return null;
+  }
 };
 
 // Calculate RSU trust score using the specified update rule
@@ -193,29 +239,42 @@ export const updateRsuTrustScores = async (
         blockchain_protected: trustResult.blockchainUpdated
       };
       
-      // Log trust update to blockchain if needed
-      if (trustResult.blockchainUpdated) {
+      // Log trust update to ledger and blockchain if needed
+      if (trustResult.blockchainUpdated || trustResult.change !== 0) {
         try {
           // Prepare reason code
           const reasonCode = trustResult.quarantined ? 'RSU_QUARANTINED' : 
                             trustResult.attackDetected ? 'ATTACK_DETECTED' : 
                             'TRUST_UPDATE';
           
-          // Use blockchain staking for significant trust changes
-          const txId = await stakeTrust(
-            rsu.rsu_id, 
+          // Record to trust ledger
+          await recordRsuTrustChange(
+            rsu.rsu_id,
+            rsu.trust_score || DEFAULT_TRUST_SCORE,
             trustResult.score,
-            reasonCode
+            reasonCode,
+            trustResult.attackDetected ? "Attack detected on RSU" : 
+            trustResult.change > 0 ? "Trust score increased" : "Trust score decreased"
           );
           
-          // Store blockchain transaction ID
-          const securityState = rsuSecurityStates[rsu.rsu_id];
-          if (securityState) {
-            securityState.blockchainTxId = txId;
+          // Use blockchain staking for significant trust changes
+          if (trustResult.blockchainUpdated) {
+            const txId = await stakeTrust(
+              rsu.rsu_id, 
+              trustResult.score,
+              reasonCode,
+              'RSU' // Add target type
+            );
+            
+            // Store blockchain transaction ID
+            const securityState = rsuSecurityStates[rsu.rsu_id];
+            if (securityState) {
+              securityState.blockchainTxId = txId;
+            }
+            
+            blockchainTransactions++;
+            console.log(`Successfully logged trust update for RSU ${rsu.rsu_id} to blockchain: ${trustResult.score}, txId: ${txId}`);
           }
-          
-          blockchainTransactions++;
-          console.log(`Successfully logged trust update for RSU ${rsu.rsu_id} to blockchain: ${trustResult.score}, txId: ${txId}`);
           
           // Show toast for quarantined RSUs
           if (trustResult.quarantined) {
@@ -232,7 +291,7 @@ export const updateRsuTrustScores = async (
             });
           }
         } catch (error) {
-          console.error(`Failed to log trust update to blockchain for RSU ${rsu.rsu_id}:`, error);
+          console.error(`Failed to log trust update for RSU ${rsu.rsu_id}:`, error);
         }
       }
       

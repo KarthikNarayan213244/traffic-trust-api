@@ -2,7 +2,8 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertOctagon, AlertTriangle, CheckCircle, Shield, Lock } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CheckCircle, Shield, Lock, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface RsuTrustOverlayProps {
   rsus: any[];
@@ -36,7 +37,9 @@ const RsuTrustOverlay: React.FC<RsuTrustOverlayProps> = ({
             <Shield size={16} className="text-primary" />
             RSU Trust Monitoring
           </h3>
-          <Badge variant="secondary" className="text-xs">Live</Badge>
+          <Link to="/rsu-trust-ledger" className="text-xs text-blue-600 hover:underline flex items-center">
+            Ledger <ExternalLink size={12} className="ml-1" />
+          </Link>
         </div>
         
         {/* Summary stats */}
