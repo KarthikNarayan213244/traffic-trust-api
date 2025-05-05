@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -25,6 +24,9 @@ interface TrafficMapProps {
   congestionData?: any[];
 }
 
+// Keep track of whether the maps API has already been initialized
+let mapsApiInitialized = false;
+
 const TrafficMap: React.FC<TrafficMapProps> = ({
   vehicles: initialVehicles = [],
   rsus: initialRsus = [],
@@ -32,7 +34,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   congestionData: initialCongestionData = []
 }) => {
   // Custom hooks to manage state
-  const { apiKey, handleApiKeySet } = useMapApiKey();
+  const { apiKey, handleApiKeySet, keyIsSet } = useMapApiKey();
   const { vehicles, rsus, congestionData, anomalies, isLoading, setVehicles, setRsus, setCongestionData, setAnomalies } = useMapData(
     initialVehicles, 
     initialRsus, 
@@ -50,9 +52,9 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
   const [mapsInitialized, setMapsInitialized] = useState<boolean>(false);
 
-  // Only initialize Google Maps when we have an API key and haven't initialized yet
+  // Only call useJsApiLoader if we have a valid API key and maps haven't been initialized
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey || "",  // Use empty string if no key is available
+    googleMapsApiKey: keyIsSet ? apiKey : "", // Use empty string if no key is set to prevent reinit with different keys
     libraries,
     id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
   });
@@ -62,6 +64,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     if (isLoaded && !mapsInitialized) {
       console.log("Google Maps API loaded successfully");
       setMapsInitialized(true);
+      mapsApiInitialized = true; // Update our module-level flag
     }
   }, [isLoaded, mapsInitialized]);
 

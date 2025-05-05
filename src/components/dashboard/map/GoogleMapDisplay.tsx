@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { GoogleMap, DirectionsService, DirectionsRenderer, Polyline } from "@react-google-maps/api";
 import VehicleMarkers from "./VehicleMarkers";
@@ -39,14 +38,21 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   const [directionsStatus, setDirectionsStatus] = useState<google.maps.DirectionsStatus | null>(null);
   const [isCalculatingDirections, setIsCalculatingDirections] = useState<boolean>(false);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const { apiKey } = useMapApiKey();
+  const { apiKey, keyIsSet } = useMapApiKey();
   const [lastRouteRequest, setLastRouteRequest] = useState<string>('');
+  const [isMapReady, setIsMapReady] = useState<boolean>(false);
+
+  // Check if Google Maps API is available
+  const googleMapsLoaded = useMemo(() => {
+    return typeof window !== 'undefined' && window.google && window.google.maps;
+  }, []);
 
   // Handle map load
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     console.log("Google Map loaded successfully");
     mapRef.current = mapInstance;
     setMap(mapInstance);
+    setIsMapReady(true);
   }, []);
 
   // Handle map click for destination selection
@@ -156,7 +162,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
   }, [map, selectedAmbulance, destination]);
 
   // Safety check - don't render if Google Maps API is not available
-  if (!window.google) {
+  if (!googleMapsLoaded) {
     console.log("Google Maps API not loaded yet in GoogleMapDisplay render");
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50">
@@ -180,20 +186,22 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
         onClick={handleMapClick}
       >
         {/* Vehicle markers */}
-        <VehicleMarkers 
-          vehicles={vehicles} 
-          onAmbulanceSelect={onAmbulanceSelect}
-          selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
-        />
+        {isMapReady && (
+          <VehicleMarkers 
+            vehicles={vehicles} 
+            onAmbulanceSelect={onAmbulanceSelect}
+            selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
+          />
+        )}
         
         {/* RSU markers */}
-        <RsuMarkers rsus={rsus} />
+        {isMapReady && <RsuMarkers rsus={rsus} />}
         
         {/* Congestion heatmap */}
-        <CongestionHeatmap congestionData={congestionData} />
+        {isMapReady && <CongestionHeatmap congestionData={congestionData} />}
         
         {/* Only use directions service when we have all required elements and a valid API key */}
-        {window.google && selectedAmbulance && destination && apiKey && isCalculatingDirections && (
+        {googleMapsLoaded && isMapReady && selectedAmbulance && destination && keyIsSet && isCalculatingDirections && (
           <DirectionsService
             options={{
               origin: { lat: selectedAmbulance.lat, lng: selectedAmbulance.lng },

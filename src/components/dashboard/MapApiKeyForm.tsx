@@ -19,7 +19,7 @@ interface MapApiKeyFormProps {
 }
 
 const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
-  const { apiKey: currentApiKey } = useMapApiKey();
+  const { apiKey: currentApiKey, keyIsSet } = useMapApiKey();
   const [apiKey, setApiKey] = useState<string>("");
   const [showDialog, setShowDialog] = useState<boolean>(false);
   
@@ -30,10 +30,10 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
   
   // Show dialog automatically if no API key is set
   useEffect(() => {
-    if (!currentApiKey) {
+    if (!keyIsSet) {
       setShowDialog(true);
     }
-  }, [currentApiKey]);
+  }, [keyIsSet]);
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {

@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 // Use a singleton pattern to ensure the API key is only loaded once per app session
 let initialApiKey: string | null = null;
 let isInitialLoad = true;
+let keyIsSet = false;
 
 // Initialize the API key only once when the module is loaded
 if (initialApiKey === null) {
@@ -23,6 +24,9 @@ if (initialApiKey === null) {
     } else {
       console.log("Using Maps API key from environment variable");
     }
+    
+    // Set our keyIsSet flag based on whether we have a valid key
+    keyIsSet = !!initialApiKey;
   } catch (error) {
     console.error("Error reading Maps API key:", error);
     initialApiKey = "";
@@ -36,11 +40,13 @@ export const useMapApiKey = () => {
     // Avoid unnecessary re-initializations by checking if the key is actually changing
     if (newApiKey !== apiKey) {
       try {
+        // Update localStorage
         localStorage.setItem(API_KEY_STORAGE_KEY, newApiKey);
         console.log("Saved new Maps API key to localStorage");
         
         // Update our module-level singleton
         initialApiKey = newApiKey;
+        keyIsSet = !!newApiKey;
         
         // Update state
         setApiKey(newApiKey);
@@ -54,7 +60,7 @@ export const useMapApiKey = () => {
           
           // Give the toast a moment to be seen
           setTimeout(() => {
-            console.log("API key changed, reloading page");
+            console.log("API key changed, reloading page to prevent initialization conflicts");
             window.location.reload();
           }, 2000);
         }
@@ -80,5 +86,6 @@ export const useMapApiKey = () => {
     isInitialLoad = false;
   }, []);
 
-  return { apiKey, handleApiKeySet };
+  // Export both the apiKey and whether it's been properly set
+  return { apiKey, handleApiKeySet, keyIsSet };
 };

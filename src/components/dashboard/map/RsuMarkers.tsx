@@ -27,36 +27,40 @@ const RsuMarkers: React.FC<RsuMarkersProps> = ({ rsus }) => {
         const strokeColor = isActive ? "#22C55E" : "#64748B";
         const coverage = rsu.coverage_radius || 500;
         
-        return (
-          <React.Fragment key={rsu.rsu_id}>
-            <Marker
-              position={position}
-              icon={{
-                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                scale: 6,
-                fillColor: fillColor,
-                fillOpacity: 0.9,
-                strokeWeight: 1,
-                strokeColor: "#FFFFFF",
-                rotation: rsu.heading || 0
-              }}
-              title={`${rsu.rsu_id} - ${rsu.location || 'Unknown Location'}`}
-            />
-            <Circle
-              center={position}
-              radius={coverage}
-              options={{
-                strokeColor: strokeColor,
-                strokeOpacity: 0.8,
-                strokeWeight: 1.5,
-                fillColor: fillColor,
-                fillOpacity: 0.15,
-                clickable: false,
-              }}
-            />
-          </React.Fragment>
-        );
-      })}
+        // Use key for both markers to ensure uniqueness
+        const markerId = `rsu-${rsu.rsu_id}`;
+        const circleId = `rsu-circle-${rsu.rsu_id}`;
+        
+        return [
+          <Marker
+            key={markerId}
+            position={position}
+            icon={{
+              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              scale: 6,
+              fillColor: fillColor,
+              fillOpacity: 0.9,
+              strokeWeight: 1,
+              strokeColor: "#FFFFFF",
+              rotation: rsu.heading || 0
+            }}
+            title={`${rsu.rsu_id} - ${rsu.location || 'Unknown Location'}`}
+          />,
+          <Circle
+            key={circleId}
+            center={position}
+            radius={coverage}
+            options={{
+              strokeColor: strokeColor,
+              strokeOpacity: 0.8,
+              strokeWeight: 1.5,
+              fillColor: fillColor,
+              fillOpacity: 0.15,
+              clickable: false,
+            }}
+          />
+        ];
+      }).flat()}
     </>
   );
 };
