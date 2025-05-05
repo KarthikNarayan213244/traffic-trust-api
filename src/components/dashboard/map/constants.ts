@@ -1,4 +1,6 @@
 
+import { Libraries } from "@react-google-maps/api";
+
 // Export the API key storage key for consistent use across the app
 export const API_KEY_STORAGE_KEY = 'google_maps_api_key';
 
@@ -25,8 +27,8 @@ export const mapOptions = {
 };
 
 // Required libraries for Google Maps API
-// Type as any to resolve Library type issues
-export const libraries: any = ["places", "drawing", "geometry", "visualization"];
+// Cast as Libraries type to resolve type issues
+export const libraries: Libraries = ["places", "drawing", "geometry", "visualization"];
 
 // Vehicle types and their corresponding colors
 export const vehicleTypeColors: Record<string, string> = {
@@ -49,9 +51,6 @@ export const rsuStatusColors: Record<string, string> = {
   "Error": "#ef4444",    // Red
   "Maintenance": "#8b5cf6" // Purple
 };
-
-// Set the Google Maps API key from environment
-export const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 // Adding mapTheme export for MapContainer
 export const mapTheme = [

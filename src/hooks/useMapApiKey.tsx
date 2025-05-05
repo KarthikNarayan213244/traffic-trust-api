@@ -1,58 +1,52 @@
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { API_KEY_STORAGE_KEY } from "@/components/dashboard/map/constants";
 import { toast } from "@/hooks/use-toast";
 
-// Use a singleton pattern to ensure the API key is only loaded once per app session
-let initialApiKey: string | null = null;
-let isInitialLoad = true;
-let keyIsSet = false;
-
-// Initialize the API key only once when the module is loaded
-if (initialApiKey === null) {
-  try {
-    // First try to get from environment variable
-    initialApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
-    
-    // If not available, try localStorage as fallback
-    if (!initialApiKey) {
-      const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY) || "";
-      if (storedKey) {
-        initialApiKey = storedKey;
-        console.log("Loaded Maps API key from localStorage:", initialApiKey ? "Key found" : "No key found");
-      }
-    } else {
-      console.log("Using Maps API key from environment variable");
-    }
-    
-    // Set our keyIsSet flag based on whether we have a valid key
-    keyIsSet = !!initialApiKey;
-  } catch (error) {
-    console.error("Error reading Maps API key:", error);
-    initialApiKey = "";
-  }
-}
-
 export const useMapApiKey = () => {
-  const [apiKey, setApiKey] = useState<string>(initialApiKey || "");
+  // Maintain a ref to detect if this is the first render
+  const isFirstRender = useRef(true);
+  
+  // Always try to get the key from environment first, then localStorage
+  const getStoredKey = (): string => {
+    try {
+      // First try to get from environment variable
+      const envKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+      
+      // If not available, try localStorage as fallback
+      if (!envKey) {
+        const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY) || "";
+        if (storedKey) {
+          console.log("Loaded Maps API key from localStorage");
+          return storedKey;
+        }
+      } else {
+        console.log("Using Maps API key from environment variable");
+        return envKey;
+      }
+    } catch (error) {
+      console.error("Error reading Maps API key:", error);
+    }
+    return "";
+  };
+
+  // Initialize state with stored key
+  const [apiKey, setApiKey] = useState<string>(getStoredKey);
+  const [keyIsSet, setKeyIsSet] = useState<boolean>(!!getStoredKey());
 
   const handleApiKeySet = useCallback((newApiKey: string) => {
-    // Avoid unnecessary re-initializations by checking if the key is actually changing
     if (newApiKey !== apiKey) {
       try {
         // Update localStorage
         localStorage.setItem(API_KEY_STORAGE_KEY, newApiKey);
         console.log("Saved new Maps API key to localStorage");
         
-        // Update our module-level singleton
-        initialApiKey = newApiKey;
-        keyIsSet = !!newApiKey;
-        
         // Update state
         setApiKey(newApiKey);
+        setKeyIsSet(!!newApiKey);
         
-        // Only force reload if we're past initial load and key is changing
-        if (!isInitialLoad) {
+        // Only force reload if we're past initial render
+        if (!isFirstRender.current) {
           toast({
             title: "API Key Updated",
             description: "The Google Maps API key has been updated. Reloading the application.",
@@ -64,9 +58,6 @@ export const useMapApiKey = () => {
             window.location.reload();
           }, 2000);
         }
-        
-        // After first render, we're no longer in initial load
-        isInitialLoad = false;
       } catch (error) {
         console.error("Error saving Maps API key to localStorage:", error);
         toast({
@@ -75,17 +66,13 @@ export const useMapApiKey = () => {
           variant: "destructive",
         });
       }
-    } else {
-      // After first render, we're no longer in initial load even if the key didn't change
-      isInitialLoad = false;
     }
   }, [apiKey]);
 
-  // After first render, we're no longer in initial load
+  // After first render, update flag
   useEffect(() => {
-    isInitialLoad = false;
+    isFirstRender.current = false;
   }, []);
 
-  // Export both the apiKey and whether it's been properly set
   return { apiKey, handleApiKeySet, keyIsSet };
 };

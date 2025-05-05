@@ -1,48 +1,56 @@
 
-import { ENDPOINTS } from "../config";
-import { Vehicle, Rsu, Anomaly, TrustLedgerEntry, CongestionZone } from "../types";
+import { ENDPOINTS } from '../config';
 
-// Type for API endpoint keys
-export type ApiEndpoint = keyof typeof ENDPOINTS;
+// Define the mapping between endpoint names and their Supabase table names
+export interface SupabaseTableMap {
+  vehicles: string;
+  rsus: string;
+  anomalies: string;
+  trustLedger: string;
+  congestion: string;
+  [key: string]: string;
+}
 
-// Type mapping for each endpoint's return type
+// Define the types that each endpoint returns
 export interface EndpointTypeMap {
-  vehicles: Vehicle[];
-  rsus: Rsu[];
-  anomalies: Anomaly[];
-  trustLedger: TrustLedgerEntry[];
-  congestion: CongestionZone[];
+  vehicles: any[];
+  rsus: any[];
+  anomalies: any[];
+  trustLedger: any[];
+  congestion: any[];
+  [key: string]: any[];
 }
 
-// Map API endpoints to their corresponding Supabase table names
-export const endpointToTableMap = {
-  vehicles: "vehicles",
-  rsus: "rsus",
-  anomalies: "anomalies",
-  trustLedger: "trust_ledger",
-  congestion: "zones_congestion"
-} as const;
-
-// Define a type for valid table names based on the values in our map
-export type ValidTableName = typeof endpointToTableMap[keyof typeof endpointToTableMap];
-
-// Type guards for each data type
-export function isVehicleData(item: any): item is Vehicle {
-  return item && 'vehicle_id' in item && 'owner_name' in item && 'vehicle_type' in item;
+// Options for fetching data
+export interface FetchOptions {
+  limit?: number;
+  page?: number;
+  filters?: Record<string, any>;
+  orderBy?: {
+    field: string;
+    ascending?: boolean;
+  };
 }
 
-export function isRsuData(item: any): item is Rsu {
-  return item && 'rsu_id' in item && 'location' in item && 'coverage_radius' in item;
+// Configuration for seeding the database
+export interface SeedOptions {
+  vehicles?: number;
+  rsus?: number;
+  anomalies?: number;
+  trustEntries?: number;
+  congestionEntries?: number;
+  overwrite?: boolean;
 }
 
-export function isAnomalyData(item: any): item is Anomaly {
-  return item && 'type' in item && 'severity' in item && 'vehicle_id' in item;
-}
-
-export function isTrustLedgerData(item: any): item is TrustLedgerEntry {
-  return item && 'tx_id' in item && 'action' in item && 'old_value' in item && 'new_value' in item;
-}
-
-export function isCongestionData(item: any): item is CongestionZone {
-  return item && 'zone_name' in item && 'congestion_level' in item;
+// Result of seeding operation
+export interface SeedResult {
+  success: boolean;
+  counts: {
+    vehicles: number;
+    rsus: number;
+    anomalies: number;
+    trustEntries: number;
+    congestionEntries: number;
+  };
+  errors?: any[];
 }

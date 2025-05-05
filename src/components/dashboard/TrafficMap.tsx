@@ -54,11 +54,11 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [mlUpdateCountdown, setMlUpdateCountdown] = useState<number>(0);
   const [mapsInitialized, setMapsInitialized] = useState<boolean>(false);
 
-  // Only call useJsApiLoader if we have a valid API key and maps haven't been initialized
+  // Only initialize the maps API if we have a key and it hasn't been initialized yet
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: keyIsSet ? apiKey : "", // Use empty string if no key is set to prevent reinit with different keys
+    googleMapsApiKey: apiKey,
     libraries,
-    id: "google-map-script", // Ensure consistent ID to prevent multiple initializations
+    id: "google-map-script",
   });
 
   // Update maps initialization status
@@ -66,7 +66,6 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     if (isLoaded && !mapsInitialized) {
       console.log("Google Maps API loaded successfully");
       setMapsInitialized(true);
-      mapsApiInitialized = true; // Update our module-level flag
     }
   }, [isLoaded, mapsInitialized]);
 
@@ -221,7 +220,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   }
 
   // Show API key form if no key is set
-  if (!apiKey) {
+  if (!keyIsSet) {
     return (
       <div className="h-[400px] flex items-center justify-center bg-gray-50 flex-col">
         <p className="text-lg mb-4">Google Maps API Key Required</p>
@@ -277,7 +276,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="md:col-span-3">
           {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
-          {isLoaded && mapsInitialized && (
+          {isLoaded && (
             <GoogleMapDisplay 
               vehicles={vehicles} 
               rsus={rsus} 

@@ -14,7 +14,6 @@ interface MapOverlaysProps {
   selectedAmbulance: Vehicle | null;
   destination: google.maps.LatLngLiteral | null;
   directionsStatus: google.maps.DirectionsStatus | null;
-  apiKey?: string;
   rsus?: any[];
   anomalies?: any[];
   isSimulationRunning?: boolean;
@@ -28,7 +27,6 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
   selectedAmbulance,
   destination,
   directionsStatus,
-  apiKey,
   rsus = [],
   anomalies = [],
   isSimulationRunning = false
@@ -48,7 +46,6 @@ const MapOverlays: React.FC<MapOverlaysProps> = ({
           ambulance={selectedAmbulance} 
           destination={destination} 
           directionsStatus={directionsStatus}
-          apiKey={apiKey}
         />
       )}
       
