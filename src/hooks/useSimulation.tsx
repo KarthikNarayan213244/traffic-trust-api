@@ -28,10 +28,12 @@ export const useSimulation = (initiallyRunning = false) => {
 
   // Toggle simulation
   const toggleSimulation = () => {
-    setIsSimulationRunning(prev => !prev);
+    const newStatus = !isSimulationRunning;
+    setIsSimulationRunning(newStatus);
+    console.log(`Simulation ${newStatus ? 'started' : 'paused'}`);
     toast({
-      title: !isSimulationRunning ? "Simulation Started" : "Simulation Paused",
-      description: !isSimulationRunning ? 
+      title: newStatus ? "Simulation Started" : "Simulation Paused",
+      description: newStatus ? 
         "Live data updates enabled. Vehicles update every 5 seconds, congestion every minute." : 
         "Data updates paused.",
     });

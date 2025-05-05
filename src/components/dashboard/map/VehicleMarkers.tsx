@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from "react";
 import { Marker } from "@react-google-maps/api";
 import { getTrustScoreColor } from "./utils";
@@ -25,12 +26,19 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
   const animationProgress = useRef<number>(0);
   const animationDuration = 5000;
 
+  // This effect handles the vehicle animation when new position data arrives
   useEffect(() => {
+    // Clean up any existing animation
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
     
     if (!isSimulationRunning || vehicles.length === 0 || !window.google) {
       return;
     }
 
+    // Create map of new vehicle positions
     const newPositions = new Map<string, google.maps.LatLng>();
     vehicles.forEach(vehicle => {
       newPositions.set(
@@ -42,42 +50,54 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
       );
     });
 
+    // If this is first time, initialize previous positions
     if (prevPositions.current.size === 0) {
       prevPositions.current = new Map(newPositions);
       setAnimatedPositions(new Map(newPositions));
       return;
     }
 
+    // Reset animation progress
     animationProgress.current = 0;
 
+    // Animation function that will be called on each frame
     const animate = (timestamp: number) => {
-      animationProgress.current = Math.min(1, animationProgress.current + 0.016);
+      // Increment progress (roughly 60fps)
+      animationProgress.current = Math.min(1, animationProgress.current + (16 / animationDuration));
       
       const currentPositions = new Map<string, google.maps.LatLng>();
       
+      // Interpolate between previous and new positions based on progress
       newPositions.forEach((newPos, id) => {
         const prevPos = prevPositions.current.get(id);
         
         if (prevPos) {
+          // Linear interpolation between previous and new positions
           const lat = prevPos.lat() + (newPos.lat() - prevPos.lat()) * animationProgress.current;
           const lng = prevPos.lng() + (newPos.lng() - prevPos.lng()) * animationProgress.current;
           currentPositions.set(id, new google.maps.LatLng(lat, lng));
         } else {
+          // If no previous position, use new position directly
           currentPositions.set(id, newPos);
         }
       });
       
+      // Update the animated positions state to re-render markers
       setAnimatedPositions(new Map(currentPositions));
       
+      // Continue animation until complete
       if (animationProgress.current < 1) {
         animationFrameId.current = requestAnimationFrame(animate);
       } else {
+        // Animation complete, update previous positions for next cycle
         prevPositions.current = new Map(newPositions);
       }
     };
     
+    // Start the animation
     animationFrameId.current = requestAnimationFrame(animate);
     
+    // Cleanup function
     return () => {
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
@@ -153,6 +173,7 @@ const VehicleMarkers: React.FC<VehicleMarkersProps> = ({
         let position;
         
         try {
+          // Use animated position if simulation is running, otherwise use static position
           position = isSimulationRunning && animatedPositions.has(vehicle.vehicle_id)
             ? animatedPositions.get(vehicle.vehicle_id)
             : new google.maps.LatLng(

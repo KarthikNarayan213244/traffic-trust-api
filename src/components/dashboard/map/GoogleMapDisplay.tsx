@@ -138,6 +138,7 @@ const GoogleMapDisplay: React.FC<GoogleMapDisplayProps> = ({
           vehicles={vehicles} 
           selectedAmbulanceId={selectedAmbulance?.vehicle_id || null}
           onAmbulanceSelect={onAmbulanceSelect}
+          isSimulationRunning={isLiveMonitoring}
         />
         
         <RsuMarkers rsus={rsus} />
