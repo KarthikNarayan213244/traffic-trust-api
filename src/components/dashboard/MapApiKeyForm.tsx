@@ -36,8 +36,6 @@ const MapApiKeyForm: React.FC<MapApiKeyFormProps> = ({ onApiKeySet }) => {
 
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
-      // We only use the onApiKeySet callback to update the key
-      // This ensures a single source of truth via useMapApiKey
       onApiKeySet(apiKey.trim());
       setShowDialog(false);
     } else {

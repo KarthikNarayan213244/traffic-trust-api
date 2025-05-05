@@ -50,15 +50,7 @@ export const useMapApiKey = () => {
   const [apiKey, setApiKey] = useState<string>(getStoredKey);
   const [keyIsSet, setKeyIsSet] = useState<boolean>(!!getStoredKey());
   
-  // Update our state if global key changes
-  useEffect(() => {
-    if (globalApiKey !== null && globalApiKey !== apiKey) {
-      console.log("Syncing with global API key");
-      setApiKey(globalApiKey);
-      setKeyIsSet(!!globalApiKey);
-    }
-  }, [apiKey]);
-
+  // Handle API key set
   const handleApiKeySet = useCallback((newApiKey: string) => {
     if (newApiKey === apiKey) return;
     
@@ -110,11 +102,13 @@ export const useMapApiKey = () => {
 
   // After first render, update flag
   useEffect(() => {
-    isFirstRender.current = false;
-    
-    // Mark as initialized if we have a key on first render
-    if (apiKey && !apiInitialized) {
-      apiInitialized = true;
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      
+      // Mark as initialized if we have a key on first render
+      if (apiKey && !apiInitialized) {
+        apiInitialized = true;
+      }
     }
   }, [apiKey]);
 
