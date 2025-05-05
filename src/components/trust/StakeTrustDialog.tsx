@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { stakeTrust, simulateStakeTrust } from "@/services/blockchain";
+import { stakeTrust } from "@/services/blockchain";
 import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -31,13 +31,14 @@ const StakeTrustDialog: React.FC<StakeTrustDialogProps> = ({
   const handleStake = async () => {
     try {
       setIsStaking(true);
-      try {
-        await stakeTrust(vehicleId, amount);
-      } catch (error) {
-        await simulateStakeTrust(vehicleId, amount);
+      
+      // Directly use stakeTrust function
+      const result = await stakeTrust(vehicleId, parseFloat(amount));
+      
+      if (result) {
+        onClose();
+        onSuccess();
       }
-      onClose();
-      onSuccess();
     } catch (error) {
       console.error("Stake operation failed:", error);
       toast({
