@@ -39,6 +39,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rsu_trust_ledger: {
+        Row: {
+          attack_type: string | null
+          details: string | null
+          id: string
+          new_trust: number | null
+          old_trust: number | null
+          rsu_id: string
+          severity: string | null
+          timestamp: string
+        }
+        Insert: {
+          attack_type?: string | null
+          details?: string | null
+          id?: string
+          new_trust?: number | null
+          old_trust?: number | null
+          rsu_id: string
+          severity?: string | null
+          timestamp?: string
+        }
+        Update: {
+          attack_type?: string | null
+          details?: string | null
+          id?: string
+          new_trust?: number | null
+          old_trust?: number | null
+          rsu_id?: string
+          severity?: string | null
+          timestamp?: string
+        }
+        Relationships: []
+      }
       rsus: {
         Row: {
           coverage_radius: number
@@ -107,6 +140,36 @@ export type Database = {
           target_type?: string | null
           timestamp?: string
           tx_id?: string
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
+      vehicle_trust_ledger: {
+        Row: {
+          action_type: string
+          details: string | null
+          id: string
+          new_trust: number
+          old_trust: number
+          timestamp: string
+          vehicle_id: string
+        }
+        Insert: {
+          action_type: string
+          details?: string | null
+          id?: string
+          new_trust: number
+          old_trust: number
+          timestamp?: string
+          vehicle_id: string
+        }
+        Update: {
+          action_type?: string
+          details?: string | null
+          id?: string
+          new_trust?: number
+          old_trust?: number
+          timestamp?: string
           vehicle_id?: string
         }
         Relationships: []

@@ -10,6 +10,8 @@ export * from './vehicles';
 export * from './rsus';
 export * from './anomalies';
 export * from './trustLedger';
+export * from './vehicleTrustLedger';
+export * from './rsuTrustLedger';
 export * from './congestion';
 
 // Export Supabase client and utilities

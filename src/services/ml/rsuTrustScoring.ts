@@ -1,366 +1,150 @@
 
 import * as tf from '@tensorflow/tfjs';
-import { toast } from "@/hooks/use-toast";
-import { stakeTrust } from "@/services/blockchain";
-import { fetchFromSupabase } from "@/services/api/supabase/fetch";
-import { v4 as uuidv4 } from 'uuid';
+import { createRsuAttackEntry } from "@/services/api/rsuTrustLedger";
 
-// Trust calculation parameters
-const TRUST_INCREASE_FACTOR = 0.01;  // If no anomaly, increase trust by this factor * (1-currentTrust)
-const TRUST_DECREASE_FACTOR = 0.1;   // If anomaly detected, decrease trust by this factor * severity
-const DEFAULT_TRUST_SCORE = 90;      // Default trust score for new RSUs
-const BLOCKCHAIN_UPDATE_THRESHOLD = 2; // Minimum trust change to trigger blockchain update
+// Supported attack types
+const ATTACK_TYPES = [
+  'Sybil Attack',
+  'Denial of Service',
+  'GPS Spoofing',
+  'Malicious Data Injection',
+  'Replay Attack'
+];
 
-// Keep track of RSU security status
-interface RsuSecurityState {
-  anomalyHistory: {
-    timestamp: string;
-    type: string;
-    severity: number;
-  }[];
-  attackDetected: boolean;
-  quarantined: boolean;
-  lastUpdateTime: string;
-  consecutiveAnomalies: number;
-  blockchainTxId?: string; // Last blockchain transaction ID
-}
-
-// RSU security state storage
-const rsuSecurityStates: Record<string, RsuSecurityState> = {};
-
-// Initialize RSU security state if not exists
-const initRsuSecurityState = (rsuId: string): RsuSecurityState => {
-  if (!rsuSecurityStates[rsuId]) {
-    rsuSecurityStates[rsuId] = {
-      anomalyHistory: [],
-      attackDetected: false,
-      quarantined: false,
-      lastUpdateTime: new Date().toISOString(),
-      consecutiveAnomalies: 0
-    };
+// Generate simulated RSU attacks
+export function generateRsuAttacks(rsus: any[], probability: number = 0.2): any[] {
+  if (!rsus || !Array.isArray(rsus) || rsus.length === 0) {
+    console.warn("No RSUs provided for attack simulation");
+    return [];
   }
-  return rsuSecurityStates[rsuId];
-};
-
-// Record RSU trust changes to trust ledger
-const recordRsuTrustChange = async (
-  rsuId: string, 
-  oldScore: number, 
-  newScore: number, 
-  action: string,
-  details?: string
-) => {
-  try {
-    const txId = `rsu-trust-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    
-    const trustEntry = {
-      tx_id: txId,
-      timestamp: new Date().toISOString(),
-      vehicle_id: 'SYSTEM', // Using SYSTEM as the actor
-      target_id: rsuId,
-      target_type: 'RSU',
-      action: action,
-      old_value: oldScore,
-      new_value: newScore,
-      details: details || 'Trust score update'
-    };
-    
-    // Write to database
-    const response = await fetch('/api/trust-ledger', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(trustEntry),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Failed to write RSU trust change to ledger:", errorText);
-      return null;
-    }
-    
-    return txId;
-  } catch (error) {
-    console.error("Error recording RSU trust change:", error);
-    return null;
-  }
-};
-
-// Calculate RSU trust score using the specified update rule
-export const calculateRsuTrustScore = (
-  rsuId: string,
-  currentTrustScore: number,
-  anomalies: any[]
-): { 
-  score: number;
-  change: number;
-  attackDetected: boolean;
-  quarantined: boolean;
-  blockchainUpdated: boolean;
-} => {
-  try {
-    // Get or initialize RSU security state
-    const securityState = initRsuSecurityState(rsuId);
-    
-    // Find anomalies associated with this RSU
-    const rsuAnomalies = anomalies.filter(a => 
-      a.target_id === rsuId && a.target_type === 'RSU'
-    );
-    
-    // Update security state with new anomalies
-    const now = new Date();
-    const newAnomalies = rsuAnomalies.filter(a => {
-      const anomalyTime = new Date(a.timestamp);
-      const timeSinceLastUpdate = new Date(securityState.lastUpdateTime);
-      return anomalyTime > timeSinceLastUpdate;
-    });
-    
-    if (newAnomalies.length > 0) {
-      console.log(`Found ${newAnomalies.length} new anomalies for RSU ${rsuId}`);
-      
-      // Add new anomalies to history
-      securityState.anomalyHistory.push(
-        ...newAnomalies.map(a => ({
-          timestamp: a.timestamp,
-          type: a.type,
-          severity: a.severity === 'High' || a.severity === 'Critical' ? 1.0 : 
-                    a.severity === 'Medium' ? 0.6 : 0.3
-        }))
-      );
-      
-      // Keep only last 20 anomalies in history
-      if (securityState.anomalyHistory.length > 20) {
-        securityState.anomalyHistory = securityState.anomalyHistory.slice(-20);
-      }
-      
-      // Consecutive anomalies counter
-      securityState.consecutiveAnomalies += 1;
-      
-      console.log(`RSU ${rsuId} now has ${securityState.consecutiveAnomalies} consecutive anomalies`);
-    } else {
-      // Reset consecutive anomalies if no new anomalies
-      securityState.consecutiveAnomalies = Math.max(0, securityState.consecutiveAnomalies - 1);
-    }
-    
-    // Update quarantine status
-    if (securityState.consecutiveAnomalies >= 3) {
-      securityState.attackDetected = true;
-      console.log(`Attack detected on RSU ${rsuId}`);
-      
-      if (securityState.consecutiveAnomalies >= 5) {
-        securityState.quarantined = true;
-        console.log(`RSU ${rsuId} has been quarantined!`);
-      }
-    }
-    
-    // Calculate new trust score using the update rule
-    let newTrustScore;
-    const oldScore = currentTrustScore || DEFAULT_TRUST_SCORE;
-    
-    if (newAnomalies.length === 0) {
-      // If no anomaly: Tₙ₊₁ = Tₙ + 0.01·(1–Tₙ/100)
-      newTrustScore = oldScore + TRUST_INCREASE_FACTOR * (100 - oldScore);
-    } else {
-      // If anomaly: Tₙ₊₁ = Tₙ – 0.1·severity*100
-      const avgSeverity = newAnomalies.reduce((sum, a) => {
-        const severityValue = a.severity === 'High' || a.severity === 'Critical' ? 1.0 : 
-                             a.severity === 'Medium' ? 0.6 : 0.3;
-        return sum + severityValue;
-      }, 0) / newAnomalies.length;
-      
-      newTrustScore = oldScore - TRUST_DECREASE_FACTOR * (avgSeverity * 100);
-      console.log(`Trust score for RSU ${rsuId} decreased from ${oldScore} to ${newTrustScore} due to anomalies`);
-    }
-    
-    // Ensure trust score stays between 0 and 100
-    newTrustScore = Math.min(100, Math.max(0, newTrustScore));
-    
-    // Update lastUpdateTime
-    securityState.lastUpdateTime = now.toISOString();
-    
-    // Determine if blockchain update is needed
-    const trustChange = Math.round(newTrustScore - oldScore);
-    const blockchainUpdateNeeded = 
-      Math.abs(trustChange) >= BLOCKCHAIN_UPDATE_THRESHOLD || 
-      securityState.attackDetected || 
-      securityState.quarantined;
-    
-    if (blockchainUpdateNeeded) {
-      console.log(`RSU ${rsuId} trust score change of ${trustChange} requires blockchain update`);
-    }
-    
-    return {
-      score: Math.round(newTrustScore),
-      change: trustChange,
-      attackDetected: securityState.attackDetected,
-      quarantined: securityState.quarantined,
-      blockchainUpdated: blockchainUpdateNeeded
-    };
-  } catch (error) {
-    console.error("Error calculating RSU trust score:", error);
-    
-    // Return current trust score if there's an error
-    return {
-      score: currentTrustScore || DEFAULT_TRUST_SCORE,
-      change: 0,
-      attackDetected: false,
-      quarantined: false,
-      blockchainUpdated: false
-    };
-  }
-};
-
-// Update trust scores for all RSUs
-export const updateRsuTrustScores = async (
-  rsus: any[],
-  anomalies: any[]
-): Promise<any[]> => {
-  try {
-    console.log(`Updating trust scores for ${rsus.length} RSUs with ${anomalies.length} anomalies`);
-    
-    // Count of blockchain transactions in this update
-    let blockchainTransactions = 0;
-    
-    // Update each RSU with a new trust score
-    const updatedRsus = await Promise.all(rsus.map(async (rsu) => {
-      const trustResult = calculateRsuTrustScore(
-        rsu.rsu_id,
-        rsu.trust_score || DEFAULT_TRUST_SCORE,
-        anomalies
-      );
-      
-      const updatedRsu = {
-        ...rsu,
-        trust_score: trustResult.score,
-        trust_score_change: trustResult.change,
-        attack_detected: trustResult.attackDetected,
-        quarantined: trustResult.quarantined,
-        last_updated: new Date().toISOString(),
-        blockchain_protected: trustResult.blockchainUpdated
-      };
-      
-      // Log trust update to ledger and blockchain if needed
-      if (trustResult.blockchainUpdated || trustResult.change !== 0) {
-        try {
-          // Prepare reason code
-          const reasonCode = trustResult.quarantined ? 'RSU_QUARANTINED' : 
-                            trustResult.attackDetected ? 'ATTACK_DETECTED' : 
-                            'TRUST_UPDATE';
-          
-          // Record to trust ledger
-          await recordRsuTrustChange(
-            rsu.rsu_id,
-            rsu.trust_score || DEFAULT_TRUST_SCORE,
-            trustResult.score,
-            reasonCode,
-            trustResult.attackDetected ? "Attack detected on RSU" : 
-            trustResult.change > 0 ? "Trust score increased" : "Trust score decreased"
-          );
-          
-          // Use blockchain staking for significant trust changes
-          if (trustResult.blockchainUpdated) {
-            const txId = await stakeTrust(
-              rsu.rsu_id, 
-              trustResult.score,
-              reasonCode,
-              'RSU' // Add target type
-            );
-            
-            // Store blockchain transaction ID
-            const securityState = rsuSecurityStates[rsu.rsu_id];
-            if (securityState) {
-              securityState.blockchainTxId = txId;
-            }
-            
-            blockchainTransactions++;
-            console.log(`Successfully logged trust update for RSU ${rsu.rsu_id} to blockchain: ${trustResult.score}, txId: ${txId}`);
-          }
-          
-          // Show toast for quarantined RSUs
-          if (trustResult.quarantined) {
-            toast({
-              title: "RSU Quarantined",
-              description: `RSU ${rsu.rsu_id} has been quarantined due to suspicious activity. Trust score: ${trustResult.score}`,
-              variant: "destructive"
-            });
-          } else if (trustResult.attackDetected) {
-            toast({
-              title: "Attack Detected",
-              description: `Attack detected on RSU ${rsu.rsu_id}. Trust score decreased to: ${trustResult.score}`,
-              variant: "destructive"
-            });
-          }
-        } catch (error) {
-          console.error(`Failed to log trust update for RSU ${rsu.rsu_id}:`, error);
-        }
-      }
-      
-      return updatedRsu;
-    }));
-    
-    // Log blockchain transaction summary
-    if (blockchainTransactions > 0) {
-      console.log(`Updated ${blockchainTransactions} RSU trust scores on blockchain`);
-      toast({
-        title: "Trust Scores Updated",
-        description: `Updated ${blockchainTransactions} RSU trust scores on the blockchain`,
-        variant: "default"
-      });
-    }
-    
-    return updatedRsus;
-  } catch (error) {
-    console.error("Error updating RSU trust scores:", error);
-    return rsus;
-  }
-};
-
-// Generate synthetic attacks on RSUs for simulation purposes
-export const generateRsuAttacks = (
-  rsus: any[],
-  attackProbability: number = 0.05
-): any[] => {
-  const generatedAnomalies: any[] = [];
-  const now = new Date().toISOString();
   
-  // Possible attack types
-  const attackTypes = [
-    {type: "Sybil Attack", severity: "High"},
-    {type: "Data Tampering", severity: "Medium"},
-    {type: "Denial of Service", severity: "High"},
-    {type: "Malicious Data Injection", severity: "Critical"},
-    {type: "Message Replay", severity: "Medium"},
-    {type: "Protocol Violation", severity: "Low"}
-  ];
+  const attacks: any[] = [];
   
-  // For each RSU, determine if it should be attacked
+  // For each RSU, decide if it will be attacked
   rsus.forEach(rsu => {
-    // Skip already quarantined RSUs
-    if (rsu.quarantined) return;
+    // Skip RSUs that don't have an ID
+    if (!rsu.rsu_id) return;
     
-    // Random chance to generate an attack, increased if attack probability is higher
-    if (Math.random() < attackProbability) {
-      const attack = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+    // Determine if this RSU will be attacked
+    if (Math.random() < probability) {
+      // Random attack type
+      const attackType = ATTACK_TYPES[Math.floor(Math.random() * ATTACK_TYPES.length)];
       
-      // Create the anomaly record
-      const anomalyId = `sim-anomaly-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      generatedAnomalies.push({
-        id: anomalyId,
-        type: attack.type,
-        timestamp: now,
-        message: `Simulated ${attack.type} detected on RSU ${rsu.rsu_id}`,
-        severity: attack.severity,
-        status: "Detected",
-        vehicle_id: null,
-        target_id: rsu.rsu_id,
-        target_type: "RSU",
-        is_simulated: true
+      // Random severity
+      const severities = ['Low', 'Medium', 'High', 'Critical'];
+      const severity = severities[Math.floor(Math.random() * severities.length)];
+      
+      // Generate trust impact based on severity
+      const oldTrust = Math.floor(Math.random() * 20) + 80; // 80-100 range
+      let newTrust;
+      
+      switch (severity) {
+        case 'Critical':
+          newTrust = Math.max(0, oldTrust - (Math.random() * 30 + 20)); // 20-50 drop
+          break;
+        case 'High':
+          newTrust = Math.max(0, oldTrust - (Math.random() * 20 + 10)); // 10-30 drop
+          break;
+        case 'Medium':
+          newTrust = Math.max(0, oldTrust - (Math.random() * 10 + 5)); // 5-15 drop
+          break;
+        case 'Low':
+        default:
+          newTrust = Math.max(0, oldTrust - (Math.random() * 5 + 1)); // 1-6 drop
+          break;
+      }
+      
+      // Round trust values
+      newTrust = Math.round(newTrust);
+      
+      // Generate attack message
+      const messages = [
+        `${attackType} detected on ${rsu.rsu_id} with ${severity.toLowerCase()} severity`,
+        `Security alert: ${attackType} targeting ${rsu.rsu_id}`,
+        `${severity} alert: ${attackType} affecting ${rsu.rsu_id}`,
+        `${rsu.rsu_id} compromised by ${attackType}`,
+        `Network integrity breach: ${attackType} on ${rsu.rsu_id}`
+      ];
+      
+      const message = messages[Math.floor(Math.random() * messages.length)];
+      
+      // Add attack to list
+      attacks.push({
+        rsu_id: rsu.rsu_id,
+        attack_type: attackType,
+        severity: severity,
+        details: message,
+        old_trust: oldTrust,
+        new_trust: newTrust,
+        timestamp: new Date().toISOString()
       });
-      
-      console.log(`Generated simulated ${attack.type} attack on RSU ${rsu.rsu_id}`);
     }
   });
   
-  return generatedAnomalies;
-};
+  return attacks;
+}
+
+// Detect RSU attacks from anomaly data and store them
+export async function detectAndStoreRsuAttacks(anomalies: any[]): Promise<any[]> {
+  try {
+    if (!anomalies || !Array.isArray(anomalies) || anomalies.length === 0) {
+      return [];
+    }
+    
+    const rsuAttacks = [];
+    
+    // Filter for RSU-related anomalies
+    const rsuAnomalies = anomalies.filter(anomaly => 
+      (anomaly.target_type === 'RSU' || 
+       (anomaly.target_id && anomaly.target_id.includes('RSU')) ||
+       (anomaly.details && anomaly.details.toLowerCase().includes('rsu')))
+    );
+    
+    // Process each anomaly and create RSU attack entries
+    for (const anomaly of rsuAnomalies) {
+      try {
+        const attackEntry = {
+          rsu_id: anomaly.target_id || anomaly.rsu_id || 'RSU-unknown',
+          attack_type: anomaly.type || 'Unknown Attack',
+          severity: anomaly.severity || 'Medium',
+          details: anomaly.message || anomaly.details || `Attack detected on ${anomaly.target_id || 'RSU'}`,
+          old_trust: anomaly.old_trust || 90,
+          new_trust: anomaly.new_trust || 70
+        };
+        
+        // Store attack in RSU trust ledger
+        const result = await createRsuAttackEntry(attackEntry);
+        rsuAttacks.push(result);
+      } catch (error) {
+        console.error("Failed to process RSU anomaly:", error);
+      }
+    }
+    
+    return rsuAttacks;
+  } catch (error) {
+    console.error("Error detecting and storing RSU attacks:", error);
+    return [];
+  }
+}
+
+// Calculate new trust score for an RSU after an attack
+export function calculateRsuTrustAfterAttack(currentTrust: number, attackType: string, severity: string): number {
+  // Default impact values
+  const impacts = {
+    'Sybil Attack': { Critical: 40, High: 30, Medium: 20, Low: 10 },
+    'Denial of Service': { Critical: 50, High: 35, Medium: 25, Low: 15 },
+    'GPS Spoofing': { Critical: 45, High: 30, Medium: 20, Low: 10 },
+    'Malicious Data Injection': { Critical: 40, High: 30, Medium: 20, Low: 10 },
+    'Replay Attack': { Critical: 35, High: 25, Medium: 15, Low: 5 },
+    'Default': { Critical: 40, High: 30, Medium: 20, Low: 10 }
+  };
+  
+  // Get impact based on attack type and severity
+  const impactCategory = impacts[attackType] || impacts['Default'];
+  const impact = impactCategory[severity] || impactCategory['Medium'];
+  
+  // Calculate new trust score
+  const newTrust = Math.max(0, currentTrust - impact);
+  
+  return Math.round(newTrust);
+}

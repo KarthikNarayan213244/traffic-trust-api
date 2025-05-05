@@ -1,11 +1,11 @@
 
 import { useState, useEffect } from "react";
-import { fetchRsuTrustLedger, getMockRsuTrustLedger } from "@/services/api/rsuTrustLedger";
+import { fetchVehicleTrustLedger, getMockVehicleTrustLedger } from "@/services/api/vehicleTrustLedger";
 import { toast } from "@/hooks/use-toast";
-import { getTrustLedger } from "@/services/blockchain";
+import { stakeTrust, getTrustLedger } from "@/services/blockchain";
 
-export const useRsuTrustLedger = () => {
-  const [rsuLedgerData, setRsuLedgerData] = useState<any[]>([]);
+export const useVehicleTrustLedger = () => {
+  const [vehicleLedgerData, setVehicleLedgerData] = useState<any[]>([]);
   const [blockchainLedgerData, setBlockchainLedgerData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isError, setIsError] = useState<boolean>(false);
@@ -13,33 +13,33 @@ export const useRsuTrustLedger = () => {
   const [isBlockchainError, setIsBlockchainError] = useState<boolean>(false);
   const [etherscanUrl, setEtherscanUrl] = useState<string>('');
 
-  const loadRsuLedgerData = async () => {
+  const loadVehicleLedgerData = async () => {
     try {
       setIsLoading(true);
       setIsError(false);
       
-      const data = await fetchRsuTrustLedger({ limit: 1000 });
-      console.log("RSU trust ledger data loaded:", data?.length || 0);
+      const data = await fetchVehicleTrustLedger({ limit: 1000 });
+      console.log("Vehicle trust ledger data loaded:", data?.length || 0);
       
       if (!data || data.length === 0) {
         // Generate mock data if no real data is available
-        const mockData = getMockRsuTrustLedger();
-        setRsuLedgerData(mockData);
-        console.log("Using mock RSU trust ledger data");
+        const mockData = getMockVehicleTrustLedger();
+        setVehicleLedgerData(mockData);
+        console.log("Using mock vehicle trust ledger data");
       } else {
-        setRsuLedgerData(data);
+        setVehicleLedgerData(data);
       }
     } catch (error) {
-      console.error("Error fetching RSU trust ledger:", error);
+      console.error("Error fetching vehicle trust ledger:", error);
       setIsError(true);
       
       // Use mock data on error
-      const mockData = getMockRsuTrustLedger();
-      setRsuLedgerData(mockData);
+      const mockData = getMockVehicleTrustLedger();
+      setVehicleLedgerData(mockData);
       
       toast({
         title: "Data Issue",
-        description: "Using cached RSU trust data due to connection issue.",
+        description: "Using cached vehicle trust data due to connection issue.",
         variant: "default",
       });
     } finally {
@@ -52,29 +52,22 @@ export const useRsuTrustLedger = () => {
       setIsBlockchainLoading(true);
       setIsBlockchainError(false);
       
-      // Get blockchain transactions specifically for RSUs
+      // Get blockchain transactions for vehicles only
       const allData = await getTrustLedger();
       
       if (!Array.isArray(allData) || allData.length === 0) {
         throw new Error("No blockchain data returned");
       }
       
-      // Process the data and filter for RSU-related entries
-      const rsuData = allData.filter(entry => {
-        // Include entries with RSU target_type
-        if (entry.target_type === 'RSU') return true;
-        
-        // Or entries with RSU in the target_id
-        if (entry.target_id && entry.target_id.includes('RSU')) return true;
-        
-        // Or with details mentioning RSU
-        if (entry.details && entry.details.toLowerCase().includes('rsu')) return true;
-        
-        return false;
-      });
+      // Filter for vehicle-related entries (not RSUs)
+      const vehicleData = allData.filter(entry => 
+        entry.target_type !== 'RSU' && 
+        (!entry.target_id || !entry.target_id.includes('RSU')) &&
+        entry.vehicle_id !== 'SYSTEM'
+      );
       
-      console.log("Blockchain RSU trust ledger data loaded:", rsuData.length);
-      setBlockchainLedgerData(rsuData);
+      console.log("Blockchain vehicle trust ledger data loaded:", vehicleData.length);
+      setBlockchainLedgerData(vehicleData);
       
       // Set Etherscan URL
       const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS || 
@@ -85,31 +78,25 @@ export const useRsuTrustLedger = () => {
         `https://goerli.etherscan.io/address/${contractAddress}` : 
         'https://goerli.etherscan.io');
     } catch (error) {
-      console.error("Error fetching blockchain RSU trust ledger:", error);
+      console.error("Error fetching blockchain vehicle trust ledger:", error);
       setIsBlockchainError(true);
-      
-      toast({
-        title: "Blockchain Connection",
-        description: "Please connect your wallet to see live blockchain data.",
-        variant: "default",
-      });
     } finally {
       setIsBlockchainLoading(false);
     }
   };
 
   const handleRefresh = () => {
-    loadRsuLedgerData();
+    loadVehicleLedgerData();
     loadBlockchainData();
   };
 
   useEffect(() => {
-    loadRsuLedgerData();
+    loadVehicleLedgerData();
     loadBlockchainData();
   }, []);
 
   return {
-    rsuLedgerData,
+    vehicleLedgerData,
     blockchainLedgerData,
     isLoading,
     isError,
@@ -117,7 +104,7 @@ export const useRsuTrustLedger = () => {
     isBlockchainError,
     etherscanUrl,
     handleRefresh,
-    loadRsuLedgerData,
+    loadVehicleLedgerData,
     loadBlockchainData,
   };
 };

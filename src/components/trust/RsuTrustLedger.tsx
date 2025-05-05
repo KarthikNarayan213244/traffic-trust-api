@@ -37,34 +37,68 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
     }
   };
 
-  // Get badge for RSU state
-  const getRsuStateBadge = (state: string) => {
-    const normalizedState = state?.toUpperCase() || '';
+  // Get attack type badge
+  const getAttackTypeBadge = (attackType: string, severity: string) => {
+    const normalizedType = attackType?.toUpperCase() || '';
     
-    if (normalizedState.includes('QUARANTIN')) {
-      return <Badge className="bg-red-500 flex items-center gap-1"><AlertTriangle size={12} /> Quarantined</Badge>;
-    } else if (normalizedState.includes('ATTACK')) {
-      return <Badge className="bg-amber-500 flex items-center gap-1"><AlertTriangle size={12} /> Attack Detected</Badge>;
-    } else if (normalizedState.includes('BLOCKCHAIN') || normalizedState.includes('PROTECTED')) {
-      return <Badge className="bg-blue-500 flex items-center gap-1"><Shield size={12} /> Protected</Badge>;
-    } else if (normalizedState.includes('RECOVER')) {
-      return <Badge className="bg-green-500 flex items-center gap-1"><CheckCircle size={12} /> Recovered</Badge>;
-    } else if (normalizedState.includes('TRUST')) {
-      return <Badge className="bg-blue-400 flex items-center gap-1"><Shield size={12} /> Trust Update</Badge>;
-    } else if (normalizedState.includes('SYBIL') || normalizedState.includes('DENIAL') || normalizedState.includes('TAMPERING')) {
-      return <Badge className="bg-amber-500 flex items-center gap-1"><AlertTriangle size={12} /> {state}</Badge>;
+    if (normalizedType.includes('SYBIL') || normalizedType.includes('SPOOF')) {
+      return (
+        <Badge className="bg-amber-500 flex items-center gap-1">
+          <AlertTriangle size={12} /> {attackType}
+        </Badge>
+      );
+    } else if (normalizedType.includes('DENIAL') || normalizedType.includes('DOS') || normalizedType.includes('DDOS')) {
+      return (
+        <Badge className="bg-red-500 flex items-center gap-1">
+          <AlertTriangle size={12} /> {attackType}
+        </Badge>
+      );
+    } else if (normalizedType.includes('TRUST') || normalizedType.includes('UPDATE')) {
+      return (
+        <Badge className="bg-blue-500 flex items-center gap-1">
+          <Shield size={12} /> {attackType}
+        </Badge>
+      );
+    } else if (normalizedType.includes('RECOVER')) {
+      return (
+        <Badge className="bg-green-500 flex items-center gap-1">
+          <CheckCircle size={12} /> {attackType}
+        </Badge>
+      );
     } else {
-      return <Badge className="bg-gray-400">{state}</Badge>;
+      return <Badge>{attackType}</Badge>;
     }
   };
 
-  // Get badge color based on trust score change
-  const getTrustBadge = (oldValue: number, newValue: number) => {
-    const difference = newValue - oldValue;
-    if (difference > 0) {
-      return <Badge className="bg-green-500">+{difference}</Badge>;
-    } else if (difference < 0) {
+  // Get severity badge
+  const getSeverityBadge = (severity: string) => {
+    const normalizedSeverity = severity?.toUpperCase() || '';
+    
+    if (normalizedSeverity.includes('CRITICAL')) {
+      return <Badge className="bg-red-600">Critical</Badge>;
+    } else if (normalizedSeverity.includes('HIGH')) {
+      return <Badge className="bg-red-500">High</Badge>;
+    } else if (normalizedSeverity.includes('MEDIUM')) {
+      return <Badge className="bg-amber-500">Medium</Badge>;
+    } else if (normalizedSeverity.includes('LOW')) {
+      return <Badge className="bg-amber-400">Low</Badge>;
+    } else {
+      return <Badge>{severity}</Badge>;
+    }
+  };
+
+  // Get trust change badge
+  const getTrustChangeBadge = (oldTrust: number, newTrust: number) => {
+    if (oldTrust === undefined || newTrust === undefined) {
+      return "-";
+    }
+    
+    const difference = newTrust - oldTrust;
+    
+    if (difference < 0) {
       return <Badge className="bg-red-500">{difference}</Badge>;
+    } else if (difference > 0) {
+      return <Badge className="bg-green-500">+{difference}</Badge>;
     } else {
       return <Badge className="bg-gray-400">0</Badge>;
     }
@@ -74,31 +108,13 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
   const sortedData = React.useMemo(() => {
     if (!Array.isArray(data)) return [];
     
-    // Filter to show only RSU entries
-    const rsuData = data.filter(entry => 
-      entry.target_type === 'RSU' || 
-      (entry.target_id && entry.target_id.includes('RSU')) ||
-      (entry.vehicle_id === 'SYSTEM' && entry.details && entry.details.toLowerCase().includes('rsu'))
-    );
-    
-    console.log(`Filtered ${data.length} entries to ${rsuData.length} RSU entries`);
-    
-    return [...rsuData].sort((a, b) => {
+    return [...data].sort((a, b) => {
       try {
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
       } catch (error) {
         return 0;
       }
     });
-  }, [data]);
-
-  // Log the data we're working with
-  React.useEffect(() => {
-    if (data && data.length > 0) {
-      console.log(`RsuTrustLedger received ${data.length} entries, first entry:`, data[0]);
-    } else {
-      console.log("RsuTrustLedger received empty data");
-    }
   }, [data]);
 
   // Loading skeleton
@@ -108,20 +124,20 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Transaction ID</TableHead>
-              <TableHead>Time</TableHead>
               <TableHead>RSU ID</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Trust Change</TableHead>
+              <TableHead>Time</TableHead>
+              <TableHead>Attack Type</TableHead>
+              <TableHead>Severity</TableHead>
+              <TableHead>Trust Impact</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {Array(5).fill(0).map((_, i) => (
               <TableRow key={i}>
-                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-16" /></TableCell>
               </TableRow>
             ))}
@@ -138,11 +154,11 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Transaction ID</TableHead>
-              <TableHead>Time</TableHead>
               <TableHead>RSU ID</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Trust Change</TableHead>
+              <TableHead>Time</TableHead>
+              <TableHead>Attack Type</TableHead>
+              <TableHead>Severity</TableHead>
+              <TableHead>Trust Impact</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -162,36 +178,22 @@ const RsuTrustLedger: React.FC<RsuTrustLedgerProps> = ({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Transaction ID</TableHead>
-            <TableHead>Time</TableHead>
             <TableHead>RSU ID</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Trust Change</TableHead>
+            <TableHead>Time</TableHead>
+            <TableHead>Attack Type</TableHead>
+            <TableHead>Severity</TableHead>
+            <TableHead>Trust Impact</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sortedData.map((entry, index) => (
-            <TableRow key={entry.tx_id || entry.id || index}>
-              <TableCell className="font-mono text-xs">
-                {entry.tx_id || entry.id || `tx-${index}`}
-              </TableCell>
+            <TableRow key={entry.id || index}>
+              <TableCell>{entry.rsu_id}</TableCell>
+              <TableCell>{formatTimestamp(entry.timestamp)}</TableCell>
+              <TableCell>{getAttackTypeBadge(entry.attack_type, entry.severity)}</TableCell>
+              <TableCell>{getSeverityBadge(entry.severity)}</TableCell>
               <TableCell>
-                {formatTimestamp(entry.timestamp)}
-              </TableCell>
-              <TableCell>{entry.target_id || entry.rsu_id || "Unknown RSU"}</TableCell>
-              <TableCell>
-                {getRsuStateBadge(entry.status || entry.action || entry.type)}
-              </TableCell>
-              <TableCell>
-                {entry.old_value !== undefined && entry.new_value !== undefined ? (
-                  getTrustBadge(entry.old_value, entry.new_value)
-                ) : entry.trust_change ? (
-                  <Badge className={entry.trust_change > 0 ? "bg-green-500" : "bg-red-500"}>
-                    {entry.trust_change > 0 ? "+" : ""}{entry.trust_change}
-                  </Badge>
-                ) : (
-                  <span>—</span>
-                )}
+                {getTrustChangeBadge(entry.old_trust, entry.new_trust)}
               </TableCell>
             </TableRow>
           ))}
