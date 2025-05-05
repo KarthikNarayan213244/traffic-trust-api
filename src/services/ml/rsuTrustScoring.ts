@@ -75,7 +75,8 @@ const recordRsuTrustChange = async (
     });
     
     if (!response.ok) {
-      console.error("Failed to write RSU trust change to ledger:", await response.text());
+      const errorText = await response.text();
+      console.error("Failed to write RSU trust change to ledger:", errorText);
       return null;
     }
     

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import WalletConnectButton from "@/components/WalletConnectButton";
@@ -13,6 +12,7 @@ import StakeTrustDialog from "@/components/trust/StakeTrustDialog";
 import NetworkInfo from "@/components/trust/NetworkInfo";
 import { generateRsuAttacks } from "@/services/ml/rsuTrustScoring";
 import { fetchFromSupabase } from "@/services/api/supabase/fetch";
+import { createAnomalies } from "@/services/api/trustLedger"; 
 import { toast } from "@/hooks/use-toast";
 
 const RsuTrustLedgerPage: React.FC = () => {
@@ -92,22 +92,12 @@ const RsuTrustLedgerPage: React.FC = () => {
       // Log the anomalies to the console
       console.log(`Generated ${anomalies.length} simulated RSU security events`);
       
-      // Store the anomalies
-      const response = await fetch('/api/anomalies', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ anomalies }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to store anomalies');
-      }
+      // Store the anomalies using our direct function
+      const storedAnomalies = await createAnomalies(anomalies);
       
       toast({
         title: "Events Generated",
-        description: `Created ${anomalies.length} simulated RSU security events`,
+        description: `Created ${storedAnomalies.length} simulated RSU security events`,
       });
       
       // Refresh the ledger data

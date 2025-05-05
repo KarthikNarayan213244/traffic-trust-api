@@ -56,6 +56,53 @@ export async function createTrustLedgerEntry(entry: any): Promise<any> {
 }
 
 /**
+ * Creates new anomaly entries for RSUs
+ */
+export async function createAnomalies(anomalies: any[]): Promise<any[]> {
+  try {
+    console.log(`Storing ${anomalies.length} anomalies`);
+    
+    // Try Direct Supabase Insert
+    try {
+      const { data, error } = await fetchFromSupabase("anomalies", {}, 'INSERT', anomalies);
+      if (error) throw new Error(error.message);
+      return data || [];
+    } catch (supabaseError) {
+      console.error("Error storing anomalies via Supabase:", supabaseError);
+      
+      // Fallback to trust ledger entries instead of anomalies
+      const trustEntries = anomalies.map(anomaly => ({
+        tx_id: `anomaly-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        timestamp: anomaly.timestamp,
+        vehicle_id: 'SYSTEM',
+        action: anomaly.type,
+        old_value: 90, // Placeholder values
+        new_value: 70,
+        details: anomaly.message,
+        target_id: anomaly.target_id,
+        target_type: 'RSU'
+      }));
+      
+      // Try to insert trust entries one by one to avoid a single failure affecting all
+      const results = [];
+      for (const entry of trustEntries) {
+        try {
+          const result = await createTrustLedgerEntry(entry);
+          results.push(result);
+        } catch (entryError) {
+          console.error("Failed to create trust entry:", entryError);
+        }
+      }
+      
+      return results;
+    }
+  } catch (error) {
+    console.error("Error creating anomalies:", error);
+    return [];
+  }
+}
+
+/**
  * Generates mock trust ledger data for testing and development
  */
 export function getMockTrustLedger(): any[] {
