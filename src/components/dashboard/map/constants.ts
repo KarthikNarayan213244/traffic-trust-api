@@ -25,8 +25,8 @@ export const mapOptions = {
 };
 
 // Required libraries for Google Maps API
-// Type as string array to resolve type issues
-export const libraries: string[] = ["places", "drawing", "geometry", "visualization"];
+// Use the proper Libraries type from @react-google-maps/api
+export const libraries = ["places", "drawing", "geometry", "visualization"] as const;
 
 // Vehicle types and their corresponding colors
 export const vehicleTypeColors: Record<string, string> = {
