@@ -54,34 +54,15 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [activeIntervals, setActiveIntervals] = useState<{[key: string]: NodeJS.Timeout | null}>({});
   const [lastIntervalRun, setLastIntervalRun] = useState<{[key: string]: number}>({});
 
-  // Memoize the loader options to ensure they don't change between renders
-  // Only create options if we have a valid API key
-  const loaderOptions = useMemo(() => {
-    // Don't create loader options at all if no API key is available
-    if (!keyIsSet || !apiKey) {
-      return null;
-    }
-    
-    return {
-      googleMapsApiKey: apiKey,
-      libraries,
-      id: getLoaderId(),
-    };
-  }, [apiKey, keyIsSet, getLoaderId]);
-
-  // Only call useJsApiLoader when we have valid options
-  const loaderResult = useJsApiLoader(
-    loaderOptions || {
-      googleMapsApiKey: "",
-      libraries,
-      id: getLoaderId(),
-      // Prevent loading when no key is set
-      preventGoogleFontsLoading: !keyIsSet,
-    }
-  );
-
-  // Destructure with fallback values when no options are provided
-  const { isLoaded = false, loadError = null } = loaderOptions ? loaderResult : {};
+  // Always call useJsApiLoader with the same structure to avoid hook violations
+  // Use the current API key or empty string, but always provide consistent options
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: apiKey || "",
+    libraries,
+    id: getLoaderId(),
+    // Only load if we have a key
+    preventGoogleFontsLoading: !keyIsSet,
+  });
 
   // Update maps initialization status
   useEffect(() => {
@@ -398,7 +379,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-3">
             {/* Only render the GoogleMapDisplay when the Google Maps API is loaded and we have a key */}
-            {isLoaded && keyIsSet && loaderOptions && (
+            {isLoaded && keyIsSet && (
               <GoogleMapDisplay 
                 vehicles={vehicles} 
                 rsus={rsus} 
@@ -450,8 +431,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     return renderLoadingError();
   }
 
-  // Only show loading if we have valid loader options and they're not loaded yet
-  if (loaderOptions && !isLoaded) {
+  // Show loading while the Google Maps API loads
+  if (!isLoaded) {
     return renderLoadingMaps();
   }
 

@@ -1,4 +1,3 @@
-
 // Default map center (Hyderabad)
 export const defaultCenter = {
   lat: 17.385044,
@@ -25,8 +24,8 @@ export const mapOptions = {
 };
 
 // Required libraries for Google Maps API
-// Use the proper Libraries type from @react-google-maps/api
-export const libraries = ["places", "drawing", "geometry", "visualization"] as const;
+// Type as Libraries to be compatible with useJsApiLoader
+export const libraries: ("places" | "drawing" | "geometry" | "visualization")[] = ["places", "drawing", "geometry", "visualization"];
 
 // Vehicle types and their corresponding colors
 export const vehicleTypeColors: Record<string, string> = {
