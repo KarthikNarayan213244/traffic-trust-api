@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 import MapApiKeyForm from "./MapApiKeyForm";
@@ -55,22 +56,33 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
   const [lastIntervalRun, setLastIntervalRun] = useState<{[key: string]: number}>({});
 
   // Memoize the loader options to ensure they don't change between renders
-  const loaderOptions = useMemo(() => ({
-    googleMapsApiKey: apiKey || "", 
+  // Only initialize if we have an API key to prevent conflicts
+  const loaderOptions = useMemo(() => {
+    if (!keyIsSet || !apiKey) {
+      return null;
+    }
+    
+    return {
+      googleMapsApiKey: apiKey, 
+      libraries,
+      id: getLoaderId(),
+    };
+  }, [apiKey, keyIsSet, getLoaderId]);
+
+  // Only initialize the maps API if we have a key and loader options
+  const { isLoaded, loadError } = useJsApiLoader(loaderOptions || {
+    googleMapsApiKey: "",
     libraries,
     id: getLoaderId(),
-  }), [apiKey, getLoaderId]);
-
-  // Only initialize the maps API if we have a key and it's the first load
-  const { isLoaded, loadError } = useJsApiLoader(loaderOptions);
+  });
 
   // Update maps initialization status
   useEffect(() => {
-    if (isLoaded && !mapsInitialized) {
+    if (isLoaded && !mapsInitialized && keyIsSet) {
       console.log("Google Maps API loaded successfully");
       setMapsInitialized(true);
     }
-  }, [isLoaded, mapsInitialized]);
+  }, [isLoaded, mapsInitialized, keyIsSet]);
 
   // Clear all intervals
   const clearAllIntervals = useCallback(() => {
@@ -378,8 +390,8 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-3">
-            {/* Only render the GoogleMapDisplay when the Google Maps API is loaded */}
-            {isLoaded && (
+            {/* Only render the GoogleMapDisplay when the Google Maps API is loaded and we have a key */}
+            {isLoaded && keyIsSet && (
               <GoogleMapDisplay 
                 vehicles={vehicles} 
                 rsus={rsus} 
@@ -431,7 +443,7 @@ const TrafficMap: React.FC<TrafficMapProps> = ({
     return renderLoadingError();
   }
 
-  if (!isLoaded) {
+  if (!isLoaded || !keyIsSet) {
     return renderLoadingMaps();
   }
 

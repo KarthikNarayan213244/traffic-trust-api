@@ -65,21 +65,21 @@ export const useMapApiKey = () => {
     try {
       // If the API has already been initialized with a different key,
       // we need to reload the page to prevent conflicts
-      if (apiInitialized && apiKey && newApiKey !== apiKey) {
+      if (apiInitialized && apiKey && newApiKey !== apiKey && globalApiKey !== newApiKey) {
         // Prevent multiple reloads
         if (isReloading) return;
         isReloading = true;
         
         toast({
           title: "API Key Updated",
-          description: "The Google Maps API key has been updated. Reloading the application.",
+          description: "The Google Maps API key has been updated. Reloading the application in 2 seconds.",
         });
         
         // Update global key and localStorage before reloading
         globalApiKey = newApiKey;
         localStorage.setItem(API_KEY_STORAGE_KEY, newApiKey);
         
-        // Give the toast a moment to be seen
+        // Give the toast a moment to be seen, then reload
         setTimeout(() => {
           console.log("API key changed, reloading page to prevent initialization conflicts");
           window.location.reload();
@@ -131,9 +131,9 @@ export const useMapApiKey = () => {
 
   // Return our API key state and an indicator of whether the first load is complete
   return { 
-    apiKey, 
+    apiKey: globalApiKey || apiKey, // Always return the global key for consistency
     handleApiKeySet, 
-    keyIsSet,
+    keyIsSet: !!(globalApiKey || apiKey),
     isFirstLoadComplete: firstLoadComplete,
     getLoaderId
   };
