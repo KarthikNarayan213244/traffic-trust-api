@@ -15,16 +15,24 @@ let trustLedgerContract;
 let stakingContract;
 let signer;
 let connectedAddress = null;
-let currentContract = null; // Default to trustLedgerContract
+let currentContract = null;
+let isInitialized = false;
 
 // Initialize a read-only provider for non-wallet operations
 export const initReadonlyProvider = () => {
   try {
+    if (isInitialized) {
+      console.log("Provider already initialized");
+      return true;
+    }
+    
     // Use a JsonRpcProvider for read-only operations
     const readonlyProvider = new ethers.providers.JsonRpcProvider(ETH_NODE_URL);
     console.log("Initialized readonly provider with RPC URL:", ETH_NODE_URL);
     trustLedgerContract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, readonlyProvider);
     stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, readonlyProvider);
+    currentContract = stakingContract;
+    isInitialized = true;
     return true;
   } catch (error) {
     console.error("Failed to initialize read-only provider:", error);
@@ -36,8 +44,9 @@ export const connectWallet = async () => {
   try {
     // Check if MetaMask is installed
     if (!window.ethereum) {
-      console.log("MetaMask not installed");
-      throw new Error("MetaMask not installed");
+      console.log("MetaMask not installed, initializing read-only provider");
+      initReadonlyProvider();
+      throw new Error("MetaMask not installed. Please install MetaMask to connect your wallet.");
     }
     
     // Reset provider to ensure we're getting a fresh connection
@@ -47,7 +56,11 @@ export const connectWallet = async () => {
     try {
       // Request account access - this will prompt the user to connect their wallet if not connected
       console.log("Requesting accounts...");
-      await provider.send("eth_requestAccounts", []);
+      const accounts = await provider.send("eth_requestAccounts", []);
+      
+      if (!accounts || accounts.length === 0) {
+        throw new Error("No accounts returned from MetaMask");
+      }
       
       // Get the signer and address
       signer = provider.getSigner();
@@ -57,7 +70,8 @@ export const connectWallet = async () => {
       // Initialize contracts with signer for sending transactions
       trustLedgerContract = new ethers.Contract(TRUST_LEDGER_ADDRESS, TRUST_LEDGER_ABI, signer);
       stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-      currentContract = stakingContract; // Set the current contract to staking by default
+      currentContract = stakingContract;
+      isInitialized = true;
       
       // Verify connection to Goerli
       const network = await provider.getNetwork();
@@ -65,15 +79,9 @@ export const connectWallet = async () => {
       
       // Check for Goerli network (chainId 5)
       if (network.chainId !== 5) {
-        toast({
-          title: "Wrong Network",
-          description: "Please connect to Goerli testnet in your wallet",
-          variant: "destructive",
-        });
+        console.log("Not on Goerli network, attempting to switch...");
         
-        // Try to switch to Goerli
         try {
-          console.log("Attempting to switch to Goerli network...");
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: '0x5' }], // 0x5 is the chainId for Goerli
@@ -86,32 +94,44 @@ export const connectWallet = async () => {
           stakingContract = new ethers.Contract(STAKING_ADDRESS, STAKING_ABI, signer);
           currentContract = stakingContract;
           
-          // Get the network again to confirm switch
+          // Verify network switch
           const updatedNetwork = await provider.getNetwork();
           console.log("After switch, connected to:", updatedNetwork.name, updatedNetwork.chainId);
-          if (updatedNetwork.chainId !== 5) {
+          
+          if (updatedNetwork.chainId === 5) {
+            toast({
+              title: "Network Switched",
+              description: "Successfully switched to Goerli testnet",
+            });
+          } else {
             throw new Error("Failed to switch to Goerli network");
           }
         } catch (switchError) {
           console.error("Failed to switch network:", switchError);
-          // Keep the address but note that we're not on Goerli
           toast({
             title: "Network Warning",
             description: "You're not connected to Goerli testnet. Some features may not work properly.",
-            variant: "warning",
+            variant: "destructive",
           });
         }
       }
       
       toast({
         title: "Wallet Connected",
-        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)} on ${network.name}`,
+        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`,
       });
       
       return connectedAddress;
     } catch (requestError) {
       console.error("Error requesting accounts:", requestError);
-      throw new Error("User rejected the connection request");
+      
+      if (requestError.code === 4001) {
+        throw new Error("Connection rejected by user");
+      } else if (requestError.code === -32002) {
+        throw new Error("Connection request already pending. Please check MetaMask.");
+      } else {
+        throw new Error(`Failed to connect: ${requestError.message}`);
+      }
     }
   } catch (error) {
     console.error("Error connecting wallet:", error);
@@ -129,15 +149,14 @@ export const connectWallet = async () => {
 if (typeof window !== 'undefined' && window.ethereum) {
   window.ethereum.on('accountsChanged', (accounts) => {
     if (accounts.length === 0) {
-      // User disconnected their wallet
       console.log("Wallet disconnected");
       connectedAddress = null;
+      isInitialized = false;
       toast({
         title: "Wallet Disconnected",
         description: "Your wallet has been disconnected",
       });
     } else {
-      // User switched accounts
       connectedAddress = accounts[0];
       console.log("Switched to account:", connectedAddress);
       toast({
@@ -146,6 +165,17 @@ if (typeof window !== 'undefined' && window.ethereum) {
       });
     }
   });
+
+  window.ethereum.on('chainChanged', (chainId) => {
+    console.log("Chain changed to:", chainId);
+    // Reload the page when chain changes to avoid issues
+    window.location.reload();
+  });
+}
+
+// Initialize read-only provider on module load
+if (typeof window !== 'undefined') {
+  initReadonlyProvider();
 }
 
 // Select which contract to use - TrustLedger or Staking
@@ -163,7 +193,7 @@ export const getConnectedAddress = () => {
 };
 
 // Export contract and provider for other modules
-export const getContract = () => currentContract || stakingContract; // Default to staking contract
+export const getContract = () => currentContract || stakingContract;
 export const getTrustLedgerContract = () => trustLedgerContract;
 export const getStakingContract = () => stakingContract;
 export const getSigner = () => signer;

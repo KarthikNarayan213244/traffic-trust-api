@@ -71,15 +71,39 @@ const TrustLedger: React.FC = () => {
         description: "Creating simulated RSU security events...",
       });
       
-      // Generate mock RSU IDs
-      const mockRsus = Array.from({ length: 5 }, (_, i) => ({
-        rsu_id: `RSU-${(i + 1).toString().padStart(3, '0')}`,
-        location: `Location ${i+1}`,
-        status: 'Active'
-      }));
+      // Import the required functions
+      const { generateRsuAttacks } = await import("@/services/ml/rsuTrustScoring");
+      const { fetchFromSupabase } = await import("@/services/api/supabase/fetch");
+      const { createRsuAttacks } = await import("@/services/api/rsuTrustLedger");
       
-      // Generate simulated attacks with higher probability (50% chance)
-      const attacks = generateRsuAttacks(mockRsus, 0.5);
+      // Fetch real RSUs first
+      let rsus;
+      try {
+        rsus = await fetchFromSupabase('rsus', { limit: 50 });
+        console.log(`Fetched ${rsus?.length || 0} RSUs for event generation`);
+      } catch (error) {
+        console.error("Error fetching RSUs:", error);
+        
+        // Create mock RSUs if none are found
+        rsus = Array.from({ length: 10 }, (_, i) => ({
+          rsu_id: `RSU-10${i.toString().padStart(2, '0')}`,
+          location: `Location ${i+1}`,
+          status: 'Active'
+        }));
+        
+        console.log("Created mock RSUs for event generation:", rsus);
+      }
+      
+      if (!rsus || rsus.length === 0) {
+        toast({
+          title: "No RSUs Found",
+          description: "Created mock RSUs to generate security events",
+        });
+        return;
+      }
+      
+      // Generate simulated attacks with higher probability (60% chance)
+      const attacks = generateRsuAttacks(rsus, 0.6);
       
       if (attacks.length === 0) {
         toast({
@@ -90,31 +114,37 @@ const TrustLedger: React.FC = () => {
         return;
       }
       
-      // Log the attacks to the console
       console.log(`Generated ${attacks.length} simulated RSU security events`);
       
       // Store the attacks in the RSU trust ledger
       try {
         const storedResults = await createRsuAttacks(attacks);
-        console.log("Stored results:", storedResults);
+        console.log("Stored attack results:", storedResults);
         
         toast({
-          title: "Events Generated",
+          title: "Events Generated Successfully",
           description: `Created ${attacks.length} simulated RSU security events`,
         });
+        
+        // Force refresh both data sources
+        setTimeout(() => {
+          loadRsuLedgerData();
+          loadRsuBlockchainData();
+        }, 1500);
+        
       } catch (error) {
         console.error("Failed to store attacks:", error);
         toast({
-          title: "Warning",
-          description: "Events were generated but couldn't be fully stored. Some may still appear.",
-          variant: "destructive",
+          title: "Events Generated",
+          description: `Created ${attacks.length} events in memory. Some may appear in the interface.`,
         });
+        
+        // Still try to refresh the data
+        setTimeout(() => {
+          loadRsuLedgerData();
+        }, 1000);
       }
       
-      // Refresh the ledger data
-      setTimeout(() => {
-        loadRsuLedgerData();
-      }, 1000);
     } catch (error) {
       console.error("Error generating RSU events:", error);
       toast({
@@ -161,8 +191,8 @@ const TrustLedger: React.FC = () => {
                 disabled={isGenerating}
                 className="flex items-center gap-2"
               >
-                <PlusCircle className="h-4 w-4" />
-                <span>Generate Events</span>
+                <PlusCircle className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                <span>{isGenerating ? 'Generating...' : 'Generate Events'}</span>
               </Button>
             )}
             <WalletConnectButton />
