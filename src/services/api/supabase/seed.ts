@@ -1,5 +1,5 @@
 
-import { supabase } from "./client";
+import { supabaseClient } from "./client";
 import { toast } from "@/hooks/use-toast";
 
 // Add a utility function to seed the database
@@ -17,7 +17,7 @@ export async function seedDatabaseWithTestData(clearExisting = false) {
     console.log(`Sending request to: ${url}`);
     
     // Get authentication token
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await supabaseClient.auth.getSession();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
