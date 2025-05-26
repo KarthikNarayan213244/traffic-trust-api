@@ -1,14 +1,12 @@
 
-import { Libraries } from "@react-google-maps/api";
-
-// Export the API key storage key for consistent use across the app
-export const API_KEY_STORAGE_KEY = 'google_maps_api_key';
-
 // Default map center (Hyderabad)
 export const defaultCenter = {
   lat: 17.385044,
   lng: 78.486671,
 };
+
+// Export the API key storage key for consistent use across the app
+export const API_KEY_STORAGE_KEY = 'google_maps_api_key';
 
 // Default container style
 export const mapContainerStyle = {
@@ -27,8 +25,8 @@ export const mapOptions = {
 };
 
 // Required libraries for Google Maps API
-// Cast as Libraries type to resolve type issues
-export const libraries: Libraries = ["places", "drawing", "geometry", "visualization"];
+// Type as string array to resolve type issues
+export const libraries: string[] = ["places", "drawing", "geometry", "visualization"];
 
 // Vehicle types and their corresponding colors
 export const vehicleTypeColors: Record<string, string> = {
