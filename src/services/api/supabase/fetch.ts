@@ -1,13 +1,10 @@
 
-import { createClient } from '@supabase/supabase-js';
-import { supabaseConfig } from './client';
+import { supabaseClient } from './client';
 import { ENDPOINTS } from '../config';
 import { FetchOptions, EndpointTypeMap, SupabaseTableMap, ApiEndpoint } from './types';
 
 // Generic function to fetch data from Supabase that accepts an endpoint key
 export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, options: FetchOptions = {}): Promise<any[]> {
-  const client = createClient(supabaseConfig.url, supabaseConfig.key);
-  
   // Map API endpoints to Supabase tables
   const tableMap: SupabaseTableMap = {
     vehicles: "vehicles",
@@ -26,7 +23,7 @@ export async function fetchFromSupabase<T extends ApiEndpoint>(endpoint: T, opti
 
   try {
     // Start query
-    let query = client
+    let query = supabaseClient
       .from(tableName)
       .select('*');
 

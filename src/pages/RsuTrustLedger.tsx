@@ -13,7 +13,7 @@ import StakeTrustDialog from "@/components/trust/StakeTrustDialog";
 import NetworkInfo from "@/components/trust/NetworkInfo";
 import { generateRsuAttacks } from "@/services/ml/rsuTrustScoring";
 import { fetchFromSupabase } from "@/services/api/supabase/fetch";
-import { createAnomalies } from "@/services/api/trustLedger"; 
+import { createRsuTrustEvents, createAnomalies } from "@/services/api/rsuTrustEvents";
 import { toast } from "@/hooks/use-toast";
 
 const RsuTrustLedgerPage: React.FC = () => {
@@ -38,17 +38,11 @@ const RsuTrustLedgerPage: React.FC = () => {
     if (!rsuLedgerData.length) return { total: 0, attacks: 0, quarantined: 0, blockchain: 0 };
     
     const attacks = rsuLedgerData.filter(entry => 
-      entry.status === 'Attack Detected' || 
-      entry.action === 'Attack Detected' ||
-      entry.action === 'ATTACK_DETECTED' ||
-      entry.type === 'Sybil Attack' ||
-      entry.type === 'Denial of Service' ||
-      entry.type === 'Malicious Data Injection'
+      entry.attack_type && entry.attack_type !== 'Trust Update'
     ).length;
     
     const quarantined = rsuLedgerData.filter(entry => 
-      entry.status === 'Quarantined' || 
-      entry.action === 'RSU_QUARANTINED'
+      entry.severity === 'Critical' || entry.severity === 'High'
     ).length;
     
     const blockchain = blockchainLedgerData.length;
@@ -89,16 +83,22 @@ const RsuTrustLedgerPage: React.FC = () => {
       }
       
       if (!rsus || rsus.length === 0) {
+        rsus = Array.from({ length: 10 }, (_, i) => ({
+          rsu_id: `RSU-10${i.toString().padStart(2, '0')}`,
+          location: `Location ${i+1}`,
+          status: 'Active'
+        }));
+        
         toast({
-          title: "No RSUs Found",
+          title: "Using Mock RSUs",
           description: "Created mock RSUs to generate security events",
         });
       }
       
-      // Generate simulated attacks with higher probability (50% chance)
-      const anomalies = generateRsuAttacks(rsus, 0.5);
+      // Generate simulated attacks with higher probability (70% chance)
+      const attacks = generateRsuAttacks(rsus, 0.7);
       
-      if (anomalies.length === 0) {
+      if (attacks.length === 0) {
         toast({
           title: "No Events Generated",
           description: "Try again to generate security events",
@@ -107,35 +107,62 @@ const RsuTrustLedgerPage: React.FC = () => {
         return;
       }
       
-      // Log the anomalies to the console
-      console.log(`Generated ${anomalies.length} simulated RSU security events`);
+      console.log(`Generated ${attacks.length} simulated RSU security events`);
       
-      // Store the anomalies using our direct function
+      // Transform attacks for RSU trust ledger
+      const trustEvents = attacks.map(attack => ({
+        rsu_id: attack.target_id || attack.vehicle_id,
+        attack_type: attack.type,
+        severity: attack.severity,
+        old_trust: Math.floor(Math.random() * 100),
+        new_trust: Math.floor(Math.random() * 100),
+        timestamp: attack.timestamp,
+        details: attack.message
+      }));
+      
+      // Transform attacks for anomalies table
+      const anomalies = attacks.map(attack => ({
+        vehicle_id: attack.target_id || attack.vehicle_id,
+        type: attack.type,
+        severity: attack.severity,
+        timestamp: attack.timestamp,
+        message: attack.message,
+        status: 'Detected'
+      }));
+      
       try {
-        const storedResults = await createAnomalies(anomalies);
-        console.log("Stored results:", storedResults);
+        // Store in both tables
+        const [trustResults, anomalyResults] = await Promise.all([
+          createRsuTrustEvents(trustEvents),
+          createAnomalies(anomalies)
+        ]);
+        
+        console.log("Stored trust events:", trustResults?.length || 0);
+        console.log("Stored anomalies:", anomalyResults?.length || 0);
         
         toast({
-          title: "Events Generated",
-          description: `Created ${anomalies.length} simulated RSU security events`,
+          title: "Events Generated Successfully",
+          description: `Created ${attacks.length} RSU security events and stored in database`,
         });
+        
+        // Refresh the data after a short delay
+        setTimeout(() => {
+          handleRefresh();
+        }, 1000);
+        
       } catch (error) {
-        console.error("Failed to store anomalies:", error);
+        console.error("Failed to store events:", error);
         toast({
-          title: "Warning",
-          description: "Events were generated but couldn't be fully stored. Some may still appear.",
+          title: "Storage Error",
+          description: "Events were generated but couldn't be stored in the database",
           variant: "destructive",
         });
       }
       
-      // Refresh the ledger data
-      setTimeout(() => {
-        handleRefresh();
-      }, 1000);
     } catch (error) {
       console.error("Error generating RSU events:", error);
       toast({
-        title: "Error",
+        title: "Generation Error",
         description: "Failed to generate RSU security events",
         variant: "destructive",
       });
@@ -150,8 +177,8 @@ const RsuTrustLedgerPage: React.FC = () => {
   React.useEffect(() => {
     console.log("RSU Ledger Data:", rsuLedgerData.length, "entries");
     console.log("Blockchain Data:", blockchainLedgerData.length, "entries");
-    console.log("Etherscan URL:", etherscanUrl);
-  }, [rsuLedgerData, blockchainLedgerData, etherscanUrl]);
+    console.log("Stats:", stats);
+  }, [rsuLedgerData, blockchainLedgerData, stats]);
 
   return (
     <MainLayout>
@@ -180,8 +207,8 @@ const RsuTrustLedgerPage: React.FC = () => {
               disabled={isGenerating}
               className="flex items-center gap-2"
             >
-              <PlusCircle className="h-4 w-4" />
-              <span>Generate Events</span>
+              <PlusCircle className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
+              <span>{isGenerating ? 'Generating...' : 'Generate Events'}</span>
             </Button>
             <WalletConnectButton />
           </div>
@@ -206,7 +233,7 @@ const RsuTrustLedgerPage: React.FC = () => {
           <Card>
             <CardContent className="p-4 flex flex-col items-center justify-center">
               <div className="text-2xl font-bold text-red-500">{stats.quarantined}</div>
-              <div className="text-sm text-muted-foreground">RSUs Quarantined</div>
+              <div className="text-sm text-muted-foreground">High Risk Events</div>
             </CardContent>
           </Card>
           <Card>

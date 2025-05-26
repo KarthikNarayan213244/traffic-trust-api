@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { fetchRsuTrustLedger, getMockRsuTrustLedger } from "@/services/api/rsuTrustLedger";
+import { fetchRsuTrustEvents, fetchRsuAnomalies } from "@/services/api/rsuTrustEvents";
 import { toast } from "@/hooks/use-toast";
 import { getTrustLedger } from "@/services/blockchain";
 
@@ -18,29 +18,52 @@ export const useRsuTrustLedger = () => {
       setIsLoading(true);
       setIsError(false);
       
-      const data = await fetchRsuTrustLedger({ limit: 1000 });
-      console.log("RSU trust ledger data loaded:", data?.length || 0);
+      // Fetch both RSU trust events and anomalies
+      const [trustEvents, anomalies] = await Promise.all([
+        fetchRsuTrustEvents({ limit: 1000 }),
+        fetchRsuAnomalies({ limit: 1000 })
+      ]);
       
-      if (!data || data.length === 0) {
-        // Generate mock data if no real data is available
-        const mockData = getMockRsuTrustLedger();
-        setRsuLedgerData(mockData);
-        console.log("Using mock RSU trust ledger data");
-      } else {
-        setRsuLedgerData(data);
+      console.log("RSU trust events loaded:", trustEvents?.length || 0);
+      console.log("RSU anomalies loaded:", anomalies?.length || 0);
+      
+      // Combine and format the data
+      const combinedData = [
+        ...trustEvents.map(event => ({
+          ...event,
+          timestamp: event.timestamp,
+          attack_type: event.attack_type,
+          severity: event.severity,
+          old_trust: event.old_trust,
+          new_trust: event.new_trust,
+          details: event.details
+        })),
+        ...anomalies.map(anomaly => ({
+          id: anomaly.id,
+          rsu_id: anomaly.vehicle_id, // Map vehicle_id to rsu_id for display
+          timestamp: anomaly.timestamp,
+          attack_type: anomaly.type,
+          severity: anomaly.severity,
+          details: anomaly.message
+        }))
+      ];
+      
+      // Sort by timestamp descending
+      combinedData.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      setRsuLedgerData(combinedData);
+      
+      if (combinedData.length === 0) {
+        console.log("No RSU trust ledger data found");
       }
     } catch (error) {
       console.error("Error fetching RSU trust ledger:", error);
       setIsError(true);
       
-      // Use mock data on error
-      const mockData = getMockRsuTrustLedger();
-      setRsuLedgerData(mockData);
-      
       toast({
-        title: "Data Issue",
-        description: "Using cached RSU trust data due to connection issue.",
-        variant: "default",
+        title: "Data Loading Error",
+        description: "Failed to load RSU trust ledger data. Try generating some events first.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -56,7 +79,9 @@ export const useRsuTrustLedger = () => {
       const allData = await getTrustLedger();
       
       if (!Array.isArray(allData) || allData.length === 0) {
-        throw new Error("No blockchain data returned");
+        console.log("No blockchain data returned");
+        setBlockchainLedgerData([]);
+        return;
       }
       
       // Process the data and filter for RSU-related entries
@@ -99,6 +124,7 @@ export const useRsuTrustLedger = () => {
   };
 
   const handleRefresh = () => {
+    console.log("Refreshing RSU trust ledger data...");
     loadRsuLedgerData();
     loadBlockchainData();
   };
